@@ -1,4 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import { theme } from './theme';
 
 type Theme = typeof theme;

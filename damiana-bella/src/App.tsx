@@ -7,7 +7,7 @@ import './App.css';
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <BrowserRouter>
+      <BrowserRouter basename="/damianaBella">
         <AppRouter />
       </BrowserRouter>
     </ThemeProvider>
