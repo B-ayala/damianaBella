@@ -1,0 +1,15 @@
+.products-page {
+  padding: 140px 2rem 2rem;
+  min-height: 100vh;
+}
+
+.products-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.products-container h1 {
+  font-size: 2.5rem;
+  color: #B8A5C8;
+  margin-bottom: 2rem;
+}
