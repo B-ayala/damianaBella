@@ -1,15 +1,24 @@
 import type { Product } from '../types/product';
 
+import saquito from '../assets/products/saquito.png';
+import saquito2 from '../assets/products/saquito2.png';
+import saquitocompleto from '../assets/products/saquitocompleto.png';
+import saquitocompleto1 from '../assets/products/saquitocompleto1.png';
+import saquitocompleto2 from '../assets/products/saquitocompleto2.png';
+import pantalon from '../assets/products/pantalon.jpeg';
+import modelo1 from '../assets/modelos/modelo1.png';
+import modelo2 from '../assets/modelos/modelo2.png';
+
 export const sampleProducts: Product[] = [
   {
     id: 1,
     name: 'Saquito Tejido Artesanal',
     price: 89.99,
-    image: '/src/assets/products/saquito.png',
+    image: saquito,
     images: [
-      '/src/assets/products/saquito.png',
-      '/src/assets/products/saquito2.png',
-      '/src/assets/products/saquitocompleto.png'
+      saquito,
+      saquito2,
+      saquitocompleto
     ],
     description: 'Saquito tejido a mano con diseño exclusivo, confeccionado con lana de primera calidad. Cada pieza es única y refleja el trabajo artesanal de nuestras tejedoras. Perfecto para las temporadas más frías, combinando estilo y comodidad.',
     category: 'Indumentaria',
@@ -52,11 +61,11 @@ export const sampleProducts: Product[] = [
     id: 2,
     name: 'Saquito Completo Premium',
     price: 129.99,
-    image: '/src/assets/products/saquitocompleto.png',
+    image: saquitocompleto,
     images: [
-      '/src/assets/products/saquitocompleto.png',
-      '/src/assets/products/saquitocompleto1.png',
-      '/src/assets/products/saquitocompleto2.png'
+      saquitocompleto,
+      saquitocompleto1,
+      saquitocompleto2
     ],
     description: 'Conjunto completo de saquito tejido artesanal con bufanda incluida. Diseño premium para quienes buscan calidad y estilo. Elaborado con técnicas tradicionales de tejido.',
     category: 'Indumentaria',
@@ -97,10 +106,10 @@ export const sampleProducts: Product[] = [
     id: 3,
     name: 'Saquito Elegante',
     price: 99.99,
-    image: '/src/assets/products/saquito2.png',
+    image: saquito2,
     images: [
-      '/src/assets/products/saquito2.png',
-      '/src/assets/products/saquito.png'
+      saquito2,
+      saquito
     ],
     description: 'Saquito tejido con terminaciones delicadas y detalles elegantes. Perfecto para ocasiones especiales o uso diario.',
     category: 'Indumentaria',
@@ -110,7 +119,8 @@ export const sampleProducts: Product[] = [
     rating: 4.3,
     reviewCount: 18,
     variants: [
-      { name: 'Talla', options: ['S', 'M', 'L'] }
+      { name: 'Talla', options: ['S', 'M', 'L'] },
+      { name: 'Color', options: ['Beige', 'Gris'] }
     ],
     specifications: [
       { label: 'Material', value: 'Lana y Algodón' },
@@ -130,10 +140,10 @@ export const sampleProducts: Product[] = [
     id: 4,
     name: 'Conjunto Completo Clásico',
     price: 139.99,
-    image: '/src/assets/products/saquitocompleto1.png',
+    image: saquitocompleto1,
     images: [
-      '/src/assets/products/saquitocompleto1.png',
-      '/src/assets/products/saquitocompleto2.png'
+      saquitocompleto1,
+      saquitocompleto2
     ],
     description: 'Set completo de prendas tejidas artesanalmente con diseño clásico atemporal.',
     category: 'Indumentaria',
@@ -143,6 +153,9 @@ export const sampleProducts: Product[] = [
     freeShipping: true,
     rating: 4.6,
     reviewCount: 31,
+    variants: [
+      { name: 'Color', options: ['Beige', 'Gris', 'Negro'] }
+    ],
     specifications: [
       { label: 'Material', value: 'Lana 100%' },
       { label: 'Incluye', value: 'Saquito completo' },
@@ -160,10 +173,10 @@ export const sampleProducts: Product[] = [
     id: 5,
     name: 'Saquito Completo Deluxe',
     price: 149.99,
-    image: '/src/assets/products/saquitocompleto2.png',
+    image: saquitocompleto2,
     images: [
-      '/src/assets/products/saquitocompleto2.png',
-      '/src/assets/products/saquitocompleto1.png'
+      saquitocompleto2,
+      saquitocompleto1
     ],
     description: 'Conjunto premium de saquito tejido a mano con los mejores materiales y acabados de lujo.',
     category: 'Indumentaria',
@@ -204,9 +217,9 @@ export const sampleProducts: Product[] = [
     id: 6,
     name: 'Pantalón Artesanal',
     price: 79.99,
-    image: '/src/assets/products/pantalon.jpeg',
+    image: pantalon,
     images: [
-      '/src/assets/products/pantalon.jpeg'
+      pantalon
     ],
     description: 'Pantalón tejido con diseño contemporáneo, cómodo y versátil.',
     category: 'Indumentaria',
@@ -216,7 +229,8 @@ export const sampleProducts: Product[] = [
     rating: 4.2,
     reviewCount: 12,
     variants: [
-      { name: 'Talla', options: ['S', 'M', 'L', 'XL'] }
+      { name: 'Talla', options: ['S', 'M', 'L', 'XL'] },
+      { name: 'Color', options: ['Negro', 'Gris Oscuro', 'Beige'] }
     ],
     specifications: [
       { label: 'Material', value: 'Lana y Algodón' },
@@ -233,10 +247,10 @@ export const sampleProducts: Product[] = [
     id: 7,
     name: 'Modelo Exclusivo 1',
     price: 79.99,
-    image: '/src/assets/modelos/modelo1.png',
+    image: modelo1,
     images: [
-      '/src/assets/modelos/modelo1.png',
-      '/src/assets/modelos/modelo2.png'
+      modelo1,
+      modelo2
     ],
     description: 'Prenda exclusiva con diseño único de nuestra colección especial.',
     category: 'Indumentaria',
@@ -245,6 +259,10 @@ export const sampleProducts: Product[] = [
     freeShipping: true,
     rating: 4.7,
     reviewCount: 28,
+    variants: [
+      { name: 'Talla', options: ['S', 'M', 'L'] },
+      { name: 'Color', options: ['Blanco', 'Gris'] }
+    ],
     specifications: [
       { label: 'Material', value: 'Lana Premium' },
       { label: 'Colección', value: 'Exclusiva' }
@@ -260,10 +278,10 @@ export const sampleProducts: Product[] = [
     id: 8,
     name: 'Modelo Exclusivo 2',
     price: 79.99,
-    image: '/src/assets/modelos/modelo2.png',
+    image: modelo2,
     images: [
-      '/src/assets/modelos/modelo2.png',
-      '/src/assets/modelos/modelo1.png'
+      modelo2,
+      modelo1
     ],
     description: 'Segunda pieza de nuestra colección exclusiva con terminaciones especiales.',
     category: 'Indumentaria',
@@ -272,6 +290,10 @@ export const sampleProducts: Product[] = [
     freeShipping: true,
     rating: 4.4,
     reviewCount: 15,
+    variants: [
+      { name: 'Talla', options: ['S', 'M', 'L'] },
+      { name: 'Color', options: ['Negro', 'Vino'] }
+    ],
     specifications: [
       { label: 'Material', value: 'Lana Premium' },
       { label: 'Colección', value: 'Exclusiva' }

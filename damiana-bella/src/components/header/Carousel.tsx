@@ -1,24 +1,32 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import modelo1 from '../../assets/modelos/modelo1.png';
-import modelo2 from '../../assets/modelos/modelo2.png';
+import img1 from '../../assets/products/saquito.png';
+import img2 from '../../assets/products/saquito2.png';
+import img3 from '../../assets/products/pantalon.jpeg';
 import './Carousel.css';
 
 const slides = [
   {
     id: 1,
-    image: modelo1,
-    title: 'ACCESORIOS EXCLUSIVOS',
-    subtitle: 'Completa tu look perfecto',
-    buttonText: 'COMPRAR AHORA'
+    images: [img3, img1, img2],
+    title: 'NUEVA COLECCIÓN',
+    subtitle: 'Descubre las últimas tendencias',
+    buttonText: 'VER CATÁLOGO'
   },
   {
     id: 2,
-    image: modelo2,
-    title: 'ACCESORIOS EXCLUSIVOS',
-    subtitle: 'Completa tu look perfecto',
+    images: [img1, img2, img3],
+    title: 'ESTILO ÚNICO',
+    subtitle: 'Prendas exclusivas para ti',
     buttonText: 'COMPRAR AHORA'
+  },
+  {
+    id: 3,
+    images: [img2, img3, img1],
+    title: 'OFERTAS ESPECIALES',
+    subtitle: 'Renueva tu guardarropa',
+    buttonText: 'VER OFERTAS'
   }
 ];
 
@@ -80,46 +88,18 @@ const Carousel = () => {
           }}
           className="carousel-slide"
         >
-          <div 
-            className="carousel-image"
-            style={{ backgroundImage: `url(${slides[currentSlide].image})` }}
-          >
+          <div className="carousel-images-container">
+            {slides[currentSlide].images.map((img, idx) => (
+              <div 
+                key={idx}
+                className="carousel-image"
+                style={{ backgroundImage: `url(${img})` }}
+              ></div>
+            ))}
             <div className="carousel-overlay"></div>
           </div>
 
-          <motion.div 
-            className="carousel-content"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-          >
-            <motion.h1 
-              className="carousel-title"
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-            >
-              {slides[currentSlide].title}
-            </motion.h1>
-            <motion.p 
-              className="carousel-subtitle"
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7, duration: 0.6 }}
-            >
-              {slides[currentSlide].subtitle}
-            </motion.p>
-            <motion.button 
-              className="carousel-button"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.9, duration: 0.5 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {slides[currentSlide].buttonText}
-            </motion.button>
-          </motion.div>
+
         </motion.div>
       </AnimatePresence>
 

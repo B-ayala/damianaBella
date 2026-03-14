@@ -2,7 +2,7 @@
   width: 100%;
   min-height: 100vh;
   background-color: #ededef;
-  padding: 140px 0 20px 0;
+  padding: 40px 0 20px 0;
 }
 
 .product-detail__container {
@@ -313,6 +313,28 @@
   border-color: #3483fa;
   background: #e8f1ff;
   font-weight: 600;
+}
+
+.variant__color-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #e5e5e5;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-block;
+  padding: 0;
+}
+
+.variant__color-circle:hover {
+  transform: scale(1.1);
+  border-color: #3483fa;
+}
+
+.variant__color-circle--selected {
+  border-color: #3483fa;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #3483fa;
 }
 
 /* Botón de guía de talles */
@@ -717,7 +739,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   cursor: zoom-out;
 }
 

@@ -2,7 +2,27 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { sampleProducts } from '../../data/products';
 import type { Product } from '../../types/product';
+import Modal from '../../components/common/Modal/Modal';
+import VariantTable from '../../components/common/VariantTable/VariantTable';
 import './ProductDetail.css';
+
+const COLOR_MAP: Record<string, string> = {
+  Beige: '#F5F5DC',
+  Gris: '#808080',
+  Negro: '#000000',
+  Azul: '#1E90FF',
+  Vino: '#722F37',
+  Camel: '#C19A6B',
+  'Gris Oscuro': '#555555',
+  'Azul Marino': '#000080',
+  Blanco: '#FFFFFF',
+  Rojo: '#FF0000',
+  Verde: '#008000',
+  Amarillo: '#FFFF00',
+  Rosa: '#FFC0CB',
+  Morado: '#800080',
+  Marrón: '#8B4513'
+};
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -183,15 +203,26 @@ const ProductDetail = () => {
                   <div key={variant.name} className="variant">
                     <label className="variant__label">{variant.name}:</label>
                     <div className="variant__options">
-                      {variant.options.map((option) => (
-                        <button
-                          key={option}
-                          className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''}`}
-                          onClick={() => handleVariantChange(variant.name, option)}
-                        >
-                          {option}
-                        </button>
-                      ))}
+                      {variant.options.map((option) => {
+                        const isColor = variant.name === 'Color';
+                        return isColor ? (
+                          <button
+                            key={option}
+                            className={`variant__color-circle ${selectedVariants[variant.name] === option ? 'variant__color-circle--selected' : ''}`}
+                            style={{ backgroundColor: COLOR_MAP[option] || '#CCCCCC' }}
+                            title={option}
+                            onClick={() => handleVariantChange(variant.name, option)}
+                          />
+                        ) : (
+                          <button
+                            key={option}
+                            className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''}`}
+                            onClick={() => handleVariantChange(variant.name, option)}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -269,7 +300,10 @@ const ProductDetail = () => {
 
             {/* Botones de acción */}
             <div className="info__actions">
-              <button className="action-btn action-btn--primary">
+              <button 
+                className="action-btn action-btn--primary"
+                onClick={() => navigate('/checkout')}
+              >
                 Comprar ahora
               </button>
               <button className="action-btn action-btn--secondary">
@@ -426,22 +460,14 @@ const ProductDetail = () => {
         </div>
       )}
 
-      {/* Modal de guía de talles */}
-      {isSizeGuideOpen && (
-        <div className="size-guide-modal" onClick={() => setIsSizeGuideOpen(false)}>
-          <div className="size-guide-modal__content" onClick={(e) => e.stopPropagation()}>
-            <button className="size-guide-modal__close" onClick={() => setIsSizeGuideOpen(false)}>
-              ✕
-            </button>
-            <h2 className="size-guide-modal__title">Guía de Talles</h2>
-            <img 
-              src="/src/assets/glosario/glosario de datlles.jpg" 
-              alt="Guía de talles" 
-              className="size-guide-modal__image"
-            />
-          </div>
-        </div>
-      )}
+      {/* Modal de Variantes / Guía de talles */}
+      <Modal
+        isOpen={isSizeGuideOpen}
+        onClose={() => setIsSizeGuideOpen(false)}
+        title="Panel de Stock / Guía de Talles"
+      >
+        <VariantTable />
+      </Modal>
     </div>
   );
 };

@@ -30,10 +30,10 @@
   }
 }
 
-/* Mobile - 1 column */
+/* Mobile - 2 columns */
 @media (max-width: 767px) {
   .product-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
     padding: 16px 0;
   }

@@ -1,5 +1,5 @@
 .app {
   width: 100%;
   min-height: 100vh;
-  padding-top: 120px;
+  /* El header es sticky y su flujo natural empuja el contenido hacia abajo, no hace falta padding-top estático */
 }

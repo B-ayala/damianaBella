@@ -5,8 +5,10 @@ import NavBar from '../components/header/navBar/NavBar';
 const ProtectedRoute = () => {
     return (
         <>
-            <TopNavBar />
-            <NavBar />
+            <div style={{ position: 'sticky', top: 0, zIndex: 9999, width: '100%' }}>
+                <TopNavBar />
+                <NavBar />
+            </div>
             <Outlet />
         </>
     );

@@ -1,0 +1,54 @@
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, Home, ShoppingBag, Users, Info, Settings, LogOut } from 'lucide-react';
+import { useAdminStore } from '../store/adminStore';
+import logoImg from '../../assets/img/logo.jpeg';
+import './AdminSidebar.css';
+
+const AdminSidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean, toggleSidebar: () => void }) => {
+    const logout = useAdminStore(state => state.logout);
+
+    const navItems = [
+        { path: '/admin', name: 'Dashboard', icon: LayoutDashboard },
+        { path: '/admin/home', name: 'Home Manager', icon: Home },
+        { path: '/admin/products', name: 'Productos', icon: ShoppingBag },
+        { path: '/admin/users', name: 'Usuarios', icon: Users },
+        { path: '/admin/about', name: 'About', icon: Info },
+        { path: '/admin/site-config', name: 'Config. del sitio', icon: Settings },
+    ];
+
+    return (
+        <>
+            <div className={`admin-sidebar-overlay ${isOpen ? 'active' : ''}`} onClick={toggleSidebar}></div>
+            <aside className={`admin-sidebar ${isOpen ? 'open' : ''}`}>
+                <div className="admin-sidebar-header">
+                    <img src={logoImg} alt="LIA Logo" className="admin-sidebar-logo" />
+                    <h2>Admin</h2>
+                </div>
+                
+                <nav className="admin-sidebar-nav">
+                    {navItems.map((item) => (
+                        <NavLink 
+                            key={item.path}
+                            to={item.path} 
+                            end={item.path === '/admin'}
+                            className={({isActive}) => `admin-nav-item ${isActive ? 'active' : ''}`}
+                            onClick={() => { if(window.innerWidth <= 768) toggleSidebar() }}
+                        >
+                            <item.icon size={20} />
+                            <span>{item.name}</span>
+                        </NavLink>
+                    ))}
+                </nav>
+
+                <div className="admin-sidebar-footer">
+                    <button onClick={logout} className="admin-logout-btn">
+                        <LogOut size={20} />
+                        <span>Cerrar Sesión</span>
+                    </button>
+                </div>
+            </aside>
+        </>
+    );
+};
+
+export default AdminSidebar;
