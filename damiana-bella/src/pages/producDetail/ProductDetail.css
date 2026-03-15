@@ -193,41 +193,6 @@
   line-height: 1.4;
 }
 
-.info__rating {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.stars {
-  display: flex;
-  gap: 2px;
-}
-
-.star {
-  color: #ddd;
-  font-size: 16px;
-}
-
-.star.filled {
-  color: #ffb800;
-}
-
-.rating__score {
-  font-weight: 600;
-  color: #333;
-}
-
-.rating__count {
-  color: #3483fa;
-  cursor: pointer;
-}
-
-.rating__count:hover {
-  text-decoration: underline;
-}
-
 /* Precio */
 .info__pricing {
   margin-bottom: 24px;
@@ -603,8 +568,7 @@
 
 .content__description h2,
 .content__specs h2,
-.content__faq h2,
-.content__reviews h2 {
+.content__faq h2 {
   font-size: 20px;
   font-weight: 600;
   margin: 0 0 20px 0;
@@ -688,41 +652,6 @@
 }
 
 .faq-answer {
-  color: #666;
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Reviews */
-.review {
-  padding: 20px;
-  border-bottom: 1px solid #e5e5e5;
-  margin-bottom: 20px;
-}
-
-.review:last-child {
-  border-bottom: none;
-}
-
-.review__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.review__header strong {
-  color: #333;
-  font-size: 14px;
-}
-
-.review__date {
-  color: #999;
-  font-size: 13px;
-  margin-left: auto;
-}
-
-.review__comment {
   color: #666;
   line-height: 1.6;
   margin: 0;

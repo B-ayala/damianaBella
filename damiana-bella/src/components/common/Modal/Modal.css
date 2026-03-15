@@ -1,100 +1,237 @@
-/* Mobile-first Modal */
+/* ============================================
+   MODAL STYLES - Professional Design
+   ============================================ */
+
+/* Overlay with backdrop blur for modern glass effect */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.5);
+    background: linear-gradient(
+        135deg,
+        rgba(184, 165, 200, 0.4) 0%,
+        rgba(0, 0, 0, 0.5) 100%
+    );
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
-    animation: fadeIn 0.3s ease;
-    padding: 0.75rem;
+    opacity: 0;
+    animation: overlayFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    padding: 1rem;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.modal-overlay.closing {
+    animation: overlayFadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.modal-content {
-    background: white;
-    width: 92%;
-    max-height: 92vh;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    animation: modalAppear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-    overflow: hidden;
-}
-
-@keyframes modalAppear {
+@keyframes overlayFadeIn {
     from {
         opacity: 0;
-        transform: scale(0.95);
+        backdrop-filter: blur(0px);
     }
     to {
         opacity: 1;
-        transform: scale(1);
+        backdrop-filter: blur(8px);
     }
 }
 
+@keyframes overlayFadeOut {
+    from {
+        opacity: 1;
+        backdrop-filter: blur(8px);
+    }
+    to {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+}
+
+/* Modal Content - Premium card styling */
+.modal-content {
+    background: linear-gradient(145deg, #ffffff 0%, #fafafa 100%);
+    width: 92%;
+    max-height: 90vh;
+    border-radius: 20px;
+    box-shadow:
+        0 25px 80px -20px rgba(184, 165, 200, 0.4),
+        0 15px 40px -10px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+    animation: modalEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    overflow: hidden;
+    position: relative;
+}
+
+.modal-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(
+        90deg,
+        var(--primary-color) 0%,
+        var(--primary-light) 50%,
+        var(--primary-color) 100%
+    );
+    border-radius: 20px 20px 0 0;
+}
+
+.modal-content.closing {
+    animation: modalExit 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes modalEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalExit {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+}
+
+/* Header - Elegant with subtle gradient */
 .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #eee;
-    background: #fafafa;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(184, 165, 200, 0.2);
+    background: linear-gradient(
+        135deg,
+        rgba(184, 165, 200, 0.08) 0%,
+        rgba(255, 255, 255, 0.9) 100%
+    );
     flex-shrink: 0;
 }
 
 .modal-title {
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: #333;
+    color: var(--text-dark);
     margin: 0;
     font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #333 0%, #666 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
+/* Close Button - Premium hover effects */
 .modal-close {
-    background: none;
+    background: rgba(184, 165, 200, 0.1);
     border: none;
     font-size: 1.5rem;
     color: #888;
     cursor: pointer;
-    transition: color 0.2s, transform 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
-    padding: 0.5rem;
-    border-radius: 50%;
+    padding: 0;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-close::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: 12px;
 }
 
 .modal-close:hover {
-    color: #B8A5C8;
-    background-color: #f0f0f0;
+    color: white;
+    transform: rotate(90deg) scale(1.05);
+    box-shadow: 0 4px 15px rgba(184, 165, 200, 0.4);
 }
 
+.modal-close:hover::before {
+    opacity: 1;
+}
+
+.modal-close svg {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.3s ease;
+}
+
+.modal-close:active {
+    transform: rotate(90deg) scale(0.95);
+}
+
+/* Body - Better spacing and typography */
 .modal-body {
-    padding: 1.25rem;
+    padding: 1.5rem;
     overflow-y: auto;
-    color: #555;
+    color: var(--text-light);
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: 1.7;
     -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: rgba(184, 165, 200, 0.1);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
 }
 
 .modal-body p {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
+    color: var(--text-light);
 }
 
-/* Tablet+ */
+.modal-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* ============================================
+   TABLET & DESKTOP BREAKPOINTS
+   ============================================ */
+
 @media (min-width: 640px) {
     .modal-overlay {
         padding: 1.5rem;
@@ -102,12 +239,17 @@
 
     .modal-content {
         width: 100%;
-        max-width: 600px;
-        max-height: 90vh;
+        max-width: 560px;
+        max-height: 85vh;
+        border-radius: 24px;
+    }
+
+    .modal-content::before {
+        border-radius: 24px 24px 0 0;
     }
 
     .modal-header {
-        padding: 1.5rem;
+        padding: 1.5rem 2rem;
     }
 
     .modal-title {
@@ -115,23 +257,40 @@
     }
 
     .modal-body {
-        padding: 2rem 1.5rem;
+        padding: 2rem;
+    }
+
+    .modal-close {
+        min-width: 48px;
+        min-height: 48px;
+        border-radius: 14px;
+    }
+
+    .modal-close::before {
+        border-radius: 14px;
     }
 }
 
-.modal-body p:last-child {
-    margin-bottom: 0;
-}
-
-/* Desktop: wider modal for admin panels */
 @media (min-width: 768px) {
     .modal-content {
-        max-width: 720px;
+        max-width: 680px;
     }
 }
 
 @media (min-width: 1024px) {
+    .modal-overlay {
+        padding: 2rem;
+    }
+
     .modal-content {
-        max-width: 800px;
+        max-width: 760px;
+        box-shadow:
+            0 30px 100px -25px rgba(184, 165, 200, 0.45),
+            0 20px 50px -15px rgba(0, 0, 0, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .modal-title {
+        font-size: 1.625rem;
     }
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser } from 'react-icons/fi';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import logoImg from '../../../assets/img/logo.jpeg';
 import AuthModal from '../../auth/AuthModal';
 import './NavBar.css';
@@ -37,16 +38,7 @@ const NavBar = () => {
   // Nivel de navegación: 'main' = Nivel 1, o el nombre de la categoría activa (Nivel 2)
   const [activeMenuLevel, setActiveMenuLevel] = useState<string>('main');
 
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [mobileMenuOpen]);
+  useBodyScrollLock(mobileMenuOpen);
 
   const closeMenu = () => {
     setMobileMenuOpen(false);

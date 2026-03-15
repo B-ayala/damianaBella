@@ -7,11 +7,7 @@ type Theme = typeof theme;
 const ThemeContext = createContext<Theme>(theme);
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
+  return useContext(ThemeContext);
 };
 
 interface ThemeProviderProps {

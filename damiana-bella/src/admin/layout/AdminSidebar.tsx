@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Home, ShoppingBag, Users, Info, Settings, LogOut } from 'lucide-react';
+import { Home, ShoppingBag, Users, Info, Settings, LogOut } from 'lucide-react';
 import { useAdminStore } from '../store/adminStore';
 import logoImg from '../../assets/img/logo.jpeg';
 import './AdminSidebar.css';
@@ -8,8 +8,7 @@ const AdminSidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean, toggleSideba
     const logout = useAdminStore(state => state.logout);
 
     const navItems = [
-        { path: '/admin', name: 'Dashboard', icon: LayoutDashboard },
-        { path: '/admin/home', name: 'Home Manager', icon: Home },
+        { path: '/admin', name: 'Home Manager', icon: Home },
         { path: '/admin/products', name: 'Productos', icon: ShoppingBag },
         { path: '/admin/users', name: 'Usuarios', icon: Users },
         { path: '/admin/about', name: 'About', icon: Info },

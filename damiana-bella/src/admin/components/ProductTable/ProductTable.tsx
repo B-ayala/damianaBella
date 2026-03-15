@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
+import { StockBadge, StatusBadge } from './ProductBadges';
 import './ProductTable.css';
 
 interface ProductTableProps {
@@ -13,7 +14,7 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
     const [sortConfig, setSortConfig] = useState<{ key: keyof AdminProduct, direction: 'asc' | 'desc' } | null>(null);
 
     // Filter by search term
-    let filteredProducts = products.filter((p: AdminProduct) => 
+    let filteredProducts = products.filter((p) => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         p.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -21,7 +22,7 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
     // Sort
     if (sortConfig !== null) {
         const { key, direction } = sortConfig;
-        filteredProducts.sort((a: AdminProduct, b: AdminProduct) => {
+        filteredProducts.sort((a, b) => {
             const aVal = a[key];
             const bVal = b[key];
             if (aVal !== undefined && bVal !== undefined) {
@@ -47,7 +48,7 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
                 {filteredProducts.length === 0 ? (
                     <p className="empty-message">No se encontraron productos.</p>
                 ) : (
-                    filteredProducts.map((product: AdminProduct) => (
+                    filteredProducts.map((product) => (
                         <div className="product-card" key={product.id}>
                             <div className="product-card-top">
                                 {product.imageUrl ? (
@@ -79,15 +80,11 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
                                 </div>
                                 <div className="product-card-field">
                                     <span className="field-label">Stock</span>
-                                    <span className={`stock-badge ${product.stock <= 5 ? 'low' : 'ok'}`}>
-                                        {product.stock}
-                                    </span>
+                                    <StockBadge stock={product.stock} />
                                 </div>
                                 <div className="product-card-field">
                                     <span className="field-label">Estado</span>
-                                    <span className={`status-badge ${product.status}`}>
-                                        {product.status === 'active' ? 'Activo' : 'Inactivo'}
-                                    </span>
+                                    <StatusBadge status={product.status} />
                                 </div>
                             </div>
                         </div>
@@ -122,7 +119,7 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
                             <td colSpan={7} className="text-center py-4 text-slate-500">No se encontraron productos.</td>
                         </tr>
                     ) : (
-                        filteredProducts.map((product: AdminProduct) => (
+                        filteredProducts.map((product) => (
                             <tr key={product.id}>
                                 <td>
                                     {product.imageUrl ? (
@@ -134,15 +131,11 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
                                 <td className="font-medium">{product.name}</td>
                                 <td>${product.price}</td>
                                 <td>
-                                    <span className={`stock-badge ${product.stock <= 5 ? 'low' : 'ok'}`}>
-                                        {product.stock}
-                                    </span>
+                                    <StockBadge stock={product.stock} />
                                 </td>
                                 <td>{product.category}</td>
                                 <td>
-                                    <span className={`status-badge ${product.status}`}>
-                                        {product.status === 'active' ? 'Activo' : 'Inactivo'}
-                                    </span>
+                                    <StatusBadge status={product.status} />
                                 </td>
                                 <td>
                                     <div className="table-actions">

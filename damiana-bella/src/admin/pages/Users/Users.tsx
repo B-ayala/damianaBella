@@ -7,7 +7,7 @@ const Users = () => {
     const { users, updateUser } = useAdminStore();
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredUsers = users.filter((u: AdminUser) => 
+    const filteredUsers = users.filter((u) => 
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -55,7 +55,7 @@ const Users = () => {
                                     <td colSpan={5} className="text-center py-4 text-slate-500">No se encontraron usuarios.</td>
                                 </tr>
                             ) : (
-                                filteredUsers.map((user: AdminUser) => (
+                                filteredUsers.map((user) => (
                                     <tr key={user.id}>
                                         <td className="font-medium">{user.name}</td>
                                         <td>{user.email}</td>

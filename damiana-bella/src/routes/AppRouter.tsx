@@ -6,12 +6,12 @@ import Contact from '../pages/contact/Contact';
 import About from '../pages/about/About';
 import ProductDetail from '../pages/producDetail/ProductDetail';
 import Checkout from '../pages/checkout/Checkout';
+import EmailConfirmation from '../pages/auth/EmailConfirmation';
 import ScrollToTop from '../components/common/ScrollToTop';
 
 // Admin imports
 import AdminProtectedRoute from '../admin/routes/AdminProtectedRoute';
 import AdminLayout from '../admin/layout/AdminLayout';
-import AdminDashboard from '../admin/pages/Dashboard/Dashboard';
 import HomeManager from '../admin/pages/HomeManager/HomeManager';
 import AdminProducts from '../admin/pages/Products/Products';
 import AdminUsers from '../admin/pages/Users/Users';
@@ -24,10 +24,13 @@ const AppRouter = () => {
     <>
       <ScrollToTop />
       <Routes>
+        {/* Auth Routes */}
+        <Route path="/auth/confirm" element={<EmailConfirmation />} />
+
         {/* Admin Routes */}
         <Route element={<AdminProtectedRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
+            <Route index element={<HomeManager />} />
             <Route path="home" element={<HomeManager />} />
             <Route path="products" element={<AdminProducts />} />
             <Route path="users" element={<AdminUsers />} />

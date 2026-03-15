@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useRef, useState, useEffect, type ReactNode } from 'react';
 import { FiX } from 'react-icons/fi';
+import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import './Modal.css';
 
 interface ModalProps {
@@ -11,18 +12,32 @@ interface ModalProps {
 
 const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
   const isOverlayClick = useRef(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+      setIsClosing(false);
+      setShouldRender(true);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 350);
+      return () => clearTimeout(timer);
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 350);
+  };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -34,21 +49,21 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isOverlayClick.current && e.target === e.currentTarget) {
-      onClose();
+      handleClose();
     }
     isOverlayClick.current = false;
   };
 
   return (
     <div 
-      className="modal-overlay" 
+      className={`modal-overlay ${isClosing ? 'closing' : ''}`}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className={`modal-content ${isClosing ? 'closing' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">{title}</h3>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" onClick={handleClose}>
             <FiX />
           </button>
         </div>

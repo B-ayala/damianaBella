@@ -31,7 +31,7 @@ const ProductDetail = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState<{ [key: string]: string }>({});
-  const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'faq' | 'reviews'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'faq'>('description');
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [postalCode, setPostalCode] = useState('');
   const [shippingCost, setShippingCost] = useState<number | null>(null);
@@ -92,18 +92,6 @@ const ProductDetail = () => {
       setShippingCost(cost);
       setShippingDays('5-7 días hábiles');
     }
-  };
-
-  const renderStars = (rating: number) => {
-    return (
-      <div className="stars">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span key={star} className={star <= rating ? 'star filled' : 'star'}>
-            ★
-          </span>
-        ))}
-      </div>
-    );
   };
 
   return (
@@ -167,15 +155,6 @@ const ProductDetail = () => {
                 {product.stock && product.stock > 0 ? ` ${product.stock} disponibles` : ' Sin stock'}
               </span>
               <h1 className="info__title">{product.name}</h1>
-              
-              {/* Rating */}
-              {product.rating && (
-                <div className="info__rating">
-                  {renderStars(product.rating)}
-                  <span className="rating__score">{product.rating}</span>
-                  <span className="rating__count">({product.reviewCount || 0} opiniones)</span>
-                </div>
-              )}
             </div>
 
             {/* Precio */}
@@ -369,14 +348,6 @@ const ProductDetail = () => {
                 Preguntas frecuentes
               </button>
             )}
-            {product.reviews && product.reviews.length > 0 && (
-              <button 
-                className={`tab ${activeTab === 'reviews' ? 'tab--active' : ''}`}
-                onClick={() => setActiveTab('reviews')}
-              >
-                Opiniones ({product.reviews.length})
-              </button>
-            )}
           </div>
 
           <div className="description__content">
@@ -424,22 +395,6 @@ const ProductDetail = () => {
                   <div key={index} className="faq-item">
                     <h4 className="faq-question">{faq.question}</h4>
                     <p className="faq-answer">{faq.answer}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'reviews' && product.reviews && (
-              <div className="content__reviews">
-                <h2>Opiniones del producto</h2>
-                {product.reviews.map((review) => (
-                  <div key={review.id} className="review">
-                    <div className="review__header">
-                      <strong>{review.author}</strong>
-                      {renderStars(review.rating)}
-                      <span className="review__date">{review.date}</span>
-                    </div>
-                    <p className="review__comment">{review.comment}</p>
                   </div>
                 ))}
               </div>

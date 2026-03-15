@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { loginUser, logoutUser } from '../../services/userService';
 
 import pantalonImg from '../../assets/products/pantalon.jpeg';
 import saquitoImg from '../../assets/products/saquito.png';
@@ -56,11 +57,12 @@ export interface FooterInfo {
 
 interface AdminState {
   isAuthenticated: boolean;
+  currentUser: { id: string; name: string; email: string; role: string } | null;
   products: AdminProduct[];
   users: AdminUser[];
   carouselImages: CarouselImage[];
   featuredProductIds: string[];
-  login: (email: string, pass: string) => boolean;
+  login: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   setCarouselImages: (images: CarouselImage[]) => void;
   addCarouselImage: (url: string) => void;
@@ -119,20 +121,38 @@ const mockFooterInfo: FooterInfo = {
 
 export const useAdminStore = create<AdminState>((set) => ({
   isAuthenticated: false,
+  currentUser: null,
   products: mockProducts,
   users: mockUsers,
   carouselImages: mockCarouselImages,
   featuredProductIds: ['1', '4', '6'],
   aboutInfo: mockAboutInfo,
   footerInfo: mockFooterInfo,
-  login: (email, pass) => {
-    if (email === 'lia@gmail.com' && pass === 'lia') {
-      set({ isAuthenticated: true });
-      return true;
+  login: async (email, pass) => {
+    try {
+      const response = await loginUser({ email, password: pass });
+      if (response.success && response.data && response.data.role === 'admin') {
+        set({
+          isAuthenticated: true,
+          currentUser: {
+            id: response.data.id || '',
+            name: response.data.name,
+            email: response.data.email,
+            role: response.data.role,
+          }
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   },
-  logout: () => set({ isAuthenticated: false }),
+  logout: async () => {
+    await logoutUser();
+    set({ isAuthenticated: false, currentUser: null });
+  },
   setCarouselImages: (images) => set({ carouselImages: images }),
   addCarouselImage: (url) => set((state) => ({
     carouselImages: [...state.carouselImages, { id: Date.now().toString(), url, order: state.carouselImages.length + 1, isActive: true }]

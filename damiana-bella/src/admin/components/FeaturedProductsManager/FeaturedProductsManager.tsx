@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Search, Plus, Trash2 } from 'lucide-react';
-import { useAdminStore, type AdminProduct } from '../../store/adminStore';
+import { useAdminStore } from '../../store/adminStore';
 import './FeaturedProductsManager.css';
 
 const FeaturedProductsManager = () => {
     const { products, featuredProductIds, addFeaturedProduct, removeFeaturedProduct } = useAdminStore();
     const [searchTerm, setSearchTerm] = useState('');
 
-    const featuredProducts = products.filter((p: AdminProduct) => featuredProductIds.includes(p.id));
+    const featuredProducts = products.filter((p) => featuredProductIds.includes(p.id));
     
     // search results logic
     const searchResults = searchTerm.trim() 
-        ? products.filter((p: AdminProduct) => 
+        ? products.filter((p) => 
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
             !featuredProductIds.includes(p.id)
           )
@@ -35,7 +35,7 @@ const FeaturedProductsManager = () => {
                 
                 {searchResults.length > 0 && (
                     <div className="search-results-dropdown">
-                        {searchResults.map((prod: AdminProduct) => (
+                        {searchResults.map((prod) => (
                             <div key={prod.id} className="search-result-item">
                                 {prod.imageUrl ? (
                                     <img src={prod.imageUrl} alt={prod.name} />
@@ -65,7 +65,7 @@ const FeaturedProductsManager = () => {
                 {featuredProducts.length === 0 ? (
                     <div className="empty-state">No hay productos destacados.</div>
                 ) : (
-                    featuredProducts.map((prod: AdminProduct) => (
+                    featuredProducts.map((prod) => (
                         <div key={prod.id} className="featured-item">
                             {prod.imageUrl ? (
                                 <img src={prod.imageUrl} alt={prod.name} />
