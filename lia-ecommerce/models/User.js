@@ -36,7 +36,8 @@ class User {
           p.name, 
           p.role, 
           p.created_at,
-          u.email
+          u.email,
+          u.email_confirmed_at
         FROM public.profiles p
         LEFT JOIN auth.users u ON p.id = u.id
         ORDER BY p.created_at DESC 
@@ -145,6 +146,9 @@ class User {
       if (result.rows.length === 0) {
         throw new Error('Usuario no encontrado');
       }
+
+      // También eliminar de auth.users para borrar completamente la cuenta
+      await client.query('DELETE FROM auth.users WHERE id = $1', [id]);
 
       await client.query('COMMIT');
       return result.rows[0];

@@ -1,7 +1,17 @@
-import { useRef, useState, useEffect } from 'react';
+import { Dialog, DialogContent, IconButton, Zoom, Box, Button, CircularProgress, useMediaQuery } from '@mui/material';
 import { FiX, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
-import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
-import './ConfirmationModal.css';
+import { keyframes } from '@emotion/react';
+
+const scaleIn = keyframes`
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+`;
+
+const shake = keyframes`
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+`;
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -13,6 +23,13 @@ interface ConfirmationModalProps {
   onActionClick?: () => void;
 }
 
+const statusColors: Record<string, { bg: string; hover: string; shadow: string }> = {
+  success: { bg: '#10b981', hover: '#059669', shadow: 'rgba(16, 185, 129, 0.3)' },
+  error: { bg: '#ef4444', hover: '#dc2626', shadow: 'rgba(239, 68, 68, 0.3)' },
+  info: { bg: '#3b82f6', hover: '#2563eb', shadow: 'rgba(59, 130, 246, 0.3)' },
+  loading: { bg: '#9ca3af', hover: '#9ca3af', shadow: 'none' },
+};
+
 const ConfirmationModal = ({
   isOpen,
   onClose,
@@ -22,57 +39,25 @@ const ConfirmationModal = ({
   actionButtonText = 'Aceptar',
   onActionClick,
 }: ConfirmationModalProps) => {
-  const isOverlayClick = useRef(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const [shouldRender, setShouldRender] = useState(isOpen);
-
-  useBodyScrollLock(isOpen);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsClosing(false);
-      setShouldRender(true);
-    } else if (shouldRender) {
-      setIsClosing(true);
-      const timer = setTimeout(() => {
-        setShouldRender(false);
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, shouldRender]);
-
-  if (!shouldRender) return null;
-
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      onClose();
-    }, 350);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      isOverlayClick.current = true;
-    } else {
-      isOverlayClick.current = false;
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isOverlayClick.current && e.target === e.currentTarget) {
-      handleClose();
-    }
-    isOverlayClick.current = false;
-  };
+  const isMobile = useMediaQuery('(max-width:479px)');
 
   const getStatusIcon = () => {
+    const iconSize = isMobile ? 40 : 48;
     switch (status) {
       case 'success':
-        return <FiCheckCircle className="confirmation-icon success" />;
+        return (
+          <Box sx={{ animation: `${scaleIn} 0.5s ease-out`, display: 'flex', mb: 1 }}>
+            <FiCheckCircle size={iconSize} color="#10b981" />
+          </Box>
+        );
       case 'error':
-        return <FiAlertCircle className="confirmation-icon error" />;
+        return (
+          <Box sx={{ animation: `${shake} 0.5s ease-out`, display: 'flex', mb: 1 }}>
+            <FiAlertCircle size={iconSize} color="#ef4444" />
+          </Box>
+        );
       case 'loading':
-        return <div className="confirmation-spinner"></div>;
+        return <CircularProgress size={50} sx={{ my: 1, color: '#667eea' }} />;
       default:
         return null;
     }
@@ -82,37 +67,101 @@ const ConfirmationModal = ({
     if (onActionClick) {
       onActionClick();
     }
-    handleClose();
+    onClose();
   };
 
+  const colors = statusColors[status] || statusColors.info;
+
   return (
-    <div
-      className={`modal-overlay ${isClosing ? 'closing' : ''}`}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      maxWidth="xs"
+      TransitionComponent={Zoom}
+      transitionDuration={350}
+      sx={{
+        zIndex: 2100,
+        '& .MuiBackdrop-root': {
+          background: 'linear-gradient(135deg, rgba(184,165,200,0.4) 0%, rgba(0,0,0,0.5) 100%)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        },
+        '& .MuiDialog-paper': {
+          borderRadius: '12px',
+          maxWidth: isMobile ? '90vw' : '400px',
+          width: '100%',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          textAlign: 'center',
+          position: 'relative',
+        },
+      }}
     >
-      <div
-        className={`confirmation-modal-content ${isClosing ? 'closing' : ''} ${status}`}
-        onClick={(e) => e.stopPropagation()}
+      <IconButton
+        onClick={onClose}
+        aria-label="Cerrar"
+        sx={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          width: 32,
+          height: 32,
+          color: '#9ca3af',
+          borderRadius: '6px',
+          zIndex: 1,
+          '&:hover': { background: '#f3f4f6', color: '#1f2937' },
+        }}
       >
-        <button className="modal-close" onClick={handleClose}>
-          <FiX />
-        </button>
+        <FiX size={20} />
+      </IconButton>
 
-        <div className="confirmation-body">
-          {getStatusIcon()}
-          <h3 className="confirmation-title">{title}</h3>
-          <p className="confirmation-message">{message}</p>
-
-          <button
-            className={`confirmation-button ${status}`}
-            onClick={handleActionClick}
-          >
-            {actionButtonText}
-          </button>
-        </div>
-      </div>
-    </div>
+      <DialogContent
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+          p: isMobile ? '30px 20px' : '40px 30px',
+        }}
+      >
+        {getStatusIcon()}
+        <h3 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 600, color: '#1f2937', margin: 0, lineHeight: 1.3 }}>
+          {title}
+        </h3>
+        <p style={{ fontSize: isMobile ? 13 : 14, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>
+          {message}
+        </p>
+        <Button
+          onClick={handleActionClick}
+          disabled={status === 'loading'}
+          sx={{
+            mt: 2,
+            px: 3,
+            py: 1.25,
+            borderRadius: '6px',
+            fontSize: 14,
+            fontWeight: 600,
+            minWidth: 120,
+            textTransform: 'none',
+            color: 'white',
+            background: colors.bg,
+            '&:hover': {
+              background: colors.hover,
+              transform: 'translateY(-2px)',
+              boxShadow: `0 4px 12px ${colors.shadow}`,
+            },
+            '&:active': {
+              transform: 'translateY(0)',
+            },
+            '&.Mui-disabled': {
+              background: '#9ca3af',
+              color: 'white',
+            },
+          }}
+        >
+          {actionButtonText}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 };
 

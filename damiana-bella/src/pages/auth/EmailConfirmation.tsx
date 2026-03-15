@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../../config/supabaseClient';
 import { verifyEmailConfirmation } from '../../services/userService';
 import ConfirmationModal from '../../components/common/Modal/ConfirmationModal';
 import './EmailConfirmation.css';
@@ -10,44 +11,74 @@ const EmailConfirmation = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const resolved = useRef(false);
+
+  const showResult = (s: 'success' | 'error', msg: string) => {
+    if (resolved.current) return;
+    resolved.current = true;
+    setStatus(s);
+    setMessage(msg);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
-    const verifyEmail = async () => {
-      try {
-        // Obtener el token del query parameter
-        const token = searchParams.get('token_hash');
-        
-        if (!token) {
-          setStatus('error');
-          setMessage('Token de verificación no encontrado.');
-          setIsModalOpen(true);
-          return;
-        }
+    const token = searchParams.get('token_hash');
 
-        // Verificar el token
-        const result = await verifyEmailConfirmation(token);
-        setStatus('success');
-        setMessage(result.message + ' Ya puedes iniciar sesión con tu cuenta.');
-        setIsModalOpen(true);
-      } catch (error) {
-        setStatus('error');
-        const errorMessage = error instanceof Error ? error.message : 'Error al verificar el email';
-        setMessage(errorMessage);
-        setIsModalOpen(true);
-      }
+    const syncProfileName = async (userId: string, name: string) => {
+      if (!name) return;
+      await supabase.from('profiles').update({ name }).eq('id', userId);
     };
 
-    verifyEmail();
+    if (token) {
+      // Flow 1: token_hash en query params (verificación directa)
+      verifyEmailConfirmation(token)
+        .then(async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await syncProfileName(user.id, user.user_metadata?.name);
+          }
+          showResult('success', '¡Cuenta confirmada correctamente! Ya puedes iniciar sesión con tu cuenta.');
+        })
+        .catch((err) => showResult('error', err instanceof Error ? err.message : 'Error al verificar el email'));
+      return;
+    }
+
+    // Flow 2: Redirect de Supabase con tokens en el hash de la URL
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          await syncProfileName(session.user.id, session.user.user_metadata?.name);
+          showResult('success', '¡Cuenta confirmada correctamente! Ya puedes iniciar sesión con tu cuenta.');
+          subscription.unsubscribe();
+        }
+      });
+
+      // Fallback: verificar sesión después de un breve delay
+      const timer = setTimeout(async () => {
+        if (resolved.current) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          showResult('success', '¡Cuenta confirmada correctamente! Ya puedes iniciar sesión con tu cuenta.');
+        } else {
+          showResult('error', 'No se pudo verificar tu correo. El enlace puede haber expirado o ser inválido.');
+        }
+        subscription.unsubscribe();
+      }, 5000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
+    }
+
+    // No se encontró ningún token
+    showResult('error', 'No se encontró un token de verificación válido.');
   }, [searchParams]);
 
   const handleModalClose = () => {
     setIsModalOpen(false);
-    if (status === 'success') {
-      // Redirigir a la home después de 1 segundo
-      setTimeout(() => {
-        navigate('/');
-      }, 500);
-    }
+    navigate('/');
   };
 
   return (
@@ -63,8 +94,9 @@ const EmailConfirmation = () => {
         isOpen={isModalOpen}
         onClose={handleModalClose}
         status={status}
-        title={status === 'success' ? 'Confirmación Exitosa' : 'Error de Verificación'}
+        title={status === 'success' ? '¡Cuenta Confirmada!' : 'Error de Verificación'}
         message={message}
+        actionButtonText={status === 'success' ? 'Ir al Inicio' : 'Volver al Inicio'}
       />
     </div>
   );

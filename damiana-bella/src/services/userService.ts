@@ -29,13 +29,17 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
         data: {
           name: payload.name,
         },
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
       },
     });
 
     if (authError) {
-      // Manejar error específico: usuario ya existe
+      // Email ya registrado y confirmado
       if (authError.message?.includes('already registered') || authError.message?.includes('User already exists')) {
-        throw new Error(`Este correo ya está registrado. Si no recibiste el email de confirmación, usa la opción de reenviar.`);
+        throw new Error('EMAIL_ALREADY_CONFIRMED');
+      }
+      if (authError.message?.toLowerCase().includes('rate limit') || authError.message?.toLowerCase().includes('over_email_send_rate_limit')) {
+        throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a intentarlo.');
       }
       throw new Error(authError.message);
     }
@@ -44,15 +48,18 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
       throw new Error('Error al crear el usuario en autenticación');
     }
 
-    // 2. Actualizar el nombre en el perfil (el trigger ya creó el perfil)
-    const { error: updateError } = await supabase
+    // Detectar "signup falso" — Supabase retorna éxito pero sin crear usuario real
+    // Esto pasa cuando el email ya existe pero no está confirmado (identities viene vacío)
+    if (!authData.user.identities || authData.user.identities.length === 0) {
+      throw new Error('EMAIL_PENDING_CONFIRMATION');
+    }
+
+    // El trigger handle_new_user() se encarga de leer el nombre desde raw_user_meta_data
+    // Intento best-effort de actualizar, pero no falla si RLS lo bloquea (email no confirmado)
+    await supabase
       .from('profiles')
       .update({ name: payload.name })
       .eq('id', authData.user.id);
-
-    if (updateError) {
-      throw new Error(`Error al actualizar el perfil: ${updateError.message}`);
-    }
 
     return {
       success: true,
@@ -164,6 +171,9 @@ export const resendConfirmationEmail = async (email: string): Promise<{ success:
     });
 
     if (error) {
+      if (error.message?.toLowerCase().includes('rate limit') || error.message?.toLowerCase().includes('over_email_send_rate_limit')) {
+        throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a solicitar el email.');
+      }
       throw new Error(error.message);
     }
 
@@ -201,5 +211,54 @@ export const verifyEmailConfirmation = async (token: string): Promise<{ success:
     throw new Error(
       error instanceof Error ? error.message : 'Error al verificar el email'
     );
+  }
+};
+
+// ============================================================
+// Admin API functions (Backend endpoints)
+// ============================================================
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+export interface AdminUserData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  created_at: string;
+  email_confirmed_at: string | null;
+}
+
+/**
+ * Obtener todos los usuarios (endpoint admin del backend)
+ */
+export const getAdminUsers = async (): Promise<AdminUserData[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/users`);
+
+  if (!response.ok) {
+    throw new Error('Error al conectar con el servidor');
+  }
+
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.message || 'Error al obtener usuarios');
+  }
+
+  return data.data;
+};
+
+/**
+ * Eliminar un usuario completamente (auth.users + profiles)
+ */
+export const deleteAdminUser = async (userId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  });
+
+  const data = await response.json().catch(() => ({ success: false, message: 'Error al eliminar usuario' }));
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || 'Error al eliminar usuario');
   }
 };
