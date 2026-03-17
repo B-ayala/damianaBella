@@ -7,8 +7,14 @@ const {
   updateUser,
   deleteUser,
   loginUser,
-  getUserByAuthId
+  getUserByAuthId,
+  signupStatus,
+  signupRateLimit
 } = require('../controllers/userController');
+
+// Signup rate limit tracker
+router.get('/signup-status/:email', signupStatus);
+router.post('/signup-ratelimit', signupRateLimit);
 
 // Ruta de login
 router.post('/login', loginUser);

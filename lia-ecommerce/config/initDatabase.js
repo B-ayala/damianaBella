@@ -131,6 +131,36 @@ const initDatabase = async () => {
     `);
     console.log('✓ Índices verificados');
 
+    // Agregar columnas a la tabla productos (si ya existe)
+    console.log('\n📦 Verificando columnas de la tabla productos...');
+    const productosExists = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'productos'
+      );
+    `);
+
+    if (productosExists.rows[0].exists) {
+      const alteraciones = [
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS description TEXT`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS discount NUMERIC(5,2)`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS condition VARCHAR(10) DEFAULT 'new'`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS free_shipping BOOLEAN DEFAULT false`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS variants JSONB`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS specifications JSONB`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS features JSONB`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS faqs JSONB`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS warranty TEXT`,
+        `ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS return_policy TEXT`,
+      ];
+      for (const sql of alteraciones) {
+        await client.query(sql);
+      }
+      console.log('✓ Columnas de productos verificadas/agregadas');
+    } else {
+      console.log('ℹ️  Tabla productos no encontrada (se crea desde Supabase)');
+    }
+
     console.log('\n✅ Base de datos inicializada correctamente');
     console.log('📌 Ahora puedes usar el servidor con: npm run dev');
     

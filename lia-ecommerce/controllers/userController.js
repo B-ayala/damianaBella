@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { getStatus, recordRateLimit } = require('../middleware/signupTracker');
 
 /**
  * @desc    Login de usuario
@@ -254,6 +255,27 @@ exports.deleteUser = async (req, res) => {
 };
 
 /**
+ * @desc    Leer estado de rate limit para un email (sin modificar nada)
+ * @route   GET /api/users/signup-status/:email
+ */
+exports.signupStatus = (req, res) => {
+  const { email } = req.params;
+  if (!email) return res.status(400).json({ success: false, message: 'Email requerido' });
+  return res.status(200).json({ success: true, ...getStatus(decodeURIComponent(email)) });
+};
+
+/**
+ * @desc    Registrar que Supabase devolvió rate limit para un email
+ * @route   POST /api/users/signup-ratelimit
+ * @body    { email: string }
+ */
+exports.signupRateLimit = (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, message: 'Email requerido' });
+  return res.status(200).json({ success: true, ...recordRateLimit(email) });
+};
+
+/**
  * @desc    Obtener usuario por user_id (Supabase Auth ID)
  * @route   GET /api/users/auth/:userId
  */
@@ -264,7 +286,7 @@ exports.getUserByAuthId = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID requerido'
+        message: 'ID de usuario requerido'
       });
     }
 
