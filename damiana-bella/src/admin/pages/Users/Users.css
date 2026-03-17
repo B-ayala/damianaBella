@@ -79,9 +79,32 @@
     color: #64748b;
 }
 
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
 .action-btn {
     min-width: 36px;
     min-height: 36px;
+    flex-shrink: 0;
+}
+
+.action-btn.promote {
+    color: #9333ea;
+}
+
+.action-btn.promote:hover {
+    background-color: #f3e8ff;
+}
+
+.action-btn.demote {
+    color: #0891b2;
+}
+
+.action-btn.demote:hover {
+    background-color: #cffafe;
 }
 
 .action-btn.activate {

@@ -20,13 +20,13 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       fullWidth
       maxWidth={false}
       TransitionComponent={Grow}
-      transitionDuration={{ enter: 450, exit: 300 }}
+      transitionDuration={{ enter: 200, exit: 150 }}
       sx={{
         zIndex: 2000,
         '& .MuiBackdrop-root': {
-          background: 'linear-gradient(135deg, rgba(184,165,200,0.4) 0%, rgba(0,0,0,0.5) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          background: 'linear-gradient(135deg, rgba(184,165,200,0.35) 0%, rgba(0,0,0,0.45) 100%)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
         },
         '& .MuiDialog-paper': {
           background: 'linear-gradient(145deg, #ffffff 0%, #fafafa 100%)',
@@ -64,13 +64,14 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: title ? 'space-between' : 'flex-end',
-          p: isMobile ? '1.25rem 1.5rem' : '1.5rem 2rem',
+          p: title
+            ? (isMobile ? '1.25rem 1.5rem' : '1.5rem 2rem')
+            : (isMobile ? '0.75rem 1rem 0' : '0.75rem 1.25rem 0'),
           borderBottom: title ? '1px solid rgba(184,165,200,0.2)' : 'none',
           background: title
             ? 'linear-gradient(135deg, rgba(184,165,200,0.08) 0%, rgba(255,255,255,0.9) 100%)'
             : 'transparent',
           flexShrink: 0,
-          ...(!title && { pb: 0 }),
         }}
       >
         {title && (
@@ -119,6 +120,7 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         className="modal-body"
         sx={{
           p: isMobile ? '1.5rem' : '2rem',
+          overflowY: 'auto',
           color: 'var(--text-light)',
           fontSize: '1rem',
           lineHeight: 1.7,

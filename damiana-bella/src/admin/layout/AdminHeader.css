@@ -1,8 +1,8 @@
 /* Mobile-first: menu toggle visible by default */
 .admin-header {
     height: 50px;
-    background-color: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
+    background-color: var(--white);
+    border-bottom: 1px solid var(--gray-200);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -22,13 +22,13 @@
     color: #64748b;
     cursor: pointer;
     padding: 0.5rem;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     min-width: 44px;
     min-height: 44px;
 }
 
 .admin-menu-toggle:hover {
-    background-color: #f1f5f9;
+    background-color: var(--gray-175);
     color: #0f172a;
 }
 

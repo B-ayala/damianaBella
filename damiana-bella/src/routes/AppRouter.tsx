@@ -1,12 +1,12 @@
 import { Routes, Route } from 'react-router-dom';
-import ProtectedRoute from './protectRouter';
-import Home from '../pages/home/Home';
-import Products from '../pages/products/Products';
-import Contact from '../pages/contact/Contact';
-import About from '../pages/about/About';
-import ProductDetail from '../pages/producDetail/ProductDetail';
-import Checkout from '../pages/checkout/Checkout';
-import EmailConfirmation from '../pages/auth/EmailConfirmation';
+import UserLayout from '../users/layout/UserLayout';
+import Home from '../users/pages/home/Home';
+import Products from '../users/pages/products/Products';
+import Contact from '../users/pages/contact/Contact';
+import About from '../users/pages/about/About';
+import ProductDetail from '../users/pages/producDetail/ProductDetail';
+import Checkout from '../users/pages/checkout/Checkout';
+import EmailConfirmation from '../users/pages/auth/EmailConfirmation';
 import ScrollToTop from '../components/common/ScrollToTop';
 
 // Admin imports
@@ -40,7 +40,7 @@ const AppRouter = () => {
         </Route>
 
         {/* Public Routes */}
-        <Route element={<ProtectedRoute />}>
+        <Route element={<UserLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />

@@ -7,12 +7,77 @@
 }
 
 :root {
+  /* ─── BRAND / PRIMARY ─── */
   --primary-color: #B8A5C8;
   --primary-light: #D4C9E0;
   --primary-dark: #9A86AC;
+  --primary-bg: #F5F0FA;
+  --primary-accent: #B8377D;
+
+  /* ─── NEUTRALS / GRAYS ─── */
+  --white: #ffffff;
+  --off-white: #fafafa;
+  --gray-50: #fdfdfd;
+  --gray-75: #f9fafb;
+  --gray-100: #f8f8f8;
+  --gray-125: #f7f7f7;
+  --gray-150: #f5f5f5;
+  --gray-175: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #dddddd;
+  --gray-400: #ccc;
+  --gray-500: #999999;
+  --gray-600: #666666;
+  --gray-700: #555555;
   --text-dark: #333;
   --text-light: #666;
+  --black: #000000;
+
+  /* ─── SEMANTIC ─── */
+  --brand-green: #2c5f2d;
+  --success: #00a650;
+  --error: #ef4444;
+  --info: #3483fa;
+  --info-hover: #2968c8;
+  --info-dark: #1f62c2;
+  --info-secondary: #009ee3;
+
+  /* ─── LEGACY ALIASES (backwards compatibility) ─── */
   --bg-light: #F5F0FA;
+
+  /* ─── ADDITIONAL SEMANTIC COLORS ─── */
+  --dark-bg: #1a1a1a;
+  --button-dark: #050505;
+  --button-dark-hover: #234a24;
+
+  /* ─── BORDER RADIUS ─── */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 50px;
+
+  /* ─── SHADOWS ─── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 15px 40px rgba(0, 0, 0, 0.2);
+  --shadow-2xl: 0 25px 80px -20px rgba(184, 165, 200, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+  --shadow-primary: 0 10px 30px rgba(184, 165, 200, 0.4);
+  --shadow-primary-hover: 0 15px 40px rgba(184, 165, 200, 0.6);
+  --shadow-dark: 0 5px 20px rgba(0, 0, 0, 0.2);
+  --shadow-footer: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+  /* ─── TRANSITIONS ─── */
+  --transition-fast: 0.2s;
+  --transition-base: 0.3s;
+  --transition-slow: 0.4s;
+  --transition-curve: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-ease: ease;
+
+  /* ─── BREAKPOINTS (reference) ─── */
+  /* mobile: < 480px | tablet: 480px - 768px | desktop: 768px - 1024px | wide: >= 1024px */
 }
 
 body {

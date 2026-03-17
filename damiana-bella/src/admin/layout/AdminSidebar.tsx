@@ -8,10 +8,10 @@ const AdminSidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean, toggleSideba
     const logout = useAdminStore(state => state.logout);
 
     const navItems = [
-        { path: '/admin', name: 'Home Manager', icon: Home },
+        { path: '/admin', name: 'Inicio', icon: Home },
         { path: '/admin/products', name: 'Productos', icon: ShoppingBag },
         { path: '/admin/users', name: 'Usuarios', icon: Users },
-        { path: '/admin/about', name: 'About', icon: Info },
+        { path: '/admin/about', name: 'Acerca de', icon: Info },
         { path: '/admin/site-config', name: 'Config. del sitio', icon: Settings },
     ];
 

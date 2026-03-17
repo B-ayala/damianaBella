@@ -4,7 +4,6 @@ import { theme } from './utils/theme';
 import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
 import Footer from './components/common/Footer/Footer';
-import './App.css';
 
 const AppContent = () => {
   const location = useLocation();

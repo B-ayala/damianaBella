@@ -21,7 +21,13 @@ interface User {
  */
 export const createUser = async (payload: CreateUserPayload): Promise<{ success: boolean; data?: User; message?: string }> => {
   try {
-    // 1. Registrarse en Supabase Auth
+    // 1. Pre-check: solo leer si hay un cooldown activo (no modifica nada)
+    const status = await getSignupStatus(payload.email);
+    if (status?.blocked) {
+      throw new Error(`SIGNUP_RATE_LIMIT:${status.remainingSeconds}:${status.count}`);
+    }
+
+    // 2. Registrarse en Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: payload.email,
       password: payload.password,
@@ -29,7 +35,7 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
         data: {
           name: payload.name,
         },
-        emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
       },
     });
 
@@ -39,7 +45,8 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
         throw new Error('EMAIL_ALREADY_CONFIRMED');
       }
       if (authError.message?.toLowerCase().includes('rate limit') || authError.message?.toLowerCase().includes('over_email_send_rate_limit')) {
-        throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a intentarlo.');
+        const updated = await notifyRateLimit(payload.email);
+        throw new Error(`SIGNUP_RATE_LIMIT:${updated?.remainingSeconds ?? 60}:${updated?.count ?? 1}`);
       }
       throw new Error(authError.message);
     }
@@ -98,10 +105,10 @@ export const loginUser = async (payload: LoginPayload): Promise<{ success: boole
       throw new Error('Error al iniciar sesión');
     }
 
-    // Obtener datos del perfil
+    // Obtener datos del perfil (email vive en auth.users, no en profiles)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, name, role, email')
+      .select('id, name, role')
       .eq('id', authData.user.id)
       .single();
 
@@ -134,7 +141,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, name, role, email')
+      .select('id, name, role')
       .eq('id', user.id)
       .single();
 
@@ -168,6 +175,9 @@ export const resendConfirmationEmail = async (email: string): Promise<{ success:
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email,
+      options: {
+        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
+      },
     });
 
     if (error) {
@@ -218,7 +228,70 @@ export const verifyEmailConfirmation = async (token: string): Promise<{ success:
 // Admin API functions (Backend endpoints)
 // ============================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL_LOCAL || 'http://localhost:3000/api';
+
+type RateLimitStatus = { blocked: boolean; count: number; remainingSeconds: number; remainingAttempts: number };
+
+// Solo lee el estado actual — no modifica nada
+const getSignupStatus = async (email: string): Promise<RateLimitStatus | null> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/signup-status/${encodeURIComponent(email)}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+};
+
+// Llamar SOLO cuando Supabase devuelve rate limit
+const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/signup-ratelimit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Cambiar la contraseña del usuario actual
+ * Verifica la contraseña actual reautenticando, luego actualiza a la nueva
+ */
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user?.email) {
+      throw new Error('No hay usuario autenticado');
+    }
+
+    // Verificar contraseña actual reautenticando
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (signInError) {
+      throw new Error('La contraseña actual es incorrecta');
+    }
+
+    // Cambiar a la nueva contraseña
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      throw new Error(updateError.message || 'Error al cambiar la contraseña');
+    }
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Error al cambiar la contraseña');
+  }
+};
 
 export interface AdminUserData {
   id: string;
@@ -233,7 +306,7 @@ export interface AdminUserData {
  * Obtener todos los usuarios (endpoint admin del backend)
  */
 export const getAdminUsers = async (): Promise<AdminUserData[]> => {
-  const response = await fetch(`${API_BASE_URL}/api/users`);
+  const response = await fetch(`${API_BASE_URL}/users`);
 
   if (!response.ok) {
     throw new Error('Error al conectar con el servidor');
@@ -252,7 +325,7 @@ export const getAdminUsers = async (): Promise<AdminUserData[]> => {
  * Eliminar un usuario completamente (auth.users + profiles)
  */
 export const deleteAdminUser = async (userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(userId)}`, {
+  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
   });
 
@@ -261,4 +334,23 @@ export const deleteAdminUser = async (userId: string): Promise<void> => {
   if (!response.ok || !data.success) {
     throw new Error(data.message || 'Error al eliminar usuario');
   }
+};
+
+/**
+ * Actualizar el rol de un usuario (admin/user)
+ */
+export const updateUserRole = async (userId: string, newRole: 'admin' | 'user'): Promise<AdminUserData> => {
+  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: newRole }),
+  });
+
+  const data = await response.json().catch(() => ({ success: false, message: 'Error al actualizar usuario' }));
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || 'Error al actualizar el rol del usuario');
+  }
+
+  return data.data;
 };

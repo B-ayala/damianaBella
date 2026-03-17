@@ -1,5 +1,5 @@
 .footer-container {
-  background-color: #1a1a1a;
+  background-color: var(--dark-bg);
   color: #f0f0f0;
   padding: 40px 20px 0;
   font-family: 'Inter', sans-serif;
@@ -25,7 +25,7 @@
   font-size: 2.5rem;
   font-weight: 700;
   margin: 0;
-  color: #ffffff;
+  color: var(--white);
   letter-spacing: 2px;
 }
 
@@ -39,7 +39,7 @@
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 5px 0;
-  color: #ffffff;
+  color: var(--white);
   position: relative;
   padding-bottom: 10px;
 }
@@ -51,7 +51,7 @@
   bottom: 0;
   height: 2px;
   width: 50px;
-  background-color: #2c5f2d; /* Verde acento de la marca */
+  background-color: var(--brand-green);
 }
 
 .footer-links {
@@ -75,11 +75,11 @@
   align-items: center;
   gap: 10px;
   font-size: 0.95rem;
-  transition: color 0.3s ease;
+  transition: color var(--transition-base) var(--transition-ease);
 }
 
 .footer-link:hover {
-  color: #2c5f2d;
+  color: var(--brand-green);
 }
 
 .footer-icon {
@@ -98,9 +98,9 @@
 
 .footer-map-container {
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-footer);
   margin-top: 10px;
 }
 

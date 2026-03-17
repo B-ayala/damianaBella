@@ -14,9 +14,9 @@ const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
     const [sortConfig, setSortConfig] = useState<{ key: keyof AdminProduct, direction: 'asc' | 'desc' } | null>(null);
 
     // Filter by search term
-    let filteredProducts = products.filter((p) => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    let filteredProducts = products.filter((p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Sort

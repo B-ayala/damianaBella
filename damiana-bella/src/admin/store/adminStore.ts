@@ -1,12 +1,6 @@
 import { create } from 'zustand';
 import { loginUser, logoutUser } from '../../services/userService';
-
-import pantalonImg from '../../assets/products/pantalon.jpeg';
-import saquitoImg from '../../assets/products/saquito.png';
-import saquito2Img from '../../assets/products/saquito2.png';
-import saquitocompletoImg from '../../assets/products/saquitocompleto.png';
-import saquitocompleto1Img from '../../assets/products/saquitocompleto1.png';
-import saquitocompleto2Img from '../../assets/products/saquitocompleto2.png';
+import type { Variant, Specification, FAQ } from '../../types/product';
 
 export interface AdminProduct {
   id: string;
@@ -14,9 +8,17 @@ export interface AdminProduct {
   price: number;
   stock: number;
   category: string;
-  hasPromo: boolean;
-  promoPrice?: number;
   imageUrl: string;
+  description?: string;
+  discount?: number;
+  condition?: 'new' | 'used';
+  freeShipping?: boolean;
+  variants?: Variant[];
+  specifications?: Specification[];
+  features?: string[];
+  faqs?: FAQ[];
+  warranty?: string;
+  returnPolicy?: string;
   status: 'active' | 'inactive';
 }
 
@@ -39,6 +41,9 @@ export interface AboutInfo {
   title: string;
   description: string;
   imageUrl: string;
+  mission: string;
+  vision: string;
+  values: { title: string; description: string }[];
 }
 
 export interface FooterInfo {
@@ -70,6 +75,9 @@ interface AdminState {
   deleteCarouselImage: (id: string) => void;
   addFeaturedProduct: (id: string) => void;
   removeFeaturedProduct: (id: string) => void;
+  setProducts: (products: AdminProduct[]) => void;
+  addProduct: (product: AdminProduct) => void;
+  updateProduct: (id: string, data: Partial<AdminProduct>) => void;
   deleteProduct: (id: string) => void;
   updateUser: (id: string, data: Partial<AdminUser>) => void;
   aboutInfo: AboutInfo;
@@ -78,76 +86,50 @@ interface AdminState {
   updateFooterInfo: (data: Partial<FooterInfo>) => void;
 }
 
-const mockProducts: AdminProduct[] = [
-  { id: '1', name: 'Saquito Tejido Artesanal', price: 15000, stock: 12, category: 'Indumentaria', hasPromo: false, imageUrl: saquitoImg, status: 'active' },
-  { id: '2', name: 'Saquito Elegante', price: 4500, stock: 2, category: 'Indumentaria', hasPromo: true, promoPrice: 3500, imageUrl: saquito2Img, status: 'active' },
-  { id: '3', name: 'Pantalón Clásico', price: 22000, stock: 0, category: 'Indumentaria', hasPromo: false, imageUrl: pantalonImg, status: 'inactive' },
-  { id: '4', name: 'Saquito Completo Premium', price: 35000, stock: 5, category: 'Indumentaria', hasPromo: true, promoPrice: 30000, imageUrl: saquitocompletoImg, status: 'active' },
-  { id: '5', name: 'Conjunto Completo Clásico', price: 28000, stock: 8, category: 'Indumentaria', hasPromo: false, imageUrl: saquitocompleto1Img, status: 'active' },
-  { id: '6', name: 'Saquito Completo Deluxe', price: 32000, stock: 4, category: 'Indumentaria', hasPromo: true, promoPrice: 27000, imageUrl: saquitocompleto2Img, status: 'active' },
-];
-
-const mockUsers: AdminUser[] = [
-  { id: '1', name: 'Lia Admin', email: 'lia@gmail.com', role: 'admin', status: 'active' },
-  { id: '2', name: 'Juan Perez', email: 'juan@example.com', role: 'user', status: 'active' },
-  { id: '3', name: 'Maria Gomez', email: 'maria@example.com', role: 'user', status: 'inactive' },
-];
-
-const mockCarouselImages: CarouselImage[] = [
-  { id: '1', url: saquitocompletoImg, order: 1, isActive: true },
-  { id: '2', url: saquitocompleto1Img, order: 2, isActive: true },
-  { id: '3', url: saquitocompleto2Img, order: 3, isActive: false },
-];
-
-const mockAboutInfo: AboutInfo = {
-  title: 'Sobre LIA',
-  description: 'Somos una marca joven dedicada al diseño de prendas únicas y con estilo. Creemos en la moda consciente y en la importancia de los detalles. Nuestra misión es brindarte piezas versátiles que te acompañen en tu día a día, haciéndote sentir cómoda y empoderada.',
-  imageUrl: 'https://via.placeholder.com/800x600'
-};
-
-const mockFooterInfo: FooterInfo = {
-  brandName: 'LIA',
-  description: 'Encontrá calidad, tendencia y comodidad en LIA. Nos dedicamos a brindarte el mejor calzado y atención, para que des cada paso con estilo.',
-  whatsapp: '+54 9 11 4144-2409',
-  email: 'liazapatos2001@gmail.com',
-  tiktokUser: '@liazapatos',
-  tiktokUrl: 'https://www.tiktok.com/@liazapatos',
-  facebookUser: 'zapatos.lia.2020',
-  facebookUrl: 'https://www.facebook.com/zapatos.lia.2020/',
-  address: 'Avelino Díaz & Alfonsina Storni, Villa Celina, Buenos Aires',
-  mapQuery: 'Avelino%20D%C3%ADaz%20%26%20Alfonsina%20Storni,%20Villa%20Celina,%20Buenos%20Aires',
-  copyright: 'LIA Zapatos. Todos los derechos reservados.'
-};
-
 export const useAdminStore = create<AdminState>((set) => ({
   isAuthenticated: false,
   currentUser: null,
-  products: mockProducts,
-  users: mockUsers,
-  carouselImages: mockCarouselImages,
-  featuredProductIds: ['1', '4', '6'],
-  aboutInfo: mockAboutInfo,
-  footerInfo: mockFooterInfo,
+  products: [],
+  users: [],
+  carouselImages: [],
+  featuredProductIds: [],
+  aboutInfo: { title: '', description: '', imageUrl: '', mission: '', vision: '', values: [] },
+  footerInfo: {
+    brandName: '',
+    description: '',
+    whatsapp: '',
+    email: '',
+    tiktokUser: '',
+    tiktokUrl: '',
+    facebookUser: '',
+    facebookUrl: '',
+    address: '',
+    mapQuery: '',
+    copyright: '',
+  },
   login: async (email, pass) => {
-    try {
-      const response = await loginUser({ email, password: pass });
-      if (response.success && response.data && response.data.role === 'admin') {
+    const response = await loginUser({ email, password: pass });
+    console.log('[adminStore] loginUser response:', JSON.stringify(response));
+    if (response.success && response.data) {
+      const userData = {
+        id: response.data.id || '',
+        name: response.data.name,
+        email: response.data.email,
+        role: response.data.role,
+      };
+
+      if (response.data.role === 'admin') {
         set({
           isAuthenticated: true,
-          currentUser: {
-            id: response.data.id || '',
-            name: response.data.name,
-            email: response.data.email,
-            role: response.data.role,
-          }
+          currentUser: userData
         });
         return true;
+      } else {
+        set({ currentUser: userData });
+        return false;
       }
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
     }
+    return false;
   },
   logout: async () => {
     await logoutUser();
@@ -168,6 +150,13 @@ export const useAdminStore = create<AdminState>((set) => ({
   })),
   removeFeaturedProduct: (id) => set((state) => ({
     featuredProductIds: state.featuredProductIds.filter(pid => pid !== id)
+  })),
+  setProducts: (products) => set({ products }),
+  addProduct: (product) => set((state) => ({
+    products: [...state.products, product]
+  })),
+  updateProduct: (id, data) => set((state) => ({
+    products: state.products.map(p => p.id === id ? { ...p, ...data } : p)
   })),
   deleteProduct: (id) => set((state) => ({
     products: state.products.filter(p => p.id !== id)

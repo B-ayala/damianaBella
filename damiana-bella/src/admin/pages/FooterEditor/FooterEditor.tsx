@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 import { useAdminStore } from '../../store/adminStore';
+import { supabase } from '../../../config/supabaseClient';
 import './FooterEditor.css';
 
 const FooterEditor = () => {
@@ -18,17 +19,63 @@ const FooterEditor = () => {
     const [mapQuery, setMapQuery] = useState(footerInfo.mapQuery);
     const [copyright, setCopyright] = useState(footerInfo.copyright);
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSave = (e: React.FormEvent) => {
+    useEffect(() => {
+        const loadFooterInfo = async () => {
+            const { data, error } = await supabase
+                .from('site_content')
+                .select('value')
+                .eq('key', 'footer')
+                .single();
+
+            if (error) {
+                setError('Error al cargar los datos.');
+            } else if (data) {
+                const info = data.value as typeof footerInfo;
+                setBrandName(info.brandName ?? '');
+                setDescription(info.description ?? '');
+                setWhatsapp(info.whatsapp ?? '');
+                setEmail(info.email ?? '');
+                setTiktokUser(info.tiktokUser ?? '');
+                setTiktokUrl(info.tiktokUrl ?? '');
+                setFacebookUser(info.facebookUser ?? '');
+                setFacebookUrl(info.facebookUrl ?? '');
+                setAddress(info.address ?? '');
+                setMapQuery(info.mapQuery ?? '');
+                setCopyright(info.copyright ?? '');
+                updateFooterInfo(info);
+            }
+            setLoading(false);
+        };
+
+        loadFooterInfo();
+    }, []);
+
+    const handleSave = async (e: { preventDefault: () => void }) => {
         e.preventDefault();
-        updateFooterInfo({
+        setError(null);
+        const newInfo = {
             brandName, description, whatsapp, email,
             tiktokUser, tiktokUrl, facebookUser, facebookUrl,
             address, mapQuery, copyright
-        });
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        };
+
+        const { error } = await supabase
+            .from('site_content')
+            .upsert({ key: 'footer', value: newInfo, updated_at: new Date().toISOString() });
+
+        if (error) {
+            setError('Error al guardar. Intentá de nuevo.');
+        } else {
+            updateFooterInfo(newInfo);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        }
     };
+
+    if (loading) return <div className="admin-footer-editor"><p>Cargando...</p></div>;
 
     return (
         <div className="admin-footer-editor">
@@ -125,6 +172,7 @@ const FooterEditor = () => {
                             <Save size={18} /> Guardar Cambios
                         </button>
                         {saved && <span className="save-success text-green-600 font-medium">¡Guardado con éxito!</span>}
+                        {error && <span className="text-red-500 font-medium">{error}</span>}
                     </div>
                 </form>
             </div>

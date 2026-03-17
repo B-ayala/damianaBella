@@ -22,7 +22,7 @@ export interface Review {
 }
 
 export interface Product {
-  id: number;
+  id: string | number;
   name: string;
   price: number;
   image: string;
