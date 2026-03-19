@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, ShoppingBag, Users, Info, Settings, LogOut } from 'lucide-react';
+import { Home, ShoppingBag, Users, Info, Settings, LogOut, Image } from 'lucide-react';
 import { useAdminStore } from '../store/adminStore';
 import logoImg from '../../assets/img/logo.jpeg';
 import './AdminSidebar.css';
@@ -13,6 +13,7 @@ const AdminSidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean, toggleSideba
         { path: '/admin/users', name: 'Usuarios', icon: Users },
         { path: '/admin/about', name: 'Acerca de', icon: Info },
         { path: '/admin/site-config', name: 'Config. del sitio', icon: Settings },
+        { path: '/admin/cloudinary', name: 'Cloudinary', icon: Image },
     ];
 
     return (

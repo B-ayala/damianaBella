@@ -83,7 +83,7 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
       onClose={handleClose}
       title="Cambiar contraseña"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingTop: '0.75rem' }}>
         {feedbackMessage && (
           <Alert
             severity={feedbackMessage.type}
@@ -104,12 +104,10 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           disabled={isLoading}
-          placeholder="Ingresá tu contraseña actual"
           size="small"
           sx={{
-            '& .MuiOutlinedInput-root': {
-              fontSize: '0.95rem',
-            },
+            '& .MuiOutlinedInput-root': { fontSize: '0.95rem' },
+            '& .MuiInputLabel-root': { fontSize: '0.95rem' },
           }}
         />
 
@@ -121,12 +119,10 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           disabled={isLoading}
-          placeholder="Ingresá tu nueva contraseña"
           size="small"
           sx={{
-            '& .MuiOutlinedInput-root': {
-              fontSize: '0.95rem',
-            },
+            '& .MuiOutlinedInput-root': { fontSize: '0.95rem' },
+            '& .MuiInputLabel-root': { fontSize: '0.95rem' },
           }}
         />
 
@@ -138,12 +134,10 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           disabled={isLoading}
-          placeholder="Confirmá tu nueva contraseña"
           size="small"
           sx={{
-            '& .MuiOutlinedInput-root': {
-              fontSize: '0.95rem',
-            },
+            '& .MuiOutlinedInput-root': { fontSize: '0.95rem' },
+            '& .MuiInputLabel-root': { fontSize: '0.95rem' },
           }}
         />
 

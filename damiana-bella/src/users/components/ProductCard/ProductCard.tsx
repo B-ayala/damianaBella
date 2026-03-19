@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Product } from '../../../types/product';
-import { COLOR_MAP, COLOR_FALLBACK } from '../../../utils/constants';
+import { parseColorOption } from '../../../utils/constants';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -20,7 +20,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
     }
   };
 
-  const colorVariant = product.variants?.find(v => v.name === 'Color');
+  const colorVariant = product.variants?.find(v => v.name.toLowerCase() === 'color');
 
   return (
     <div className="product-card">
@@ -38,14 +38,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
         
         {colorVariant && colorVariant.options && (
           <div className="product-card__colors">
-            {colorVariant.options.map((color, index) => (
-              <span 
-                key={index}
-                className="product-card__color-circle"
-                style={{ backgroundColor: COLOR_MAP[color] || COLOR_FALLBACK }}
-                title={color}
-              />
-            ))}
+            {colorVariant.options.map((color, index) => {
+              const { name, hex } = parseColorOption(color);
+              return (
+                <span
+                  key={index}
+                  className="product-card__color-circle"
+                  style={{ backgroundColor: hex }}
+                  title={name}
+                />
+              );
+            })}
           </div>
         )}
 

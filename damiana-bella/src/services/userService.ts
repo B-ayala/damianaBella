@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient';
+import { apiFetch } from '../utils/apiFetch';
 
 interface CreateUserPayload {
   name: string;
@@ -228,14 +229,14 @@ export const verifyEmailConfirmation = async (token: string): Promise<{ success:
 // Admin API functions (Backend endpoints)
 // ============================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL_LOCAL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL_LOCAL;
 
 type RateLimitStatus = { blocked: boolean; count: number; remainingSeconds: number; remainingAttempts: number };
 
 // Solo lee el estado actual — no modifica nada
 const getSignupStatus = async (email: string): Promise<RateLimitStatus | null> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/users/signup-status/${encodeURIComponent(email)}`);
+    const res = await apiFetch(`${API_BASE_URL}/users/signup-status/${encodeURIComponent(email)}`);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -246,7 +247,7 @@ const getSignupStatus = async (email: string): Promise<RateLimitStatus | null> =
 // Llamar SOLO cuando Supabase devuelve rate limit
 const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/users/signup-ratelimit`, {
+    const res = await apiFetch(`${API_BASE_URL}/users/signup-ratelimit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -306,7 +307,7 @@ export interface AdminUserData {
  * Obtener todos los usuarios (endpoint admin del backend)
  */
 export const getAdminUsers = async (): Promise<AdminUserData[]> => {
-  const response = await fetch(`${API_BASE_URL}/users`);
+  const response = await apiFetch(`${API_BASE_URL}/users`);
 
   if (!response.ok) {
     throw new Error('Error al conectar con el servidor');
@@ -325,7 +326,7 @@ export const getAdminUsers = async (): Promise<AdminUserData[]> => {
  * Eliminar un usuario completamente (auth.users + profiles)
  */
 export const deleteAdminUser = async (userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
+  const response = await apiFetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
   });
 
@@ -340,7 +341,7 @@ export const deleteAdminUser = async (userId: string): Promise<void> => {
  * Actualizar el rol de un usuario (admin/user)
  */
 export const updateUserRole = async (userId: string, newRole: 'admin' | 'user'): Promise<AdminUserData> => {
-  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
+  const response = await apiFetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: newRole }),

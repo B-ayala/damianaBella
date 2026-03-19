@@ -9,6 +9,7 @@ export interface AdminProduct {
   stock: number;
   category: string;
   imageUrl: string;
+  images?: string[];
   description?: string;
   discount?: number;
   condition?: 'new' | 'used';
@@ -20,6 +21,7 @@ export interface AdminProduct {
   warranty?: string;
   returnPolicy?: string;
   status: 'active' | 'inactive';
+  featured?: boolean;
 }
 
 export interface AdminUser {
@@ -66,15 +68,12 @@ interface AdminState {
   products: AdminProduct[];
   users: AdminUser[];
   carouselImages: CarouselImage[];
-  featuredProductIds: string[];
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   setCarouselImages: (images: CarouselImage[]) => void;
   addCarouselImage: (url: string) => void;
   updateCarouselImage: (id: string, data: Partial<CarouselImage>) => void;
   deleteCarouselImage: (id: string) => void;
-  addFeaturedProduct: (id: string) => void;
-  removeFeaturedProduct: (id: string) => void;
   setProducts: (products: AdminProduct[]) => void;
   addProduct: (product: AdminProduct) => void;
   updateProduct: (id: string, data: Partial<AdminProduct>) => void;
@@ -92,7 +91,6 @@ export const useAdminStore = create<AdminState>((set) => ({
   products: [],
   users: [],
   carouselImages: [],
-  featuredProductIds: [],
   aboutInfo: { title: '', description: '', imageUrl: '', mission: '', vision: '', values: [] },
   footerInfo: {
     brandName: '',
@@ -144,12 +142,6 @@ export const useAdminStore = create<AdminState>((set) => ({
   })),
   deleteCarouselImage: (id) => set((state) => ({
     carouselImages: state.carouselImages.filter(img => img.id !== id)
-  })),
-  addFeaturedProduct: (id) => set((state) => ({
-    featuredProductIds: [...state.featuredProductIds, id]
-  })),
-  removeFeaturedProduct: (id) => set((state) => ({
-    featuredProductIds: state.featuredProductIds.filter(pid => pid !== id)
   })),
   setProducts: (products) => set({ products }),
   addProduct: (product) => set((state) => ({

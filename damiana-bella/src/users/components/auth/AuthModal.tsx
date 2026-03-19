@@ -481,7 +481,14 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         {/* Tabs */}
         <Tabs
           value={view}
-          onChange={(_, v) => setView(v as 'login' | 'register')}
+          onChange={(_, v) => {
+            setErrors({});
+            setServerError('');
+            setSuccessMessage('');
+            setEmailErrorType(null);
+            setEmailConfirmedByLink(false);
+            setView(v as 'login' | 'register');
+          }}
           variant="fullWidth"
           sx={{
             borderBottom: '2px solid rgba(184,165,200,0.25)',

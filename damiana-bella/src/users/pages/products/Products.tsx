@@ -19,16 +19,21 @@ const Products = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const toTitleCase = (str: string) =>
+    str.trim().replace(/\b\w/g, c => c.toUpperCase());
+
   const categories = useMemo(() => {
     const cats = Array.from(
-      new Set(products.map((p) => p.category).filter(Boolean))
+      new Set(products.map((p) => p.category ? toTitleCase(p.category) : null).filter(Boolean))
     ) as string[];
     return ['Todos', ...cats.sort()];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     if (activeCategory === 'Todos') return products;
-    return products.filter((p) => p.category === activeCategory);
+    return products.filter((p) =>
+      p.category?.toLowerCase() === activeCategory.toLowerCase()
+    );
   }, [products, activeCategory]);
 
   const handleCategoryClick = (cat: string) => {

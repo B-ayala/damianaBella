@@ -72,3 +72,13 @@ export const COLOR_MAP: Record<string, string> = {
 };
 
 export const COLOR_FALLBACK = '#CCCCCC';
+
+// Parsea una opción de color. Formato estándar: "Negro", "Azul", etc.
+// Formato custom: "Nombre|#hexvalue"
+export const parseColorOption = (colorStr: string): { name: string; hex: string } => {
+    const pipeIdx = colorStr.indexOf('|#');
+    if (pipeIdx !== -1) {
+        return { name: colorStr.slice(0, pipeIdx), hex: colorStr.slice(pipeIdx + 1) };
+    }
+    return { name: colorStr, hex: COLOR_MAP[colorStr] ?? COLOR_FALLBACK };
+};

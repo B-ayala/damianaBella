@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { sampleProducts } from '../../../data/products';
+import { fetchProductById, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import Modal from '../../../components/common/Modal/Modal';
 import VariantTable from '../../../components/common/VariantTable/VariantTable';
-import { COLOR_MAP, COLOR_FALLBACK } from '../../../utils/constants';
+import { parseColorOption } from '../../../utils/constants';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -22,12 +22,9 @@ const ProductDetail = () => {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
   useEffect(() => {
-    const foundProduct = sampleProducts.find(p => p.id === Number(id));
-    if (foundProduct) {
-      setProduct(foundProduct);
-    } else {
-      navigate('/products');
-    }
+    fetchProductById(id!)
+      .then((row) => setProduct(mapDbRowToProduct(row)))
+      .catch(() => navigate('/products'));
   }, [id, navigate]);
 
   if (!product) {
@@ -48,9 +45,11 @@ const ProductDetail = () => {
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
+  const stock = product.stock ?? 0;
+
   const handleQuantityChange = (delta: number) => {
     const newQuantity = quantity + delta;
-    if (newQuantity >= 1 && newQuantity <= (product.stock || 99)) {
+    if (newQuantity >= 1 && newQuantity <= stock) {
       setQuantity(newQuantity);
     }
   };
@@ -166,13 +165,16 @@ const ProductDetail = () => {
                     <label className="variant__label">{variant.name}:</label>
                     <div className="variant__options">
                       {variant.options.map((option) => {
-                        const isColor = variant.name === 'Color';
+                        const isColor = variant.name.toLowerCase() === 'color';
+                        const { name: colorName, hex: colorHex } = isColor
+                          ? parseColorOption(option)
+                          : { name: option, hex: '' };
                         return isColor ? (
                           <button
                             key={option}
                             className={`variant__color-circle ${selectedVariants[variant.name] === option ? 'variant__color-circle--selected' : ''}`}
-                            style={{ backgroundColor: COLOR_MAP[option] || COLOR_FALLBACK }}
-                            title={option}
+                            style={{ backgroundColor: colorHex }}
+                            title={colorName}
                             onClick={() => handleVariantChange(variant.name, option)}
                           />
                         ) : (
@@ -181,7 +183,7 @@ const ProductDetail = () => {
                             className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''}`}
                             onClick={() => handleVariantChange(variant.name, option)}
                           >
-                            {option}
+                            {variant.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option}
                           </button>
                         );
                       })}
@@ -201,29 +203,29 @@ const ProductDetail = () => {
             <div className="info__quantity">
               <label className="quantity__label">Cantidad:</label>
               <div className="quantity__controls">
-                <button 
+                <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(-1)}
-                  disabled={quantity <= 1}
+                  disabled={quantity <= 1 || stock === 0}
                 >
                   -
                 </button>
-                <input 
-                  type="text" 
-                  className="quantity__input" 
-                  value={quantity}
+                <input
+                  type="text"
+                  className="quantity__input"
+                  value={stock === 0 ? 0 : quantity}
                   readOnly
                 />
-                <button 
+                <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(1)}
-                  disabled={quantity >= (product.stock || 99)}
+                  disabled={stock === 0 || quantity >= stock}
                 >
                   +
                 </button>
               </div>
-              <span className="quantity__available">
-                ({product.stock || 0} disponibles)
+              <span className={`quantity__available${stock === 0 ? ' quantity__available--out' : ''}`}>
+                {stock === 0 ? 'Sin stock' : `(${stock} disponibles)`}
               </span>
             </div>
 
@@ -262,13 +264,51 @@ const ProductDetail = () => {
 
             {/* Botones de acción */}
             <div className="info__actions">
-              <button 
-                className="action-btn action-btn--primary"
+              <button
                 onClick={() => navigate('/checkout')}
+                disabled={stock === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  padding: '14px 24px',
+                  background: stock === 0 ? '#a0bcf8' : '#3483fa',
+                  color: '#ffffff',
+                  border: '2px solid #3483fa',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.2s',
+                  opacity: stock === 0 ? 0.6 : 1,
+                }}
               >
                 Comprar ahora
               </button>
-              <button className="action-btn action-btn--secondary">
+              <button
+                disabled={stock === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  padding: '14px 24px',
+                  background: '#ffffff',
+                  color: '#3483fa',
+                  border: '2px solid #3483fa',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.2s',
+                  opacity: stock === 0 ? 0.6 : 1,
+                }}
+              >
                 Agregar al carrito
               </button>
             </div>

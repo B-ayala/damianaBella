@@ -7,17 +7,38 @@ import './ProductTable.css';
 interface ProductTableProps {
     onEdit: (product: AdminProduct) => void;
     searchTerm: string;
+    filterCategory?: string;
+    filterStatus?: string;
+    filterStock?: string;
 }
 
-const ProductTable = ({ onEdit, searchTerm }: ProductTableProps) => {
+const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = '', filterStock = '' }: ProductTableProps) => {
     const { products, deleteProduct } = useAdminStore();
     const [sortConfig, setSortConfig] = useState<{ key: keyof AdminProduct, direction: 'asc' | 'desc' } | null>(null);
 
     // Filter by search term
     let filteredProducts = products.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Filter by category
+    if (filterCategory) {
+        filteredProducts = filteredProducts.filter(p => p.category === filterCategory);
+    }
+
+    // Filter by status
+    if (filterStatus) {
+        filteredProducts = filteredProducts.filter(p => p.status === filterStatus);
+    }
+
+    // Filter by stock
+    if (filterStock === 'in_stock') {
+        filteredProducts = filteredProducts.filter(p => p.stock > 0);
+    } else if (filterStock === 'low_stock') {
+        filteredProducts = filteredProducts.filter(p => p.stock > 0 && p.stock <= 5);
+    } else if (filterStock === 'out_of_stock') {
+        filteredProducts = filteredProducts.filter(p => p.stock === 0);
+    }
 
     // Sort
     if (sortConfig !== null) {

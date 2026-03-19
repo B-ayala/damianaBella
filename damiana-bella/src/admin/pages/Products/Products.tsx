@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search } from 'lucide-react';
 import ProductTable from '../../components/ProductTable/ProductTable';
 import ProductModal from '../../components/ProductModal/ProductModal';
@@ -7,11 +7,19 @@ import { fetchProducts } from '../../../services/productService';
 import './Products.css';
 
 const Products = () => {
-    const { setProducts } = useAdminStore();
+    const { setProducts, products } = useAdminStore();
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterStock, setFilterStock] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const categories = useMemo(() => {
+        const unique = [...new Set(products.map(p => p.category).filter(Boolean))];
+        return unique.sort();
+    }, [products]);
 
     useEffect(() => {
         const loadProducts = async () => {
@@ -36,6 +44,7 @@ const Products = () => {
                     warranty: (p.warranty as string) || undefined,
                     returnPolicy: (p.return_policy as string) || undefined,
                     status: (p.status as 'active' | 'inactive') || 'active',
+                    featured: (p.featured as boolean) || false,
                 }));
                 setProducts(mapped);
             } catch (err) {
@@ -70,14 +79,45 @@ const Products = () => {
             </div>
 
             <div className="admin-card products-toolbar">
-                <div className="search-input-wrapper admin-w-full admin-max-w-md">
+                <div className="search-input-wrapper">
                     <Search size={18} className="search-icon" />
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por nombre o categoría..."
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+                <div className="toolbar-filters">
+                    <select
+                        className="filter-select"
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                        <option value="">Todas las categorías</option>
+                        {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="filter-select"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                        <option value="">Todos los estados</option>
+                        <option value="active">Activo</option>
+                        <option value="inactive">Inactivo</option>
+                    </select>
+                    <select
+                        className="filter-select"
+                        value={filterStock}
+                        onChange={(e) => setFilterStock(e.target.value)}
+                    >
+                        <option value="">Todo el stock</option>
+                        <option value="in_stock">En stock</option>
+                        <option value="low_stock">Stock bajo (≤5)</option>
+                        <option value="out_of_stock">Sin stock</option>
+                    </select>
                 </div>
             </div>
 
@@ -85,7 +125,13 @@ const Products = () => {
                 {loading ? (
                     <p style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>Cargando productos...</p>
                 ) : (
-                    <ProductTable onEdit={handleOpenModal} searchTerm={searchTerm} />
+                    <ProductTable
+                        onEdit={handleOpenModal}
+                        searchTerm={searchTerm}
+                        filterCategory={filterCategory}
+                        filterStatus={filterStatus}
+                        filterStock={filterStock}
+                    />
                 )}
             </div>
 

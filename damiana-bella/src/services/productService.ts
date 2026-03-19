@@ -1,26 +1,33 @@
 import { supabase } from '../config/supabaseClient';
 import { type AdminProduct } from '../admin/store/adminStore';
 import type { Product } from '../types/product';
+import { apiFetch } from '../utils/apiFetch';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const mapDbRowToProduct = (row: any): Product => ({
-  id: row.id,
-  name: row.name,
-  price: row.price,
-  image: row.image_url || '',
-  description: row.description,
-  category: row.category,
-  discount: row.discount,
-  stock: row.stock,
-  condition: row.condition,
-  freeShipping: row.free_shipping,
-  variants: row.variants,
-  specifications: row.specifications,
-  features: row.features,
-  faqs: row.faqs,
-  warranty: row.warranty,
-  returnPolicy: row.return_policy,
-});
+export const mapDbRowToProduct = (row: any): Product => {
+  const images: string[] = row.images && row.images.length > 0
+    ? row.images
+    : row.image_url ? [row.image_url] : [];
+  return {
+    id: row.id,
+    name: row.name,
+    price: row.price,
+    image: images[0] || '',
+    images,
+    description: row.description,
+    category: row.category,
+    discount: row.discount,
+    stock: row.stock,
+    condition: row.condition,
+    freeShipping: row.free_shipping,
+    variants: row.variants,
+    specifications: row.specifications,
+    features: row.features,
+    faqs: row.faqs,
+    warranty: row.warranty,
+    returnPolicy: row.return_policy,
+  };
+};
 
 const API_URL = import.meta.env.VITE_API_URL_LOCAL;
 
@@ -42,6 +49,77 @@ export const getCloudinarySignature = async () => {
   return data.data;
 };
 
+export interface CloudinaryFolder {
+  name: string;
+  path: string;
+}
+
+// Fetch folders at a given path (empty = root)
+export const fetchCloudinaryFolders = async (token: string, path?: string): Promise<CloudinaryFolder[]> => {
+  const url = path
+    ? `${API_URL}/cloudinary/folders?path=${encodeURIComponent(path)}`
+    : `${API_URL}/cloudinary/folders`;
+  const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  if (!response.ok) throw new Error('Failed to fetch folders');
+  const data = await response.json();
+  return (data.data?.folders ?? []) as CloudinaryFolder[];
+};
+
+// Create a new folder
+export const createCloudinaryFolder = async (token: string, path: string): Promise<void> => {
+  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ path }),
+  });
+  if (!response.ok) throw new Error('Failed to create folder');
+};
+
+// Delete a folder (must be empty)
+export const deleteCloudinaryFolder = async (token: string, path: string): Promise<void> => {
+  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ path }),
+  });
+  if (!response.ok) throw new Error('Failed to delete folder');
+};
+
+// Fetch Cloudinary public config (cloudName, apiKey)
+export const fetchCloudinaryConfig = async (): Promise<{ cloudName: string; apiKey: string }> => {
+  const response = await fetch(`${API_URL}/cloudinary/config`);
+  if (!response.ok) throw new Error('Failed to fetch Cloudinary config');
+  const data = await response.json();
+  return data.data;
+};
+
+// Fetch images from Cloudinary (admin only)
+export const fetchCloudinaryImages = async (token: string, folder?: string, nextCursor?: string) => {
+  let url = `${API_URL}/cloudinary/images`;
+  const params = new URLSearchParams();
+  if (folder) params.set('folder', folder);
+  if (nextCursor) params.set('next_cursor', nextCursor);
+  if (params.toString()) url += `?${params.toString()}`;
+
+  const response = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch Cloudinary images');
+  const data = await response.json();
+  return data.data as { resources: CloudinaryResource[]; next_cursor?: string };
+};
+
+export interface CloudinaryResource {
+  public_id: string;
+  secure_url: string;
+  format: string;
+  bytes: number;
+  created_at: string;
+  width: number;
+  height: number;
+}
+
 // Delete image from Cloudinary
 export const deleteCloudinaryImage = async (publicId: string, token: string) => {
   const response = await fetch(`${API_URL}/cloudinary/delete`, {
@@ -58,6 +136,52 @@ export const deleteCloudinaryImage = async (publicId: string, token: string) => 
   }
 
   return response.json();
+};
+
+// Fetch unique active categories from Supabase
+export const fetchCategories = async (): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from('productos')
+    .select('category')
+    .eq('status', 'active');
+
+  if (error) {
+    console.error('Fetch categories error:', error);
+    throw error;
+  }
+
+  const categories = [...new Set(data?.map((p) => p.category).filter(Boolean))] as string[];
+  return categories.sort();
+};
+
+// Fetch featured products from Supabase (for home page)
+export const fetchFeaturedProducts = async () => {
+  const { data, error } = await supabase
+    .from('productos')
+    .select('*')
+    .eq('featured', true)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Fetch featured products error:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Toggle product featured status in Supabase
+export const toggleProductFeatured = async (id: string, featured: boolean) => {
+  const { error } = await supabase
+    .from('productos')
+    .update({ featured })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Toggle featured error:', error);
+    throw error;
+  }
 };
 
 // Fetch all products from Supabase
@@ -96,7 +220,7 @@ export const createProduct = async (
   product: Omit<AdminProduct, 'id'>,
   token: string
 ) => {
-  const response = await fetch(`${API_URL}/products`, {
+  const response = await apiFetch(`${API_URL}/products`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -137,7 +261,7 @@ export const updateProduct = async (
   product: Partial<AdminProduct>,
   token: string
 ) => {
-  const response = await fetch(`${API_URL}/products/${id}`, {
+  const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -174,7 +298,7 @@ export const updateProduct = async (
 
 // Delete product (via backend - also deletes from Cloudinary)
 export const deleteProduct = async (id: string, token: string) => {
-  const response = await fetch(`${API_URL}/products/${id}`, {
+  const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -187,6 +311,80 @@ export const deleteProduct = async (id: string, token: string) => {
   }
 
   return response.json();
+};
+
+// ── Carousel Images ──────────────────────────────────────────────────────────
+
+export interface CarouselImageRow {
+  id: string;
+  url: string;
+  order: number;
+  isActive: boolean;
+}
+
+const mapCarouselRow = (row: Record<string, unknown>): CarouselImageRow => ({
+  id: row.id as string,
+  url: row.url as string,
+  order: row.order as number,
+  isActive: row.is_active as boolean,
+});
+
+// Fetch active images (user-facing)
+export const fetchCarouselImages = async (): Promise<CarouselImageRow[]> => {
+  const { data, error } = await supabase
+    .from('carousel_images')
+    .select('*')
+    .eq('is_active', true)
+    .order('order', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapCarouselRow);
+};
+
+// Fetch all images (admin)
+export const fetchAllCarouselImages = async (): Promise<CarouselImageRow[]> => {
+  const { data, error } = await supabase
+    .from('carousel_images')
+    .select('*')
+    .order('order', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapCarouselRow);
+};
+
+export const insertCarouselImage = async (url: string, order: number): Promise<CarouselImageRow> => {
+  const { data, error } = await supabase
+    .from('carousel_images')
+    .insert([{ url, order, is_active: true }])
+    .select()
+    .single();
+  if (error) throw error;
+  return mapCarouselRow(data);
+};
+
+export const updateCarouselImageDb = async (
+  id: string,
+  changes: { url?: string; order?: number; is_active?: boolean }
+): Promise<void> => {
+  const { error } = await supabase
+    .from('carousel_images')
+    .update(changes)
+    .eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteCarouselImageDb = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('carousel_images')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+};
+
+export const reorderCarouselImages = async (images: { id: string; order: number }[]): Promise<void> => {
+  await Promise.all(
+    images.map(img =>
+      supabase.from('carousel_images').update({ order: img.order }).eq('id', img.id)
+    )
+  );
 };
 
 // Direct Supabase methods (for client-side operations if needed)

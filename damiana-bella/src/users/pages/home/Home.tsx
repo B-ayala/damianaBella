@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Carousel from '../../components/header/Carousel';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
-import { fetchProducts, mapDbRowToProduct } from '../../../services/productService';
+import { fetchFeaturedProducts, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import './Home.css';
 
@@ -9,7 +9,7 @@ const Home = () => {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    fetchProducts()
+    fetchFeaturedProducts()
       .then((rows) => setProducts(rows.map(mapDbRowToProduct)))
       .catch(console.error);
   }, []);

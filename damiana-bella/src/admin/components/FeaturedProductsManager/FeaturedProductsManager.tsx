@@ -1,21 +1,32 @@
 import { useState } from 'react';
 import { Search, Plus, Trash2 } from 'lucide-react';
 import { useAdminStore } from '../../store/adminStore';
+import { toggleProductFeatured } from '../../../services/productService';
 import './FeaturedProductsManager.css';
 
 const FeaturedProductsManager = () => {
-    const { products, featuredProductIds, addFeaturedProduct, removeFeaturedProduct } = useAdminStore();
+    const { products, updateProduct } = useAdminStore();
     const [searchTerm, setSearchTerm] = useState('');
 
-    const featuredProducts = products.filter((p) => featuredProductIds.includes(p.id));
-    
-    // search results logic
-    const searchResults = searchTerm.trim() 
-        ? products.filter((p) => 
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-            !featuredProductIds.includes(p.id)
+    const featuredProducts = products.filter((p) => p.featured);
+
+    const searchResults = searchTerm.trim()
+        ? products.filter((p) =>
+            p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            !p.featured
           )
         : [];
+
+    const handleAdd = async (id: string) => {
+        await toggleProductFeatured(id, true);
+        updateProduct(id, { featured: true });
+        setSearchTerm('');
+    };
+
+    const handleRemove = async (id: string) => {
+        await toggleProductFeatured(id, false);
+        updateProduct(id, { featured: false });
+    };
 
     return (
         <div className="admin-card featured-manager">
@@ -25,14 +36,14 @@ const FeaturedProductsManager = () => {
             <div className="featured-search-container">
                 <div className="search-input-wrapper">
                     <Search size={18} className="search-icon" />
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         placeholder="Buscar productos para destacar..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                
+
                 {searchResults.length > 0 && (
                     <div className="search-results-dropdown">
                         {searchResults.map((prod) => (
@@ -46,12 +57,9 @@ const FeaturedProductsManager = () => {
                                     <span className="result-name">{prod.name}</span>
                                     <span className="result-price">${prod.price}</span>
                                 </div>
-                                <button 
+                                <button
                                     className="admin-btn-secondary"
-                                    onClick={() => {
-                                        addFeaturedProduct(prod.id);
-                                        setSearchTerm('');
-                                    }}
+                                    onClick={() => handleAdd(prod.id)}
                                 >
                                     <Plus size={16} /> Agregar
                                 </button>
@@ -76,9 +84,9 @@ const FeaturedProductsManager = () => {
                                 <h4>{prod.name}</h4>
                                 <span>{prod.category}</span>
                             </div>
-                            <button 
+                            <button
                                 className="action-btn delete"
-                                onClick={() => removeFeaturedProduct(prod.id)}
+                                onClick={() => handleRemove(prod.id)}
                             >
                                 <Trash2 size={18} />
                             </button>

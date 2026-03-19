@@ -17,6 +17,7 @@ import AdminProducts from '../admin/pages/Products/Products';
 import AdminUsers from '../admin/pages/Users/Users';
 import AboutEditor from '../admin/pages/AboutEditor/AboutEditor';
 import FooterEditor from '../admin/pages/FooterEditor/FooterEditor';
+import CloudinaryManager from '../admin/pages/CloudinaryManager/CloudinaryManager';
 
 
 const AppRouter = () => {
@@ -36,6 +37,7 @@ const AppRouter = () => {
             <Route path="users" element={<AdminUsers />} />
             <Route path="about" element={<AboutEditor />} />
             <Route path="site-config" element={<FooterEditor />} />
+            <Route path="cloudinary" element={<CloudinaryManager />} />
           </Route>
         </Route>
 
