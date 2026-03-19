@@ -1,0 +1,286 @@
+import { Link } from 'react-router-dom';
+import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
+import logoImg from '../../../../assets/img/logo.jpeg';
+import AuthModal from '../../auth/AuthModal';
+import UserProfileDropdown from './UserProfileDropdown';
+import ChangePasswordModal from './ChangePasswordModal';
+import { useAdminStore } from '../../../../admin/store/adminStore';
+import { fetchCategories } from '../../../../services/productService';
+import './NavBar.css';
+
+const baseNavItems = [
+  { name: 'Inicio', path: '/', hasSubcategories: false },
+  { name: 'Productos', path: '/products', hasSubcategories: true },
+  { name: 'Contacto', path: '/contact', hasSubcategories: false },
+  { name: 'Acerca de', path: '/about', hasSubcategories: false }
+];
+
+const NavBar = () => {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const currentUser = useAdminStore(state => state.currentUser);
+  const logout = useAdminStore(state => state.logout);
+
+  // Nivel de navegación: 'main' = Nivel 1, o el nombre de la categoría activa (Nivel 2)
+  const [activeMenuLevel, setActiveMenuLevel] = useState<string>('main');
+
+  useBodyScrollLock(mobileMenuOpen);
+
+  useEffect(() => {
+    fetchCategories()
+      .then(setCategories)
+      .catch(console.error);
+  }, []);
+
+  const closeMenu = () => {
+    setMobileMenuOpen(false);
+    setTimeout(() => setActiveMenuLevel('main'), 300); // Restablecer luego de la animación
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  const handleMobileChangePassword = () => {
+    closeMenu();
+    setIsMobilePasswordModalOpen(true);
+  };
+
+  const isProductosLevel = activeMenuLevel === 'Productos';
+
+  return (
+    <nav className="navbar">
+      {/* Burbujas animadas */}
+      <div className="bubbles">
+        {[...Array(10)].map((_, i) => <div key={i} className="bubble"></div>)}
+      </div>
+
+      <div className="navbar-container">
+        {/* Mobile Menu Toggle */}
+        <button
+          className="mobile-menu-toggle"
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        {/* Logo */}
+        <Link to="/" className="navbar-logo" onClick={closeMenu}>
+          <img src={logoImg} alt="LIA Logo" className="logo-img" />
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="desktop-nav hide-mobile">
+          <ul className="desktop-nav-list">
+            {baseNavItems.map((item) => (
+              <li key={item.name} className="desktop-nav-item">
+                <Link to={item.path} className="desktop-nav-link">
+                  {item.name}
+                  {item.hasSubcategories && <FiChevronDown className="desktop-nav-arrow" />}
+                </Link>
+                {item.hasSubcategories && categories.length > 0 && (
+                  <div className="desktop-dropdown">
+                    <ul className="desktop-dropdown-list">
+                      {categories.map((cat, idx) => (
+                        <li key={idx} className="desktop-dropdown-item">
+                          <Link
+                            to={`/products?category=${cat}`}
+                            className="desktop-dropdown-link"
+                          >
+                            {cat}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Mobile Overlay */}
+        <div
+          className={`mobile-overlay ${mobileMenuOpen ? 'active' : ''}`}
+          onClick={closeMenu}
+        />
+
+        {/* Menú Principal Deslizable */}
+        <div className={`nav-menu-slider ${mobileMenuOpen ? 'active' : ''}`}>
+
+          {/* --- Nivel 1: Menú Principal --- */}
+          <div className={`nav-menu-level level-main ${activeMenuLevel !== 'main' ? 'slide-out' : ''}`}>
+            <div className="nav-menu-header">
+              <span className="nav-menu-title">Menú</span>
+              <button className="nav-menu-close" onClick={closeMenu}>
+                <FiX />
+              </button>
+            </div>
+
+            {currentUser && (
+              <div style={{ padding: '0', borderBottom: '1px solid rgba(184,165,200,0.2)' }}>
+                <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FiUser size={20} />
+                    <span style={{ fontWeight: 500 }}>{currentUser.name}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      color: '#c0392b',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Cerrar sesión"
+                  >
+                    <FiLogOut size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={handleMobileChangePassword}
+                  style={{
+                    width: '100%',
+                    padding: '0.9rem 1rem',
+                    background: 'none',
+                    border: 'none',
+                    borderTop: '1px solid rgba(184,165,200,0.15)',
+                    cursor: 'pointer',
+                    color: 'var(--text-dark)',
+                    fontSize: '0.95rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    transition: 'background-color var(--transition-fast)',
+                    textAlign: 'left'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  title="Cambiar contraseña"
+                >
+                  <FiLock size={18} />
+                  <span>Cambiar contraseña</span>
+                </button>
+              </div>
+            )}
+
+            <ul className="nav-menu-list">
+              {baseNavItems.map((item) => (
+                <li key={item.name} className="nav-menu-item">
+                  {item.hasSubcategories ? (
+                    <button
+                      className="nav-link-btn"
+                      onClick={() => setActiveMenuLevel(item.name)}
+                    >
+                      {item.name}
+                      <FiChevronRight className="nav-link-arrow" />
+                    </button>
+                  ) : (
+                    <Link
+                      to={item.path}
+                      className="nav-link"
+                      onClick={closeMenu}
+                    >
+                      {item.name}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* --- Nivel 2: Categorías --- */}
+          <div className={`nav-menu-level level-sub ${activeMenuLevel !== 'main' ? 'slide-in' : ''}`}>
+             <div className="nav-menu-header">
+              <button className="nav-menu-back" onClick={() => setActiveMenuLevel('main')}>
+                <FiArrowLeft />
+              </button>
+              <span className="nav-menu-title">{isProductosLevel ? 'PRODUCTOS' : activeMenuLevel.toUpperCase()}</span>
+              <button className="nav-menu-close" onClick={closeMenu}>
+                <FiX />
+              </button>
+            </div>
+
+            <ul className="nav-menu-list">
+              {categories.map((cat, idx) => (
+                <li key={idx} className="nav-menu-item">
+                  <Link
+                    to={`/products?category=${cat}`}
+                    className="nav-link"
+                    onClick={closeMenu}
+                  >
+                    {cat}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Right Side Icons */}
+        <div className="navbar-right">
+          <div className="search-container">
+            <button
+              className="icon-btn"
+              onClick={() => setSearchOpen(!searchOpen)}
+            >
+              <FiSearch className="icon" />
+            </button>
+            {searchOpen && (
+              <input
+                type="text"
+                placeholder="Buscar productos..."
+                className="search-input"
+                autoFocus
+              />
+            )}
+          </div>
+          {currentUser ? (
+            <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <>
+              <button
+                className="login-btn hide-mobile"
+                onClick={() => setIsAuthModalOpen(true)}
+              >
+                Iniciar sesion
+              </button>
+              <button
+                className="icon-btn hide-desktop"
+                onClick={() => setIsAuthModalOpen(true)}
+              >
+                <FiUser className="icon" />
+              </button>
+            </>
+          )}
+          <button className="icon-btn">
+            <FiShoppingCart className="icon" />
+          </button>
+        </div>
+      </div>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isMobilePasswordModalOpen}
+        onClose={() => setIsMobilePasswordModalOpen(false)}
+      />
+    </nav>
+  );
+};
+
+export default NavBar;

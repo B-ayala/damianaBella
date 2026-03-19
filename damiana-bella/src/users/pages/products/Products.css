@@ -1,0 +1,52 @@
+.products-page {
+  padding: 40px 2rem 2rem;
+  min-height: 100vh;
+}
+
+.products-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.products-container h1 {
+  font-size: 2.5rem;
+  color: #B8A5C8;
+  margin-bottom: 1.5rem;
+}
+
+/* Filtros por categoría */
+.products-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+}
+
+.products-filter-btn {
+  padding: 0.45rem 1.1rem;
+  border: 2px solid #B8A5C8;
+  border-radius: 999px;
+  background: transparent;
+  color: #B8A5C8;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.products-filter-btn:hover {
+  background: #B8A5C8;
+  color: #fff;
+}
+
+.products-filter-btn.active {
+  background: #B8A5C8;
+  color: #fff;
+}
+
+.products-loading,
+.products-empty {
+  color: #888;
+  font-size: 1rem;
+  margin-top: 2rem;
+}

@@ -1,0 +1,262 @@
+/* ============================================
+   PRODUCT MODAL STYLES - Professional Design
+   ============================================ */
+
+/* Remove modal-body padding when containing product modal */
+.modal-body:has(.product-modal-container) {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Mobile-first: stacked layout */
+.product-modal-container {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(184, 165, 200, 0.2);
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.product-modal-sidebar {
+    width: 100%;
+    border-bottom: 1px solid rgba(184, 165, 200, 0.2);
+    background: linear-gradient(180deg, rgba(184, 165, 200, 0.06) 0%, rgba(255, 255, 255, 0.9) 100%);
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: row;
+    gap: 0.35rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+    scrollbar-width: none;
+}
+
+.product-modal-sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Enhanced Tab Buttons with site palette */
+.tab-btn {
+    text-align: center;
+    background: none;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    min-height: 38px;
+    flex-shrink: 0;
+    font-family: 'Poppins', sans-serif;
+}
+
+.tab-btn:hover {
+    background: rgba(184, 165, 200, 0.15);
+    color: var(--primary-dark);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: #ffffff;
+    box-shadow: 0 3px 12px rgba(184, 165, 200, 0.35);
+}
+
+.product-modal-content {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
+}
+
+.product-modal-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.product-modal-content::-webkit-scrollbar-track {
+    background: rgba(184, 165, 200, 0.1);
+    border-radius: 3px;
+}
+
+.product-modal-content::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+}
+
+.tab-pane h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+}
+
+.tab-pane p {
+    color: var(--text-light);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+/* Enhanced Footer */
+.product-modal-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid rgba(184, 165, 200, 0.2);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(184, 165, 200, 0.06) 100%);
+    flex-shrink: 0;
+}
+
+.product-modal-footer button {
+    flex: 1;
+    min-height: 48px;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Primary button with gradient */
+.product-modal-footer .admin-btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 15px rgba(184, 165, 200, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.product-modal-footer .admin-btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.product-modal-footer .admin-btn-primary:hover {
+    box-shadow: 0 6px 25px rgba(184, 165, 200, 0.5);
+    transform: translateY(-2px);
+}
+
+.product-modal-footer .admin-btn-primary:hover::before {
+    left: 100%;
+}
+
+.product-modal-footer .admin-btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Secondary button with site palette */
+.product-modal-footer .admin-btn-secondary {
+    background: #fff;
+    color: var(--text-light);
+    border: 2px solid rgba(184, 165, 200, 0.3);
+    font-weight: 500;
+}
+
+.product-modal-footer .admin-btn-secondary:hover {
+    background: rgba(184, 165, 200, 0.1);
+    border-color: var(--primary-color);
+    color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(184, 165, 200, 0.15);
+}
+
+.product-modal-footer .admin-btn-secondary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Tablet (640px+) */
+@media (min-width: 640px) {
+    .product-modal-sidebar {
+        padding: 0.75rem 1rem;
+    }
+
+    .tab-btn {
+        font-size: 0.85rem;
+        padding: 0.625rem 1rem;
+    }
+
+    .product-modal-content {
+        padding: 1.5rem;
+    }
+
+    .tab-pane h3 {
+        font-size: 1.2rem;
+    }
+
+    .product-modal-footer {
+        padding: 1.25rem 1.75rem;
+        gap: 1rem;
+    }
+
+    .product-modal-footer button {
+        flex: none;
+        min-width: 160px;
+        padding: 0.875rem 2rem;
+    }
+}
+
+/* Desktop (768px+): side-by-side layout */
+@media (min-width: 768px) {
+    .product-modal-container {
+        flex-direction: row;
+        min-height: 400px;
+    }
+
+    .product-modal-sidebar {
+        width: 190px;
+        flex-direction: column;
+        border-right: 1px solid rgba(184, 165, 200, 0.2);
+        border-bottom: none;
+        overflow-x: visible;
+        overflow-y: auto;
+        gap: 0.5rem;
+        padding: 1rem 0.75rem;
+    }
+
+    .tab-btn {
+        text-align: left;
+        font-size: 0.875rem;
+        padding: 0.75rem 1rem;
+        width: 100%;
+    }
+
+    .product-modal-content {
+        padding: 1.75rem;
+    }
+
+    .tab-pane h3 {
+        font-size: 1.3rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .product-modal-sidebar {
+        width: 210px;
+    }
+
+    .product-modal-content {
+        padding: 2rem;
+    }
+}
