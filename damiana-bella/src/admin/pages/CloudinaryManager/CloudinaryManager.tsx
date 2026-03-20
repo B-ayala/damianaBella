@@ -5,6 +5,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '../../../config/supabaseClient';
+import { apiFetch } from '../../../utils/apiFetch';
 import { useAdminStore } from '../../store/adminStore';
 import {
   fetchCloudinaryImages,
@@ -181,7 +182,7 @@ const CloudinaryManager = () => {
           apiKey: config.apiKey,
           uploadSignature: async (callback: (sig: string, ts: number) => void, paramsToSign: Record<string, unknown>) => {
             const ts = Math.round(Date.now() / 1000);
-            const res = await fetch(`${import.meta.env.VITE_API_URL_LOCAL}/cloudinary/sign`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL_LOCAL}/cloudinary/sign`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify({ ...paramsToSign, timestamp: ts }),

@@ -33,7 +33,7 @@ const API_URL = import.meta.env.VITE_API_URL_LOCAL;
 
 // Get Cloudinary signature for signed uploads
 export const getCloudinarySignature = async () => {
-  const response = await fetch(`${API_URL}/cloudinary/sign`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/sign`, {
     method: 'POST',
   });
 
@@ -59,7 +59,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
   const url = path
     ? `${API_URL}/cloudinary/folders?path=${encodeURIComponent(path)}`
     : `${API_URL}/cloudinary/folders`;
-  const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (!response.ok) throw new Error('Failed to fetch folders');
   const data = await response.json();
   return (data.data?.folders ?? []) as CloudinaryFolder[];
@@ -67,7 +67,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
 
 // Create a new folder
 export const createCloudinaryFolder = async (token: string, path: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ path }),
@@ -77,7 +77,7 @@ export const createCloudinaryFolder = async (token: string, path: string): Promi
 
 // Delete a folder (must be empty)
 export const deleteCloudinaryFolder = async (token: string, path: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ path }),
@@ -87,7 +87,7 @@ export const deleteCloudinaryFolder = async (token: string, path: string): Promi
 
 // Fetch Cloudinary public config (cloudName, apiKey)
 export const fetchCloudinaryConfig = async (): Promise<{ cloudName: string; apiKey: string }> => {
-  const response = await fetch(`${API_URL}/cloudinary/config`);
+  const response = await apiFetch(`${API_URL}/cloudinary/config`);
   if (!response.ok) throw new Error('Failed to fetch Cloudinary config');
   const data = await response.json();
   return data.data;
@@ -101,7 +101,7 @@ export const fetchCloudinaryImages = async (token: string, folder?: string, next
   if (nextCursor) params.set('next_cursor', nextCursor);
   if (params.toString()) url += `?${params.toString()}`;
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
 
@@ -122,7 +122,7 @@ export interface CloudinaryResource {
 
 // Delete image from Cloudinary
 export const deleteCloudinaryImage = async (publicId: string, token: string) => {
-  const response = await fetch(`${API_URL}/cloudinary/delete`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/delete`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

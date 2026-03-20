@@ -4,6 +4,7 @@ import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
 import type { Variant, Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
+import { apiFetch } from '../../../utils/apiFetch';
 import './ProductModal.css';
 import './ProductModalStylesExtension.css';
 
@@ -142,7 +143,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
             images: validImages,
             condition,
             description,
-            discount: discount ? parseFloat(discount) : null,
+            discount: discount ? parseFloat(discount) : undefined,
             freeShipping,
             variants: variants.map(v => ({
                 name: v.name,
@@ -182,7 +183,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
 
             if (product?.id) {
                 // Editar: llamar API y actualizar store
-                const response = await fetch(
+                const response = await apiFetch(
                     `${import.meta.env.VITE_API_URL_LOCAL}/products/${product.id}`,
                     {
                         method: 'PUT',
@@ -200,7 +201,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                 updateProduct(product.id, payload);
             } else {
                 // Crear: llamar API y agregar al store
-                const response = await fetch(`${import.meta.env.VITE_API_URL_LOCAL}/products`, {
+                const response = await apiFetch(`${import.meta.env.VITE_API_URL_LOCAL}/products`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

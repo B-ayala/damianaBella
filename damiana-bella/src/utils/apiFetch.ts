@@ -4,6 +4,19 @@
  */
 export const apiFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const headers = new Headers(init?.headers);
-  headers.set('ngrok-skip-browser-warning', 'true');
+
+  const rawUrl = typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.toString()
+      : input.url;
+
+  const targetHost = new URL(rawUrl, window.location.origin).hostname;
+  const isNgrokHost = targetHost.endsWith('.ngrok-free.app') || targetHost.endsWith('.ngrok-free.dev');
+
+  if (isNgrokHost) {
+    headers.set('ngrok-skip-browser-warning', 'true');
+  }
+
   return fetch(input, { ...init, headers });
 };

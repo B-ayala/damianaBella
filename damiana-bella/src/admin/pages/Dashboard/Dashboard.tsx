@@ -9,7 +9,7 @@ const Dashboard = () => {
     const totalProducts = products.length;
     const lowStockProducts = products.filter(p => p.stock <= 5).length;
     const totalUsers = users.length;
-    const activePromos = products.filter(p => p.hasPromo && p.status === 'active').length;
+    const activePromos = products.filter(p => p.discount && p.discount > 0 && p.status === 'active').length;
 
     const cards = [
         { title: 'Total Productos', value: totalProducts, icon: Package, color: 'bg-blue-100 text-blue-600', iconColor: '#2563eb', bgColor: '#dbeafe' },
