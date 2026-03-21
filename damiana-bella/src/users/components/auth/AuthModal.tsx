@@ -226,50 +226,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [confirmationError, setConfirmationError] = useState('');
   const [emailConfirmedByLink, setEmailConfirmedByLink] = useState(false);
 
-  // Cooldown para reenvío de email
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Cooldown y contador para rate limit de registro
-  const [rateLimitCooldown, setRateLimitCooldown] = useState(0);
-  const [rateLimitCount, setRateLimitCount] = useState(0);
-  const rateLimitRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startCooldown = (seconds = 60) => {
-    setResendCooldown(seconds);
-    if (cooldownRef.current) clearInterval(cooldownRef.current);
-    cooldownRef.current = setInterval(() => {
-      setResendCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(cooldownRef.current!);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const startRateLimitCooldown = (seconds = 60) => {
-    setRateLimitCooldown(seconds);
-    if (rateLimitRef.current) clearInterval(rateLimitRef.current);
-    rateLimitRef.current = setInterval(() => {
-      setRateLimitCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(rateLimitRef.current!);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-      if (rateLimitRef.current) clearInterval(rateLimitRef.current);
-    };
-  }, []);
-
   // Escuchar confirmación de email desde la otra pestaña
   useEffect(() => {
     if (!showConfirmationModal) return;
@@ -304,9 +260,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setConfirmedEmail('');
     setConfirmationError('');
     setEmailConfirmedByLink(false);
-    setRateLimitCooldown(0);
-    setRateLimitCount(0);
-    if (rateLimitRef.current) clearInterval(rateLimitRef.current);
     // Ensure small timeout to not show reset during fade out animation
     setTimeout(() => {
         onClose();
@@ -400,13 +353,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         setEmailErrorType('pending');
         setServerError('pending');
       } else if (message.startsWith('SIGNUP_RATE_LIMIT:')) {
-        const [, secs, cnt] = message.split(':');
-        const remainingSeconds = parseInt(secs) || 60;
-        const count = parseInt(cnt) || 1;
-        setEmailErrorType(null);
-        setRateLimitCount(count);
-        if (remainingSeconds > 0) startRateLimitCooldown(remainingSeconds);
-        setServerError('__rate_limit__');
+        setConfirmedEmail(registerEmail.trim());
+        setShowConfirmationModal(true);
+        setConfirmationError('');
       } else {
         setEmailErrorType(null);
         setServerError(message);
@@ -427,7 +376,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     try {
       const result = await resendConfirmationEmail(registerEmail.trim());
       setSuccessMessage(result.message);
-      startCooldown(60);
       setTimeout(() => {
         setSuccessMessage('');
         setView('login');
@@ -436,9 +384,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al reenviar el email';
       setServerError(message);
-      if (message.toLowerCase().includes('demasiados intentos') || message.toLowerCase().includes('rate limit')) {
-        startCooldown(60);
-      }
     } finally {
       setIsResendingEmail(false);
     }
@@ -454,14 +399,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setConfirmationError('');
     try {
       await resendConfirmationEmail(confirmedEmail);
-      startCooldown(60);
       setConfirmationError('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al reenviar el email';
       setConfirmationError(message);
-      if (message.toLowerCase().includes('demasiados intentos') || message.toLowerCase().includes('rate limit')) {
-        startCooldown(60);
-      }
     } finally {
       setIsResendingEmail(false);
     }
@@ -710,24 +651,15 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   <Button
                     type="button"
                     onClick={handleResendEmail}
-                    disabled={isResendingEmail || resendCooldown > 0}
+                    disabled={isResendingEmail}
                     startIcon={<FiMail size={15} />}
                     sx={resendBtnSx}
                   >
-                    {isResendingEmail ? 'Reenviando...' : resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : 'Reenviar email de confirmación'}
+                    {isResendingEmail ? 'Reenviando...' : 'Reenviar email de confirmación'}
                   </Button>
                 </Alert>
               )}
-              {!emailErrorType && serverError === '__rate_limit__' && rateLimitCount >= 2 && rateLimitCooldown === 0 && (
-                <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
-                  <Box>
-                    Te {Math.max(0, 6 - rateLimitCount) === 1 ? 'queda' : 'quedan'}{' '}
-                    <strong>{Math.max(0, 6 - rateLimitCount)}</strong>{' '}
-                    intento{Math.max(0, 6 - rateLimitCount) === 1 ? '' : 's'} más.
-                  </Box>
-                </Alert>
-              )}
-              {!emailErrorType && serverError && serverError !== '__rate_limit__' && (
+              {!emailErrorType && serverError && (
                 <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
                   {serverError}
                 </Alert>
@@ -739,16 +671,11 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 </Alert>
               )}
 
-              <Button type="submit" disabled={isLoading || rateLimitCooldown > 0} variant="contained" fullWidth sx={submitBtnSx}
+              <Button type="submit" disabled={isLoading} variant="contained" fullWidth sx={submitBtnSx}
                 startIcon={!isLoading ? <FiUserPlus size={18} /> : undefined}
               >
                 {isLoading ? 'Registrando...' : 'Registrarse'}
               </Button>
-              {rateLimitCooldown > 0 && (
-                <Box sx={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', mt: '-0.5rem' }}>
-                  Podés volver a intentar en <strong style={{ color: '#c0392b' }}>{rateLimitCooldown}s</strong>
-                </Box>
-              )}
             </Box>
           )}
 
@@ -928,7 +855,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           <Stack direction="column" spacing={1} sx={{ width: '100%', mt: 1 }}>
             <Button
               onClick={handleResendEmailFromConfirmation}
-              disabled={isResendingEmail || resendCooldown > 0}
+              disabled={isResendingEmail}
               variant="contained"
               fullWidth
               startIcon={<FiMail size={16} />}
@@ -950,7 +877,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 '&.Mui-disabled': { opacity: 0.65, color: 'white', background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)' },
               }}
             >
-              {isResendingEmail ? 'Reenviando...' : resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : '¿No te llegó el correo? Reenviar'}
+              {isResendingEmail ? 'Reenviando...' : '¿No te llegó el correo? Reenviar'}
             </Button>
 
             <Button
