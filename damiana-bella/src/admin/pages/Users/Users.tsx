@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, RefreshCw, Shield, ShieldOff } from 'lucide-react';
+import { Pagination, Box } from '@mui/material';
 import { useAdminStore } from '../../store/adminStore';
 import { getAdminUsers, deleteAdminUser, updateUserRole, type AdminUserData } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
@@ -9,6 +10,8 @@ const Users = () => {
     const currentUser = useAdminStore(state => state.currentUser);
     const [users, setUsers] = useState<AdminUserData[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [userToDelete, setUserToDelete] = useState<AdminUserData | null>(null);
@@ -37,9 +40,19 @@ const Users = () => {
         loadUsers();
     }, []);
 
-    const filteredUsers = users.filter((u) => 
-        (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const filteredUsers = users.filter((u) =>
+        (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
+    const paginatedUsers = filteredUsers.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
     );
 
     const handleDeleteClick = (user: AdminUserData) => {
@@ -93,6 +106,16 @@ const Users = () => {
         }
 
         const newRole = user.role === 'admin' ? 'user' : 'admin';
+
+        if (newRole === 'admin' && !user.email_confirmed_at) {
+            setFeedback({
+                isOpen: true,
+                status: 'error',
+                title: 'Acción no permitida',
+                message: `El usuario "${user.name || user.email}" no ha confirmado su email. Solo se puede dar rol admin a usuarios verificados.`,
+            });
+            return;
+        }
 
         try {
             const updatedUser = await updateUserRole(user.id, newRole);
@@ -160,6 +183,7 @@ const Users = () => {
                         <p>Cargando usuarios...</p>
                     </div>
                 ) : (
+                    <>
                     <div className="admin-table-container">
                         <table className="admin-table">
                             <thead>
@@ -179,9 +203,16 @@ const Users = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredUsers.map((user) => {
+                                    paginatedUsers.map((user) => {
                                         const emailStatus = getEmailStatus(user);
                                         const isSelf = currentUser?.id === user.id;
+                                        const canPromote = !!user.email_confirmed_at;
+                                        const roleButtonDisabled = isSelf || (user.role !== 'admin' && !canPromote);
+                                        const roleButtonTitle = isSelf
+                                            ? 'No puedes cambiar tu rol'
+                                            : user.role !== 'admin' && !canPromote
+                                                ? 'El usuario debe confirmar su email antes de ser admin'
+                                                : `Cambiar a ${user.role === 'admin' ? 'usuario' : 'admin'}`;
                                         return (
                                             <tr key={user.id}>
                                                 <td className="font-medium">{user.name || '—'}</td>
@@ -201,8 +232,8 @@ const Users = () => {
                                                         <button
                                                             onClick={() => handleToggleRole(user)}
                                                             className={`action-btn ${user.role === 'admin' ? 'demote' : 'promote'}`}
-                                                            title={isSelf ? 'No puedes cambiar tu rol' : `Cambiar a ${user.role === 'admin' ? 'usuario' : 'admin'}`}
-                                                            disabled={isSelf}
+                                                            title={roleButtonTitle}
+                                                            disabled={roleButtonDisabled}
                                                         >
                                                             {user.role === 'admin' ? <ShieldOff size={16} /> : <Shield size={16} />}
                                                         </button>
@@ -223,6 +254,20 @@ const Users = () => {
                             </tbody>
                         </table>
                     </div>
+                    {totalPages > 1 && (
+                        <Box display="flex" justifyContent="center" alignItems="center" pt={1} pb={0.5}>
+                            <Pagination
+                                count={totalPages}
+                                page={currentPage}
+                                onChange={(_, page) => setCurrentPage(page)}
+                                size="small"
+                                siblingCount={1}
+                                boundaryCount={1}
+                                color="primary"
+                            />
+                        </Box>
+                    )}
+                    </>
                 )}
             </div>
 

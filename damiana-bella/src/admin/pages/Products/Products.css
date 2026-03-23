@@ -33,11 +33,38 @@
     gap: 0.5rem;
 }
 
+.products-header-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
 .admin-btn-primary {
     min-height: 44px;
     padding: 0 1rem;
     white-space: nowrap;
     width: 100%;
+}
+
+.admin-btn-secondary {
+    min-height: 44px;
+    padding: 0 1rem;
+    white-space: nowrap;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.admin-btn-secondary:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
 .products-toolbar {
@@ -106,8 +133,19 @@
         justify-content: space-between;
     }
 
+    .products-header-actions {
+        flex-direction: row;
+        width: auto;
+        gap: 0.5rem;
+    }
+
     .admin-btn-primary {
         width: auto;
+    }
+
+    .admin-btn-secondary {
+        width: auto;
+        min-height: 38px;
     }
 
     .admin-max-w-md {

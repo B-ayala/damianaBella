@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Pagination, Box } from '@mui/material';
 import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { StockBadge, StatusBadge } from './ProductBadges';
+import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
+import { deleteProduct as deleteProductApi } from '../../../services/productService';
+import { supabase } from '../../../config/supabaseClient';
 import './ProductTable.css';
 
 interface ProductTableProps {
@@ -15,6 +19,9 @@ interface ProductTableProps {
 const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = '', filterStock = '' }: ProductTableProps) => {
     const { products, deleteProduct } = useAdminStore();
     const [sortConfig, setSortConfig] = useState<{ key: keyof AdminProduct, direction: 'asc' | 'desc' } | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
 
     // Filter by search term
     let filteredProducts = products.filter((p) =>
@@ -54,6 +61,17 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
         });
     }
 
+    // Reset page when filters/search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterCategory, filterStatus, filterStock]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    const paginatedProducts = filteredProducts.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
+
     const requestSort = (key: keyof AdminProduct) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -69,7 +87,7 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                 {filteredProducts.length === 0 ? (
                     <p className="empty-message">No se encontraron productos.</p>
                 ) : (
-                    filteredProducts.map((product) => (
+                    paginatedProducts.map((product) => (
                         <div className="product-card" key={product.id}>
                             <div className="product-card-top">
                                 {product.imageUrl ? (
@@ -85,11 +103,7 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                                     <button onClick={() => onEdit(product)} className="action-btn edit" title="Editar">
                                         <Edit size={16} />
                                     </button>
-                                    <button onClick={() => {
-                                        if (window.confirm('¿Eliminar producto?')) {
-                                            deleteProduct(product.id);
-                                        }
-                                    }} className="action-btn delete" title="Eliminar">
+                                    <button onClick={() => setConfirmDeleteId(product.id)} className="action-btn delete" title="Eliminar">
                                         <Trash2 size={16} />
                                     </button>
                                 </div>
@@ -140,7 +154,7 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                             <td colSpan={7} className="text-center py-4 text-slate-500">No se encontraron productos.</td>
                         </tr>
                     ) : (
-                        filteredProducts.map((product) => (
+                        paginatedProducts.map((product) => (
                             <tr key={product.id}>
                                 <td>
                                     {product.imageUrl ? (
@@ -163,11 +177,7 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                                         <button onClick={() => onEdit(product)} className="action-btn edit" title="Editar">
                                             <Edit size={16} />
                                         </button>
-                                        <button onClick={() => {
-                                            if (window.confirm('¿Eliminar producto?')) {
-                                                deleteProduct(product.id);
-                                            }
-                                        }} className="action-btn delete" title="Eliminar">
+                                        <button onClick={() => setConfirmDeleteId(product.id)} className="action-btn delete" title="Eliminar">
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
@@ -177,6 +187,44 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                     )}
                 </tbody>
             </table>
+
+        {totalPages > 1 && (
+            <Box display="flex" justifyContent="center" alignItems="center" pt={1} pb={0.5}>
+                <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={(_, page) => setCurrentPage(page)}
+                    size="small"
+                    siblingCount={1}
+                    boundaryCount={1}
+                    color="primary"
+                />
+            </Box>
+        )}
+
+        <ConfirmationModal
+            isOpen={confirmDeleteId !== null}
+            onClose={() => setConfirmDeleteId(null)}
+            title="Eliminar producto"
+            message="¿Estás seguro de que querés eliminar este producto? Esta acción no se puede deshacer."
+            status="error"
+            actionButtonText="Eliminar"
+            cancelButtonText="Cancelar"
+            onActionClick={async () => {
+                if (!confirmDeleteId) return;
+                try {
+                    const session = await supabase.auth.getSession();
+                    const token = session.data.session?.access_token;
+                    if (!token) throw new Error('Token no disponible');
+                    await deleteProductApi(confirmDeleteId, token);
+                    deleteProduct(confirmDeleteId);
+                } catch (err) {
+                    console.error('Error eliminando producto:', err);
+                } finally {
+                    setConfirmDeleteId(null);
+                }
+            }}
+        />
         </div>
     );
 };

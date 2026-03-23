@@ -1,12 +1,36 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, BarChart2 } from 'lucide-react';
 import ProductTable from '../../components/ProductTable/ProductTable';
 import ProductModal from '../../components/ProductModal/ProductModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
-import { fetchProducts } from '../../../services/productService';
+import { fetchAllProducts } from '../../../services/productService';
 import './Products.css';
 
+const mapProductRow = (p: Record<string, unknown>): AdminProduct => ({
+    id: String(p.id),
+    name: p.name as string,
+    price: p.price as number,
+    stock: p.stock as number,
+    category: (p.category as string) || '',
+    imageUrl: (p.image_url as string) || '',
+    images: (p.images as string[]) || undefined,
+    description: (p.description as string) || undefined,
+    discount: (p.discount as number) || undefined,
+    condition: (p.condition as 'new' | 'used') || 'new',
+    freeShipping: (p.free_shipping as boolean) || false,
+    variants: (p.variants as AdminProduct['variants']) || undefined,
+    specifications: (p.specifications as AdminProduct['specifications']) || undefined,
+    features: (p.features as string[]) || undefined,
+    faqs: (p.faqs as AdminProduct['faqs']) || undefined,
+    warranty: (p.warranty as string) || undefined,
+    returnPolicy: (p.return_policy as string) || undefined,
+    status: (p.status as 'active' | 'inactive') || 'active',
+    featured: (p.featured as boolean) || false,
+});
+
 const Products = () => {
+    const navigate = useNavigate();
     const { setProducts, products } = useAdminStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
@@ -21,40 +45,21 @@ const Products = () => {
         return unique.sort();
     }, [products]);
 
+    const loadProducts = async () => {
+        try {
+            const data = await fetchAllProducts();
+            setProducts(data.map((p: Record<string, unknown>) => mapProductRow(p)));
+        } catch (err) {
+            console.error('Error cargando productos:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadProducts = async () => {
-            try {
-                const data = await fetchProducts();
-                // Mapear snake_case de la DB a camelCase del store
-                const mapped: AdminProduct[] = data.map((p: Record<string, unknown>) => ({
-                    id: String(p.id),
-                    name: p.name as string,
-                    price: p.price as number,
-                    stock: p.stock as number,
-                    category: (p.category as string) || '',
-                    imageUrl: (p.image_url as string) || '',
-                    description: (p.description as string) || undefined,
-                    discount: (p.discount as number) || undefined,
-                    condition: (p.condition as 'new' | 'used') || 'new',
-                    freeShipping: (p.free_shipping as boolean) || false,
-                    variants: (p.variants as AdminProduct['variants']) || undefined,
-                    specifications: (p.specifications as AdminProduct['specifications']) || undefined,
-                    features: (p.features as string[]) || undefined,
-                    faqs: (p.faqs as AdminProduct['faqs']) || undefined,
-                    warranty: (p.warranty as string) || undefined,
-                    returnPolicy: (p.return_policy as string) || undefined,
-                    status: (p.status as 'active' | 'inactive') || 'active',
-                    featured: (p.featured as boolean) || false,
-                }));
-                setProducts(mapped);
-            } catch (err) {
-                console.error('Error cargando productos:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
         loadProducts();
-    }, [setProducts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleOpenModal = (product?: AdminProduct) => {
         setEditingProduct(product || null);
@@ -73,9 +78,14 @@ const Products = () => {
                     <h1 className="admin-page-title">Productos</h1>
                     <p className="admin-page-subtitle">Administra tu catálogo de productos.</p>
                 </div>
-                <button className="admin-btn-primary admin-flex-center gap-2" onClick={() => handleOpenModal()}>
-                    <Plus size={18} /> Nuevo Producto
-                </button>
+                <div className="products-header-actions">
+                    <button className="admin-btn-secondary admin-flex-center gap-2" onClick={() => navigate('/admin/sales')}>
+                        <BarChart2 size={16} /> Ver ventas
+                    </button>
+                    <button className="admin-btn-primary admin-flex-center gap-2" onClick={() => handleOpenModal()}>
+                        <Plus size={18} /> Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             <div className="admin-card products-toolbar">
@@ -135,10 +145,11 @@ const Products = () => {
                 )}
             </div>
 
-            <ProductModal 
-                isOpen={isModalOpen} 
-                onClose={handleCloseModal} 
-                product={editingProduct} 
+            <ProductModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                product={editingProduct}
+                onSaved={loadProducts}
             />
         </div>
     );

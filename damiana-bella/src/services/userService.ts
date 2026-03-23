@@ -185,6 +185,11 @@ export const resendConfirmationEmail = async (email: string): Promise<{ success:
       if (error.message?.toLowerCase().includes('rate limit') || error.message?.toLowerCase().includes('over_email_send_rate_limit')) {
         throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a solicitar el email.');
       }
+      if (error.message?.toLowerCase().includes('you can only request this after')) {
+        const match = error.message.match(/after (\d+) second/);
+        const seconds = match ? match[1] : '60';
+        throw new Error(`RESEND_COOLDOWN:${seconds}`);
+      }
       throw new Error(error.message);
     }
 

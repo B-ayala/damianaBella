@@ -2,6 +2,58 @@
    PRODUCT DETAIL — estilos base (mobile-first → desktop)
    ============================================================ */
 
+/* ---------- Animaciones ---------- */
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-7px); }
+  40%  { transform: translateX(7px); }
+  60%  { transform: translateX(-5px); }
+  80%  { transform: translateX(5px); }
+  100% { transform: translateX(0); }
+}
+
+/* ---------- Error de variantes ---------- */
+.variant--error {
+  border: 2px solid #ef4444;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background-color: #fef2f2;
+  transition: border-color 0.2s;
+}
+
+.variant--error.variant--shake {
+  animation: shake 0.45s ease;
+}
+
+.variant-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fef2f2;
+  border: 2px solid #ef4444;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.variant-error-banner__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 /* ---------- Contenedor raíz ---------- */
 .product-detail {
   width: 100%;

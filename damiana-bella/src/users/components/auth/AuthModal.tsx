@@ -224,7 +224,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
   const [confirmationError, setConfirmationError] = useState('');
+  const [emailActuallySent, setEmailActuallySent] = useState(false);
   const [emailConfirmedByLink, setEmailConfirmedByLink] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Escuchar confirmación de email desde la otra pestaña
   useEffect(() => {
@@ -318,6 +321,21 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     }
   };
 
+  const startResendCooldown = (seconds: number) => {
+    setResendCooldown(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const handleRegisterSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setServerError('');
@@ -336,8 +354,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
 
       // Mostrar modal de confirmación en lugar de redirigir automáticamente
       setConfirmedEmail(registerEmail.trim());
+      setEmailActuallySent(true);
       setShowConfirmationModal(true);
       setConfirmationError('');
+      startResendCooldown(60);
 
       // Limpiar formulario
       setRegisterName('');
@@ -354,6 +374,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         setServerError('pending');
       } else if (message.startsWith('SIGNUP_RATE_LIMIT:')) {
         setConfirmedEmail(registerEmail.trim());
+        setEmailActuallySent(false);
         setShowConfirmationModal(true);
         setConfirmationError('');
       } else {
@@ -402,7 +423,13 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       setConfirmationError('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al reenviar el email';
-      setConfirmationError(message);
+      if (message.startsWith('RESEND_COOLDOWN:')) {
+        const seconds = parseInt(message.split(':')[1], 10) || 60;
+        startResendCooldown(seconds);
+        setConfirmationError('');
+      } else {
+        setConfirmationError(message);
+      }
     } finally {
       setIsResendingEmail(false);
     }
@@ -412,6 +439,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setShowConfirmationModal(false);
     setConfirmedEmail('');
     setConfirmationError('');
+    setEmailActuallySent(false);
+    setResendCooldown(0);
+    if (cooldownRef.current) { clearInterval(cooldownRef.current); cooldownRef.current = null; }
     setView('login');
   };
 
@@ -810,14 +840,16 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </Typography>
 
           <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' }, color: '#666', fontWeight: 500 }}>
-            Hemos enviado un enlace de confirmación a:
+            {emailActuallySent
+              ? 'Hemos enviado un enlace de confirmación a:'
+              : 'Tu cuenta fue creada, pero no pudimos enviar el email de confirmación a:'}
           </Typography>
 
           <Box
             sx={{
               fontSize: { xs: '0.75rem', sm: '0.85rem' },
               color: 'var(--primary-color)',
-              fontWeight: 600,
+            fontWeight: 600,
               background: 'rgba(102,126,234,0.08)',
               p: { xs: '0.5rem 0.75rem', sm: '0.6rem 1rem' },
               borderRadius: '6px',
@@ -831,7 +863,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </Box>
 
           <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.85rem' }, color: '#999', lineHeight: 1.4, mt: 0.5 }}>
-            Haz clic en el enlace dentro del email para confirmar tu cuenta y activarla.
+            {emailActuallySent
+              ? 'Haz clic en el enlace dentro del email para confirmar tu cuenta y activarla.'
+              : 'Se alcanzó el límite de envíos. Usá el botón de abajo para reenviar el email cuando estés listo.'}
           </Typography>
 
           {confirmationError && (
@@ -855,7 +889,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           <Stack direction="column" spacing={1} sx={{ width: '100%', mt: 1 }}>
             <Button
               onClick={handleResendEmailFromConfirmation}
-              disabled={isResendingEmail}
+              disabled={isResendingEmail || resendCooldown > 0}
               variant="contained"
               fullWidth
               startIcon={<FiMail size={16} />}
@@ -877,7 +911,11 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 '&.Mui-disabled': { opacity: 0.65, color: 'white', background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)' },
               }}
             >
-              {isResendingEmail ? 'Reenviando...' : '¿No te llegó el correo? Reenviar'}
+              {isResendingEmail
+                ? 'Reenviando...'
+                : resendCooldown > 0
+                  ? `Podés reenviar en ${resendCooldown}s`
+                  : '¿No te llegó el correo? Reenviar'}
             </Button>
 
             <Button

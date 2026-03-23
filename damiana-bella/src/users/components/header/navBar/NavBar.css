@@ -242,6 +242,10 @@
   transform: translateX(0);
 }
 
+.level-sub.slide-out {
+  transform: translateX(-100%);
+}
+
 .nav-menu-header {
   display: flex;
   align-items: center;
@@ -465,57 +469,103 @@
   transition: transform var(--transition-base) var(--transition-ease);
 }
 
-/* Dropdown */
+
+/* Dropdown nivel 1 (aparece debajo del nav item) */
 .desktop-dropdown {
   position: absolute;
   top: 100%;
   left: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
   background: var(--white);
   min-width: 200px;
-  box-shadow: var(--shadow-md);
-  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  border-top: 2px solid var(--primary-accent);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(10px);
-  transition: all var(--transition-base) var(--transition-ease);
-  z-index: 100;
-  padding: 0.5rem 0;
-  border: 1px solid #eee;
+  transform: translateY(6px);
+  transition:
+    opacity var(--transition-base) var(--transition-ease),
+    visibility var(--transition-base) var(--transition-ease),
+    transform var(--transition-base) var(--transition-ease);
+  z-index: 200;
 }
 
-.desktop-nav-item:hover .desktop-dropdown {
+.desktop-nav-item:hover > .desktop-dropdown {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
 
-.desktop-nav-item:hover .desktop-nav-arrow {
+.desktop-nav-item:hover > .desktop-nav-link .desktop-nav-arrow {
   transform: rotate(180deg);
 }
 
-.desktop-dropdown-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
 .desktop-dropdown-item {
-  width: 100%;
+  position: relative;
 }
 
 .desktop-dropdown-link {
-  display: block;
-  padding: 0.8rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.1rem;
   color: var(--gray-700);
   text-decoration: none;
-  transition: all var(--transition-fast) var(--transition-ease);
-  font-size: 0.95rem;
+  font-size: 0.93rem;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .desktop-dropdown-link:hover {
   background: var(--gray-50);
   color: var(--primary-accent);
-  padding-left: 1.8rem;
+}
+
+.desktop-dropdown-item.has-submenu > .desktop-dropdown-link {
+  padding-right: 0.75rem;
+}
+
+.desktop-dropdown-item.has-submenu:hover > .desktop-dropdown-link {
+  background: var(--gray-50);
+  color: var(--primary-accent);
+}
+
+.submenu-arrow {
+  font-size: 0.8rem;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+/* Subdropdown nivel 2 (aparece a la derecha del item) */
+.desktop-subdropdown {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  background: var(--white);
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  border-top: 2px solid var(--primary-accent);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(6px);
+  transition:
+    opacity var(--transition-base) var(--transition-ease),
+    visibility var(--transition-base) var(--transition-ease),
+    transform var(--transition-base) var(--transition-ease);
+  z-index: 201;
+}
+
+.desktop-dropdown-item.has-submenu:hover > .desktop-subdropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
 }
 
 /* Login Button */

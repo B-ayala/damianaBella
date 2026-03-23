@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
+import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
 import type { Variant, Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
 import { apiFetch } from '../../../utils/apiFetch';
+import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
+import { Folder, FolderOpen, Dot, Plus, X } from 'lucide-react';
 import './ProductModal.css';
 import './ProductModalStylesExtension.css';
 
@@ -12,26 +15,36 @@ interface ProductModalProps {
     isOpen: boolean;
     onClose: () => void;
     product: AdminProduct | null;
+    onSaved?: () => void;
 }
 
 
 const tabs = ['Datos Básicos', 'Variantes', 'Promociones', 'Descripción', 'Especificaciones', 'FAQ'];
 
-const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
-    const { addProduct, updateProduct, products } = useAdminStore();
+const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) => {
+    const { addProduct, updateProduct } = useAdminStore();
 
-    const existingCategories = Array.from(
-        new Set(products.map(p => p.category).filter(Boolean))
-    ).sort();
     const [activeTab, setActiveTab] = useState(tabs[0]);
+    const [dbCategories, setDbCategories] = useState<Category[]>([]);
 
     // Datos Básicos
     const [name, setName] = useState('');
     const [category, setCategory] = useState('');
-    const [isNewCategory, setIsNewCategory] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [newCatName, setNewCatName] = useState('');
+    const [savingCategory, setSavingCategory] = useState(false);
+    const [categoryError, setCategoryError] = useState('');
+    const [newCatParentId, setNewCatParentId] = useState<string | null>(null);
+    const [showManageCatModal, setShowManageCatModal] = useState(false);
+    const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
+    const [manageCatError, setManageCatError] = useState('');
+    const [deleteCatConfirm, setDeleteCatConfirm] = useState<{ id: string; name: string } | null>(null);
+    const [catDropOpen, setCatDropOpen] = useState(false);
+    const [expandedCatIds, setExpandedCatIds] = useState<Set<string>>(new Set());
     const [price, setPrice] = useState('');
     const [stock, setStock] = useState('');
     const [condition, setCondition] = useState<'new' | 'used'>('new');
+    const [status, setStatus] = useState<'active' | 'inactive'>('active');
     const [images, setImages] = useState<string[]>([]);
 
     // Promociones
@@ -74,17 +87,58 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [showOptionalWarning, setShowOptionalWarning] = useState(false);
+    const [missingOptionals, setMissingOptionals] = useState<string[]>([]);
+
+    // Clear category error as soon as a category is selected
+    React.useEffect(() => {
+        if (category && fieldErrors.category) {
+            setFieldErrors(prev => { const n = {...prev}; delete n.category; return n; });
+        }
+    }, [category]);
+
+    const toggleCatExpand = (id: string) => {
+        setExpandedCatIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    // Pre-compute tree once per dbCategories change — avoids O(n³) filters on every render
+    const categoryTree = useMemo(() => (
+        dbCategories
+            .filter(c => c.level === 1)
+            .map(cat => ({
+                ...cat,
+                children: dbCategories
+                    .filter(c => c.parent_id === cat.id)
+                    .map(sub => ({
+                        ...sub,
+                        children: dbCategories.filter(c => c.parent_id === sub.id),
+                    })),
+            }))
+    ), [dbCategories]);
 
     useEffect(() => {
         if (isOpen) {
+            const savedCategory = product?.category || '';
+            fetchCategoriesTree().then(cats => {
+                setDbCategories(cats);
+                // Normaliza: busca la categoría de forma case-insensitive y usa el
+                // nombre exacto de la DB para que coincida con el option del árbol.
+                const matched = cats.find(c => c.name.toLowerCase() === savedCategory.toLowerCase());
+                setCategory(matched ? matched.name : savedCategory);
+            });
             setActiveTab(tabs[0]);
             if (product) {
                 setName(product.name || '');
-                setCategory(product.category || '');
-                setIsNewCategory(false);
+                setCategory(savedCategory);
                 setPrice(product.price?.toString() || '');
                 setStock(product.stock?.toString() || '');
                 setCondition(product.condition || 'new');
+                setStatus(product.status || 'active');
                 setImages(
                     product.images && product.images.length > 0
                         ? [...product.images]
@@ -114,10 +168,10 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
     const resetForm = () => {
         setName('');
         setCategory('');
-        setIsNewCategory(false);
         setPrice('');
         setStock('');
         setCondition('new');
+        setStatus('active');
         setImages([]);
         setDiscount('');
         setFreeShipping(false);
@@ -130,6 +184,9 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         setFaqs([]);
         setCustomColorName('');
         setCustomColorHex('#000000');
+        setFieldErrors({});
+        setShowOptionalWarning(false);
+        setMissingOptionals([]);
     };
 
     const buildPayload = () => {
@@ -161,16 +218,11 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
             faqs,
             warranty,
             returnPolicy,
-            status: 'active' as const,
+            status,
         };
     };
 
-    const handleSave = async () => {
-        if (!name || !price) {
-            setError('El nombre y el precio son requeridos');
-            return;
-        }
-
+    const executeSave = async () => {
         setSaving(true);
         setError('');
 
@@ -223,11 +275,45 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
 
             resetForm();
             onClose();
+            onSaved?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo guardar el producto');
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSave = async () => {
+        // Nivel 1: campos obligatorios
+        const errors: Record<string, string> = {};
+        if (!name.trim()) errors.name = 'El nombre es requerido';
+        if (!price) errors.price = 'El precio es requerido';
+        if (!category) errors.category = 'La categoría es requerida';
+        if (!stock) errors.stock = 'El stock es requerido';
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            setActiveTab('Datos Básicos');
+            return;
+        }
+
+        setFieldErrors({});
+
+        // Nivel 2: campos opcionales recomendados
+        const hasValidVariants = variants.some(v => v.name.trim() && v.optionsText.trim());
+        const missing: string[] = [];
+        if (!hasValidVariants) missing.push('Variantes (colores, talles)');
+        if (!description.trim()) missing.push('Descripción');
+        if (specifications.length === 0) missing.push('Especificaciones técnicas');
+        if (faqs.length === 0) missing.push('Preguntas frecuentes (FAQ)');
+
+        if (missing.length > 0) {
+            setMissingOptionals(missing);
+            setShowOptionalWarning(true);
+            return;
+        }
+
+        await executeSave();
     };
 
     const addImage = () => setImages(prev => [...prev, '']);
@@ -272,6 +358,48 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         setSpecifications(updated);
     };
 
+    const handleCreateCategory = async () => {
+        if (!newCatName.trim()) return;
+        setSavingCategory(true);
+        setCategoryError('');
+        try {
+            const parentCat = newCatParentId ? dbCategories.find(c => c.id === newCatParentId) : null;
+            const level = parentCat ? parentCat.level + 1 : 1;
+            const created = await createCategory(newCatName.trim(), newCatParentId, level);
+            const updated = await fetchCategoriesTree();
+            setDbCategories(updated);
+            setCategory(created.name);
+            setShowCategoryModal(false);
+            setNewCatName('');
+            setNewCatParentId(null);
+        } catch (err) {
+            setCategoryError(err instanceof Error ? err.message : 'No se pudo crear la categoría');
+        } finally {
+            setSavingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (id: string, name: string) => {
+        setDeleteCatConfirm({ id, name });
+    };
+
+    const confirmDeleteCategory = async () => {
+        if (!deleteCatConfirm) return;
+        const { id, name } = deleteCatConfirm;
+        setDeletingCatId(id);
+        setManageCatError('');
+        try {
+            await deleteCategory(id);
+            const updated = await fetchCategoriesTree();
+            setDbCategories(updated);
+            if (category === name) setCategory('');
+        } catch (err) {
+            setManageCatError(err instanceof Error ? err.message : 'No se pudo eliminar la categoría');
+        } finally {
+            setDeletingCatId(null);
+        }
+    };
+
     const addFaq = () => setFaqs([...faqs, { question: '', answer: '' }]);
     const removeFaq = (i: number) => setFaqs(faqs.filter((_, j) => j !== i));
     const updateFaq = (i: number, field: 'question' | 'answer', value: string) => {
@@ -281,6 +409,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
     };
 
     return (
+        <>
         <Modal
             isOpen={isOpen}
             onClose={onClose}
@@ -288,15 +417,19 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         >
             <div className="product-modal-container">
                 <div className="product-modal-sidebar">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab}
-                            className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            {tab}
-                        </button>
-                    ))}
+                    {tabs.map(tab => {
+                        const hasError = tab === 'Datos Básicos' && Object.keys(fieldErrors).length > 0;
+                        return (
+                            <button
+                                key={tab}
+                                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tab)}
+                            >
+                                {tab}
+                                {hasError && <span className="tab-btn__error-dot" />}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="product-modal-content">
@@ -311,73 +444,146 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                         <div className="tab-pane">
                             <h3>Datos Básicos</h3>
                             <div className="admin-form-grid">
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.name ? ' form-group--error' : ''}`}>
                                     <label>Nombre del producto</label>
                                     <input
                                         type="text"
                                         placeholder="Ej: Remera Básica"
                                         value={name}
-                                        onChange={e => setName(e.target.value)}
+                                        onChange={e => { setName(e.target.value); if (fieldErrors.name) setFieldErrors(prev => { const n = {...prev}; delete n.name; return n; }); }}
                                     />
+                                    {fieldErrors.name && <span className="field-error-msg">{fieldErrors.name}</span>}
                                 </div>
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.category ? ' form-group--error' : ''}`}>
                                     <label>Categoría</label>
-                                    {!isNewCategory ? (
-                                        <select
-                                            className="category-select"
-                                            value={category}
-                                            onChange={e => {
-                                                if (e.target.value === '__new__') {
-                                                    setCategory('');
-                                                    setIsNewCategory(true);
-                                                } else {
-                                                    setCategory(e.target.value);
-                                                }
-                                            }}
-                                        >
-                                            <option value="">-- Seleccionar categoría --</option>
-                                            {existingCategories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                            <option value="__new__">+ Agregar nueva categoría...</option>
-                                        </select>
-                                    ) : (
-                                        <div className="category-new-input-wrapper">
-                                            <input
-                                                type="text"
-                                                className="category-new-input"
-                                                placeholder="Nombre de la nueva categoría"
-                                                value={category}
-                                                onChange={e => setCategory(e.target.value)}
-                                                autoFocus
+                                    <div className="cat-drop-wrapper">
+                                        {catDropOpen && (
+                                            <div
+                                                className="cat-drop-backdrop"
+                                                onClick={() => setCatDropOpen(false)}
                                             />
-                                            <button
-                                                type="button"
-                                                className="category-cancel-btn"
-                                                onClick={() => { setIsNewCategory(false); setCategory(''); }}
-                                            >
-                                                Cancelar
-                                            </button>
-                                        </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className={`cat-drop-trigger${catDropOpen ? ' cat-drop-trigger--open' : ''}`}
+                                            onClick={() => setCatDropOpen(o => !o)}
+                                        >
+                                            <span className={category ? '' : 'cat-drop-placeholder'}>
+                                                {category || '-- Seleccionar categoría --'}
+                                            </span>
+                                            <svg className="cat-drop-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="6 9 12 15 18 9" />
+                                            </svg>
+                                        </button>
+                                        {catDropOpen && (
+                                            <div className="cat-drop-panel">
+                                                <div
+                                                    className="cat-drop-item"
+                                                    onClick={() => { setCategory(''); setCatDropOpen(false); }}
+                                                >
+                                                    <span className="cat-drop-placeholder">-- Seleccionar categoría --</span>
+                                                </div>
+                                                {/* Fallback: categoría actual no encontrada en el árbol */}
+                                                {category && !dbCategories.some(c => c.name.toLowerCase() === category.toLowerCase()) && (
+                                                    <div
+                                                        className="cat-drop-item cat-drop-item--active"
+                                                        onClick={() => setCatDropOpen(false)}
+                                                    >
+                                                        {category}
+                                                    </div>
+                                                )}
+                                                {dbCategories.filter(c => c.level === 1).map(root => {
+                                                    const children = dbCategories.filter(c => c.parent_id === root.id);
+                                                    const rootExpanded = expandedCatIds.has(root.id);
+                                                    return (
+                                                        <div key={root.id} className="cat-drop-group">
+                                                            <div className="cat-drop-group-row">
+                                                                <div
+                                                                    className={`cat-drop-item cat-drop-item--root${category === root.name ? ' cat-drop-item--active' : ''}`}
+                                                                    onClick={() => { setCategory(root.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                >
+                                                                    {root.name}
+                                                                </div>
+                                                                {children.length > 0 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-drop-expand"
+                                                                        onClick={() => toggleCatExpand(root.id)}
+                                                                    >
+                                                                        {rootExpanded ? '▲ ocultar' : 'ver más'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {rootExpanded && children.map(child => {
+                                                                const grandchildren = dbCategories.filter(c => c.parent_id === child.id);
+                                                                const childExpanded = expandedCatIds.has(child.id);
+                                                                return (
+                                                                    <div key={child.id} className="cat-drop-subgroup">
+                                                                        <div className="cat-drop-group-row">
+                                                                            <div
+                                                                                className={`cat-drop-item cat-drop-item--sub${category === child.name ? ' cat-drop-item--active' : ''}`}
+                                                                                onClick={() => { setCategory(child.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                            >
+                                                                                {child.name}
+                                                                            </div>
+                                                                            {grandchildren.length > 0 && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="cat-drop-expand cat-drop-expand--sm"
+                                                                                    onClick={() => toggleCatExpand(child.id)}
+                                                                                >
+                                                                                    {childExpanded ? '▲ ocultar' : 'ver más'}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                        {childExpanded && grandchildren.map(gc => (
+                                                                            <div
+                                                                                key={gc.id}
+                                                                                className={`cat-drop-item cat-drop-item--subsub${category === gc.name ? ' cat-drop-item--active' : ''}`}
+                                                                                onClick={() => { setCategory(gc.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                            >
+                                                                                {gc.name}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {dbCategories.length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="cat-manage-link"
+                                            onClick={() => { setShowManageCatModal(true); setManageCatError(''); }}
+                                        >
+                                            Gestionar categorías
+                                        </button>
                                     )}
+                                    {fieldErrors.category && <span className="field-error-msg">{fieldErrors.category}</span>}
                                 </div>
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.price ? ' form-group--error' : ''}`}>
                                     <label>Precio ($)</label>
                                     <input
                                         type="number"
                                         placeholder="0.00"
                                         value={price}
-                                        onChange={e => setPrice(e.target.value)}
+                                        onChange={e => { setPrice(e.target.value); if (fieldErrors.price) setFieldErrors(prev => { const n = {...prev}; delete n.price; return n; }); }}
                                     />
+                                    {fieldErrors.price && <span className="field-error-msg">{fieldErrors.price}</span>}
                                 </div>
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.stock ? ' form-group--error' : ''}`}>
                                     <label>Stock disponible</label>
                                     <input
                                         type="number"
                                         placeholder="0"
                                         value={stock}
-                                        onChange={e => setStock(e.target.value)}
+                                        onChange={e => { setStock(e.target.value); if (fieldErrors.stock) setFieldErrors(prev => { const n = {...prev}; delete n.stock; return n; }); }}
                                     />
+                                    {fieldErrors.stock && <span className="field-error-msg">{fieldErrors.stock}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label>Condición</label>
@@ -387,6 +593,16 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                     >
                                         <option value="new">Nuevo</option>
                                         <option value="used">Usado</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Estado</label>
+                                    <select
+                                        value={status}
+                                        onChange={e => setStatus(e.target.value as 'active' | 'inactive')}
+                                    >
+                                        <option value="active">Activo</option>
+                                        <option value="inactive">Inactivo</option>
                                     </select>
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -847,6 +1063,271 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                 </div>
             </div>
 
+            {showCategoryModal && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => { setShowCategoryModal(false); setNewCatName(''); setCategoryError(''); setNewCatParentId(null); }}
+                >
+                    <div className="cat-modal cat-modal--create" onClick={e => e.stopPropagation()}>
+                        <h4 className="cat-modal__title">Nueva Categoría</h4>
+                        <div className="form-group">
+                            <label>Nombre</label>
+                            <input
+                                type="text"
+                                placeholder="Ej: Vestidos"
+                                value={newCatName}
+                                onChange={e => setNewCatName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && newCatName.trim()) handleCreateCategory(); }}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>¿Dónde agregarla?</label>
+                            <select
+                                className="cat-parent-select"
+                                value={newCatParentId ?? '__root__'}
+                                onChange={e => setNewCatParentId(e.target.value === '__root__' ? null : e.target.value)}
+                            >
+                                <option value="__root__">— Categoría principal (nivel 1)</option>
+                                {(() => {
+                                    const opts: React.ReactElement[] = [];
+                                    const addOpt = (cat: Category, depth: number) => {
+                                        const prefix = '\u00a0\u00a0\u00a0'.repeat(depth) + (depth > 0 ? '↳ ' : '');
+                                        opts.push(
+                                            <option key={cat.id} value={cat.id}>
+                                                {prefix}{cat.name}
+                                            </option>
+                                        );
+                                        if (cat.level < 2) {
+                                            dbCategories
+                                                .filter(c => c.parent_id === cat.id)
+                                                .forEach(child => addOpt(child, depth + 1));
+                                        }
+                                    };
+                                    dbCategories.filter(c => c.level === 1).forEach(root => addOpt(root, 0));
+                                    return opts;
+                                })()}
+                            </select>
+                            <p className="cat-location-hint">
+                                {newCatParentId ? (() => {
+                                    const parent = dbCategories.find(c => c.id === newCatParentId);
+                                    if (!parent) return null;
+                                    if (parent.level === 1) {
+                                        return <>Subcategoría de <strong>{parent.name}</strong></>;
+                                    }
+                                    const grandparent = dbCategories.find(c => c.id === parent.parent_id);
+                                    return <>Subcategoría de <strong>{parent.name}</strong>{grandparent ? <> (dentro de {grandparent.name})</> : null}</>;
+                                })() : 'Se creará como categoría principal'}
+                            </p>
+                        </div>
+                        {categoryError && (
+                            <p className="cat-modal__error">{categoryError}</p>
+                        )}
+                        <div className="cat-modal__actions">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => { setShowCategoryModal(false); setNewCatName(''); setCategoryError(''); setNewCatParentId(null); }}
+                                disabled={savingCategory}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={handleCreateCategory}
+                                disabled={!newCatName.trim() || savingCategory}
+                            >
+                                {savingCategory ? 'Guardando...' : 'Crear categoría'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showManageCatModal && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                >
+                    <div className="cat-modal cat-modal--manage" onClick={e => e.stopPropagation()}>
+
+                        {/* ── Header ── */}
+                        <div className="cat-manage-header">
+                            <div className="cat-manage-header-info">
+                                <h4 className="cat-manage-title">Gestionar Categorías</h4>
+                                <p className="cat-manage-subtitle">
+                                    {categoryTree.length} principal{categoryTree.length !== 1 ? 'es' : ''} · {dbCategories.length} en total
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="cat-manage-close-btn"
+                                onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                                title="Cerrar"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* ── Hint ── */}
+                        <div className="cat-manage-hint">
+                            <p>Eliminar una categoría también elimina sus subcategorías. Pasá el cursor (o tocá) para ver las acciones.</p>
+                        </div>
+
+                        {/* ── Error ── */}
+                        {manageCatError && <p className="cat-modal__error" style={{ margin: '0.6rem 1.25rem 0' }}>{manageCatError}</p>}
+
+                        {/* ── Tree body ── */}
+                        <div className="cat-manage-body">
+                            {categoryTree.length === 0 ? (
+                                <div className="cat-list__empty">
+                                    <FolderOpen size={36} strokeWidth={1.5} className="cat-list__empty-icon" />
+                                    <p>No hay categorías creadas aún.</p>
+                                    <p className="cat-list__empty-sub">Usá el botón de abajo para crear la primera.</p>
+                                </div>
+                            ) : (
+                                <div className="cat-tree">
+                                    {categoryTree.map(cat => (
+                                        <div key={cat.id} className="cat-tree-node">
+                                            {/* Nivel 1 */}
+                                            <div className="cat-tree-row cat-tree-row--1">
+                                                <span className="cat-tree-icon">
+                                                    <Folder size={16} strokeWidth={1.8} />
+                                                </span>
+                                                <span className="cat-tree-name">{cat.name}</span>
+                                                {cat.children.length > 0 && (
+                                                    <span className="cat-tree-badge">{cat.children.length}</span>
+                                                )}
+                                                <div className="cat-tree-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="cat-tree-add-btn"
+                                                        title={`Agregar subcategoría en "${cat.name}"`}
+                                                        onClick={() => {
+                                                            setNewCatParentId(cat.id);
+                                                            setShowManageCatModal(false);
+                                                            setNewCatName('');
+                                                            setCategoryError('');
+                                                            setShowCategoryModal(true);
+                                                        }}
+                                                    >
+                                                        <Plus size={11} strokeWidth={2.5} /> Sub
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="cat-tree-del-btn"
+                                                        disabled={deletingCatId === cat.id}
+                                                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                                                        title="Eliminar categoría"
+                                                    >
+                                                        {deletingCatId === cat.id ? '…' : <X size={13} strokeWidth={2.5} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Nivel 2 */}
+                                            {cat.children.length > 0 && (
+                                                <div className="cat-tree-children">
+                                                    {cat.children.map(sub => (
+                                                        <div key={sub.id} className="cat-tree-node">
+                                                            <div className="cat-tree-row cat-tree-row--2">
+                                                                <span className="cat-tree-icon cat-tree-icon--sub">
+                                                                    <FolderOpen size={14} strokeWidth={1.8} />
+                                                                </span>
+                                                                <span className="cat-tree-name cat-tree-name--sub">{sub.name}</span>
+                                                                {sub.children.length > 0 && (
+                                                                    <span className="cat-tree-badge">{sub.children.length}</span>
+                                                                )}
+                                                                <div className="cat-tree-actions">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-tree-add-btn cat-tree-add-btn--sm"
+                                                                        title={`Agregar subcategoría en "${sub.name}"`}
+                                                                        onClick={() => {
+                                                                            setNewCatParentId(sub.id);
+                                                                            setShowManageCatModal(false);
+                                                                            setNewCatName('');
+                                                                            setCategoryError('');
+                                                                            setShowCategoryModal(true);
+                                                                        }}
+                                                                    >
+                                                                        <Plus size={10} strokeWidth={2.5} /> Sub
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-tree-del-btn cat-tree-del-btn--sm"
+                                                                        disabled={deletingCatId === sub.id}
+                                                                        onClick={() => handleDeleteCategory(sub.id, sub.name)}
+                                                                        title="Eliminar"
+                                                                    >
+                                                                        {deletingCatId === sub.id ? '…' : <X size={12} strokeWidth={2.5} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Nivel 3 */}
+                                                            {sub.children.length > 0 && (
+                                                                <div className="cat-tree-children cat-tree-children--deep">
+                                                                    {sub.children.map(subsub => (
+                                                                        <div key={subsub.id} className="cat-tree-row cat-tree-row--3">
+                                                                            <span className="cat-tree-icon cat-tree-icon--subsub">
+                                                                                <Dot size={16} strokeWidth={3} />
+                                                                            </span>
+                                                                            <span className="cat-tree-name cat-tree-name--subsub">{subsub.name}</span>
+                                                                            <div className="cat-tree-actions">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="cat-tree-del-btn cat-tree-del-btn--sm"
+                                                                                    disabled={deletingCatId === subsub.id}
+                                                                                    onClick={() => handleDeleteCategory(subsub.id, subsub.name)}
+                                                                                    title="Eliminar"
+                                                                                >
+                                                                                    {deletingCatId === subsub.id ? '…' : <X size={11} strokeWidth={2.5} />}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Footer ── */}
+                        <div className="cat-manage-footer">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => {
+                                    setShowManageCatModal(false);
+                                    setManageCatError('');
+                                    setNewCatParentId(null);
+                                    setNewCatName('');
+                                    setCategoryError('');
+                                    setShowCategoryModal(true);
+                                }}
+                            >
+                                + Nueva categoría
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="product-modal-footer">
                 <button className="admin-btn-secondary" onClick={onClose} disabled={saving}>
                     Cancelar
@@ -859,7 +1340,57 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                     {saving ? 'Guardando...' : 'Guardar producto'}
                 </button>
             </div>
+
+            {showOptionalWarning && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => setShowOptionalWarning(false)}
+                >
+                    <div className="cat-modal optional-warning-modal" onClick={e => e.stopPropagation()}>
+                        <h4 className="cat-modal__title">Campos opcionales incompletos</h4>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#555', lineHeight: 1.6 }}>
+                            ¿Estás seguro que deseas guardar el producto sin la siguiente información?
+                        </p>
+                        <ul className="optional-warning-list">
+                            {missingOptionals.map(field => (
+                                <li key={field}>{field}</li>
+                            ))}
+                        </ul>
+                        <div className="cat-modal__actions">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => setShowOptionalWarning(false)}
+                                disabled={saving}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={() => { setShowOptionalWarning(false); executeSave(); }}
+                                disabled={saving}
+                            >
+                                {saving ? 'Guardando...' : 'Guardar de todas formas'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Modal>
+
+        <ConfirmationModal
+            isOpen={deleteCatConfirm !== null}
+            onClose={() => setDeleteCatConfirm(null)}
+            title={`Eliminar "${deleteCatConfirm?.name}"`}
+            message="También se eliminarán sus subcategorías. Esta acción no se puede deshacer."
+            status="error"
+            actionButtonText="Eliminar"
+            cancelButtonText="Cancelar"
+            onActionClick={confirmDeleteCategory}
+        />
+
+        </>
     );
 };
 

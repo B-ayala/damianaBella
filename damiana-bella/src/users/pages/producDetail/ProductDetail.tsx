@@ -4,7 +4,10 @@ import { fetchProductById, mapDbRowToProduct } from '../../../services/productSe
 import type { Product } from '../../../types/product';
 import Modal from '../../../components/common/Modal/Modal';
 import VariantTable from '../../../components/common/VariantTable/VariantTable';
+import PurchaseVariantModal from '../../components/PurchaseVariantModal/PurchaseVariantModal';
 import { parseColorOption } from '../../../utils/constants';
+import { useCartStore } from '../../../store/cartStore';
+import type { UnitVariants } from '../../../store/cartStore';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -20,6 +23,11 @@ const ProductDetail = () => {
   const [shippingCost, setShippingCost] = useState<number | null>(null);
   const [shippingDays, setShippingDays] = useState<string>('');
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [variantError, setVariantError] = useState('');
+  const [missingVariants, setMissingVariants] = useState<string[]>([]);
+  const [isShaking, setIsShaking] = useState(false);
+  const setCartItem = useCartStore((s) => s.setItem);
 
   useEffect(() => {
     fetchProductById(id!)
@@ -74,6 +82,51 @@ const ProductDetail = () => {
       setShippingCost(cost);
       setShippingDays('5-7 días hábiles');
     }
+  };
+
+  const hasVariants = (product?.variants?.length ?? 0) > 0;
+
+  const getMissingVariants = (): string[] => {
+    if (!product?.variants) return [];
+    return product.variants
+      .filter(v => !selectedVariants[v.name])
+      .map(v => v.name);
+  };
+
+  const confirmPurchase = (unitVariants: UnitVariants[]) => {
+    setIsVariantModalOpen(false);
+    const unitPrice = product!.discount
+      ? product!.price * (1 - product!.discount / 100)
+      : product!.price;
+    setCartItem({
+      product: product!,
+      quantity,
+      unitVariants,
+      unitPrice,
+      totalPrice: unitPrice * quantity,
+    });
+    navigate('/checkout');
+  };
+
+  const handleBuy = () => {
+    setVariantError('');
+    setMissingVariants([]);
+    const missing = getMissingVariants();
+    if (missing.length > 0) {
+      setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
+      setMissingVariants(missing);
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (quantity > 1 && hasVariants) {
+      setIsVariantModalOpen(true);
+      return;
+    }
+    // qty === 1 or no variants — go directly
+    const sameVariants: UnitVariants[] = Array.from({ length: quantity }, () => ({ ...selectedVariants }));
+    confirmPurchase(sameVariants);
   };
 
   return (
@@ -161,7 +214,7 @@ const ProductDetail = () => {
             {product.variants && product.variants.length > 0 && (
               <div className="info__variants">
                 {product.variants.map((variant) => (
-                  <div key={variant.name} className="variant">
+                  <div key={variant.name} className={`variant${missingVariants.includes(variant.name) ? ` variant--error${isShaking ? ' variant--shake' : ''}` : ''}`}>
                     <label className="variant__label">{variant.name}:</label>
                     <div className="variant__options">
                       {variant.options.map((option) => {
@@ -263,9 +316,15 @@ const ProductDetail = () => {
             </div>
 
             {/* Botones de acción */}
+            {variantError && (
+              <div className="variant-error-banner">
+                <span className="variant-error-banner__icon">!</span>
+                <span>{variantError}</span>
+              </div>
+            )}
             <div className="info__actions">
               <button
-                onClick={() => navigate('/checkout')}
+                onClick={handleBuy}
                 disabled={stock === 0}
                 style={{
                   display: 'flex',
@@ -446,6 +505,18 @@ const ProductDetail = () => {
       >
         <VariantTable />
       </Modal>
+
+      {/* Modal de selección de variantes por unidad */}
+      {isVariantModalOpen && product && (
+        <PurchaseVariantModal
+          isOpen={isVariantModalOpen}
+          onClose={() => setIsVariantModalOpen(false)}
+          onConfirm={confirmPurchase}
+          product={product}
+          quantity={quantity}
+          initialVariants={selectedVariants}
+        />
+      )}
     </div>
   );
 };

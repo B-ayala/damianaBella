@@ -24,9 +24,7 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       sx={{
         zIndex: 2000,
         '& .MuiBackdrop-root': {
-          background: 'linear-gradient(135deg, rgba(184,165,200,0.35) 0%, rgba(0,0,0,0.45) 100%)',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.45)',
         },
         '& .MuiDialog-paper': {
           background: 'linear-gradient(145deg, #ffffff 0%, #fafafa 100%)',

@@ -138,8 +138,78 @@ export const deleteCloudinaryImage = async (publicId: string, token: string) => 
   return response.json();
 };
 
-// Fetch unique active categories from Supabase
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  level: number;
+}
+
+// Fetch full category tree from the categories table
+export const fetchCategoriesTree = async (): Promise<Category[]> => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name, slug, parent_id, level')
+    .order('level', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) {
+    // Table may not exist yet — return empty silently
+    console.warn('fetchCategoriesTree:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as Category[];
+};
+
+// Create a new category (or subcategory if parentId is provided)
+export const createCategory = async (
+  name: string,
+  parentId: string | null,
+  level: number
+): Promise<Category> => {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name, slug, parent_id: parentId, level })
+    .select('id, name, slug, parent_id, level')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Category;
+};
+
+// Delete a category (cascades to subcategories via ON DELETE CASCADE)
+export const deleteCategory = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
+// Fetch level-1 category names (used by NavBar dropdown)
+// Falls back to reading from productos if categories table is not set up yet
 export const fetchCategories = async (): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('level', 1)
+      .order('name', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      return data.map((c) => c.name) as string[];
+    }
+  } catch {
+    // fall through to fallback
+  }
+
+  // Fallback: derive unique categories from productos table
   const { data, error } = await supabase
     .from('productos')
     .select('category')
@@ -184,11 +254,27 @@ export const toggleProductFeatured = async (id: string, featured: boolean) => {
   }
 };
 
-// Fetch all products from Supabase
+// Fetch all products from Supabase (admin — includes inactive)
+export const fetchAllProducts = async () => {
+  const { data, error } = await supabase
+    .from('productos')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Fetch products error:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Fetch all products from Supabase (only active)
 export const fetchProducts = async () => {
   const { data, error } = await supabase
     .from('productos')
     .select('*')
+    .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (error) {

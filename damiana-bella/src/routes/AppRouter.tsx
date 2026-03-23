@@ -6,6 +6,7 @@ import Contact from '../users/pages/contact/Contact';
 import About from '../users/pages/about/About';
 import ProductDetail from '../users/pages/producDetail/ProductDetail';
 import Checkout from '../users/pages/checkout/Checkout';
+import CheckoutResult from '../users/pages/checkout/CheckoutResult';
 import EmailConfirmation from '../users/pages/auth/EmailConfirmation';
 import ScrollToTop from '../components/common/ScrollToTop';
 
@@ -18,6 +19,8 @@ import AdminUsers from '../admin/pages/Users/Users';
 import AboutEditor from '../admin/pages/AboutEditor/AboutEditor';
 import FooterEditor from '../admin/pages/FooterEditor/FooterEditor';
 import CloudinaryManager from '../admin/pages/CloudinaryManager/CloudinaryManager';
+import AdminSales from '../admin/pages/Sales/Sales';
+import AdminDispatches from '../admin/pages/Dispatches/Dispatches';
 
 
 const AppRouter = () => {
@@ -38,6 +41,8 @@ const AppRouter = () => {
             <Route path="about" element={<AboutEditor />} />
             <Route path="site-config" element={<FooterEditor />} />
             <Route path="cloudinary" element={<CloudinaryManager />} />
+            <Route path="sales" element={<AdminSales />} />
+            <Route path="dispatches" element={<AdminDispatches />} />
           </Route>
         </Route>
 
@@ -47,6 +52,7 @@ const AppRouter = () => {
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/result" element={<CheckoutResult />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
         </Route>

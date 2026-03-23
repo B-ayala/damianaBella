@@ -21,6 +21,7 @@ interface ConfirmationModalProps {
   status?: 'success' | 'error' | 'info' | 'loading';
   actionButtonText?: string;
   onActionClick?: () => void;
+  cancelButtonText?: string;
 }
 
 const statusColors: Record<string, { bg: string; hover: string; shadow: string }> = {
@@ -38,6 +39,7 @@ const ConfirmationModal = ({
   status = 'info',
   actionButtonText = 'Aceptar',
   onActionClick,
+  cancelButtonText,
 }: ConfirmationModalProps) => {
   const isMobile = useMediaQuery('(max-width:479px)');
 
@@ -82,9 +84,7 @@ const ConfirmationModal = ({
       sx={{
         zIndex: 2100,
         '& .MuiBackdrop-root': {
-          background: 'linear-gradient(135deg, rgba(184,165,200,0.4) 0%, rgba(0,0,0,0.5) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.5)',
         },
         '& .MuiDialog-paper': {
           borderRadius: '12px',
@@ -130,36 +130,56 @@ const ConfirmationModal = ({
         <p style={{ fontSize: isMobile ? 13 : 14, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>
           {message}
         </p>
-        <Button
-          onClick={handleActionClick}
-          disabled={status === 'loading'}
-          sx={{
-            mt: 2,
-            px: 3,
-            py: 1.25,
-            borderRadius: '6px',
-            fontSize: 14,
-            fontWeight: 600,
-            minWidth: 120,
-            textTransform: 'none',
-            color: 'white',
-            background: colors.bg,
-            '&:hover': {
-              background: colors.hover,
-              transform: 'translateY(-2px)',
-              boxShadow: `0 4px 12px ${colors.shadow}`,
-            },
-            '&:active': {
-              transform: 'translateY(0)',
-            },
-            '&.Mui-disabled': {
-              background: '#9ca3af',
+        <Box sx={{ display: 'flex', gap: 2, mt: 2, flexDirection: cancelButtonText ? 'row' : 'column', justifyContent: 'center' }}>
+          {cancelButtonText && (
+            <Button
+              onClick={onClose}
+              sx={{
+                px: 3,
+                py: 1.25,
+                borderRadius: '6px',
+                fontSize: 14,
+                fontWeight: 600,
+                minWidth: 120,
+                textTransform: 'none',
+                color: '#374151',
+                background: '#f3f4f6',
+                '&:hover': { background: '#e5e7eb' },
+              }}
+            >
+              {cancelButtonText}
+            </Button>
+          )}
+          <Button
+            onClick={handleActionClick}
+            disabled={status === 'loading'}
+            sx={{
+              px: 3,
+              py: 1.25,
+              borderRadius: '6px',
+              fontSize: 14,
+              fontWeight: 600,
+              minWidth: 120,
+              textTransform: 'none',
               color: 'white',
-            },
-          }}
-        >
-          {actionButtonText}
-        </Button>
+              background: colors.bg,
+              '&:hover': {
+                background: colors.hover,
+                transform: 'translateY(-2px)',
+                boxShadow: `0 4px 12px ${colors.shadow}`,
+              },
+              '&:active': {
+                transform: 'translateY(0)',
+              },
+              '&.Mui-disabled': {
+                background: '#9ca3af',
+                color: 'white',
+              },
+            }}
+          >
+            {actionButtonText}
+          </Button>
+        </Box>
       </DialogContent>
     </Dialog>
   );
