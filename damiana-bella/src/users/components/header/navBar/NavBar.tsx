@@ -8,6 +8,8 @@ import UserProfileDropdown from './UserProfileDropdown';
 import ChangePasswordModal from './ChangePasswordModal';
 import { useAdminStore } from '../../../../admin/store/adminStore';
 import { fetchCategoriesTree, type Category } from '../../../../services/productService';
+import { useCartStore } from '../../../../store/cartStore';
+import CartDrawer from '../../cart/CartDrawer';
 import './NavBar.css';
 
 const staticNavBefore = [{ name: 'Inicio', path: '/' }];
@@ -31,6 +33,8 @@ const NavBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const totalItems = useCartStore((s) => s.totalItems());
   const [categoryTree, setCategoryTree] = useState<Category[]>([]);
   // Mobile: track which level-1 and level-2 category the user drilled into
   const [mobileL1, setMobileL1] = useState<Category | null>(null);
@@ -346,14 +350,16 @@ const NavBar = () => {
               </button>
             </>
           )}
-          <button className="icon-btn">
+          <button className="icon-btn cart-badge-wrapper" onClick={() => setIsCartOpen(true)}>
             <FiShoppingCart className="icon" />
+            {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
           </button>
         </div>
       </div>
 
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <ChangePasswordModal isOpen={isMobilePasswordModalOpen} onClose={() => setIsMobilePasswordModalOpen(false)} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </nav>
   );
 };
