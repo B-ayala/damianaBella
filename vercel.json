@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd damiana-bella && npm install && npm run build",
+  "outputDirectory": "damiana-bella/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
