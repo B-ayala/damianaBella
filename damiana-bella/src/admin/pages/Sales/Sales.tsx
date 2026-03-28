@@ -24,7 +24,7 @@ interface Sale {
     total_price: number;
     units_config: Record<string, string>[] | null;
     payment_method: string;
-    payment_status: 'pendiente' | 'pagado';
+    payment_status: 'pendiente' | 'pagado' | 'fallido' | 'expirado' | 'cancelado';
     shipping_method: string | null;
     created_at: string;
     // joined from productos
@@ -34,6 +34,26 @@ interface Sale {
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
     mp: 'Mercado Pago',
     transfer: 'Transferencia',
+};
+
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+    pendiente: 'Pendiente',
+    pagado: 'Pagado',
+    fallido: 'Fallido',
+    expirado: 'Expirado',
+    cancelado: 'Cancelado',
+};
+
+const EXPIRY_MS = 15 * 60 * 1000;
+
+// Trata como expirado a órdenes MP pendientes con más de 15 min (UI-only, antes de que corra el cron)
+const getEffectiveStatus = (sale: Sale): Sale['payment_status'] => {
+    if (
+        sale.payment_method === 'mp' &&
+        sale.payment_status === 'pendiente' &&
+        Date.now() - new Date(sale.created_at).getTime() > EXPIRY_MS
+    ) return 'expirado';
+    return sale.payment_status;
 };
 
 const SHIPPING_METHOD_LABEL: Record<string, string> = {
@@ -114,7 +134,11 @@ const Sales = () => {
     }, []);
 
     const handleTogglePaymentStatus = async (sale: Sale) => {
-        const newStatus = sale.payment_status === 'pendiente' ? 'pagado' : 'pendiente';
+        // Solo las órdenes de transferencia se gestionan manualmente
+        if (sale.payment_method !== 'transfer') return;
+        const effectiveStatus = getEffectiveStatus(sale);
+        if (effectiveStatus === 'fallido' || effectiveStatus === 'expirado' || effectiveStatus === 'cancelado') return;
+        const newStatus = effectiveStatus === 'pendiente' ? 'pagado' : 'pendiente';
         const { error } = await supabase
             .from('ventas')
             .update({ payment_status: newStatus })
@@ -138,7 +162,7 @@ const Sales = () => {
         );
     }
     if (filterPaymentStatus) {
-        filtered = filtered.filter((s) => s.payment_status === filterPaymentStatus);
+        filtered = filtered.filter((s) => getEffectiveStatus(s) === filterPaymentStatus);
     }
     if (filterPaymentMethod) {
         filtered = filtered.filter((s) => s.payment_method === filterPaymentMethod);
@@ -193,6 +217,8 @@ const Sales = () => {
                         <option value="">Todos los pagos</option>
                         <option value="pendiente">Pendiente</option>
                         <option value="pagado">Pagado</option>
+                        <option value="expirado">Expirado</option>
+                        <option value="fallido">Fallido</option>
                     </select>
                     <select
                         className="filter-select"
@@ -218,11 +244,11 @@ const Sales = () => {
             {/* Summary badges */}
             <div className="sales-summary">
                 <div className="summary-badge total">
-                    <span className="summary-value">{sales.length}</span>
+                    <span className="summary-value">{sales.filter(s => s.payment_status === 'pagado').length}</span>
                     <span className="summary-label">Total ventas</span>
                 </div>
                 <div className="summary-badge pending">
-                    <span className="summary-value">{sales.filter(s => s.payment_status === 'pendiente').length}</span>
+                    <span className="summary-value">{sales.filter(s => getEffectiveStatus(s) === 'pendiente').length}</span>
                     <span className="summary-label">Pendientes de pago</span>
                 </div>
                 <div className="summary-badge paid">
@@ -329,13 +355,19 @@ const Sales = () => {
                                         </div>
                                         <div className="sale-card-field">
                                             <span className="field-label">Estado pago</span>
-                                            <button
-                                                className={`payment-badge ${sale.payment_status}`}
-                                                onClick={() => handleTogglePaymentStatus(sale)}
-                                                title="Clic para cambiar estado"
-                                            >
-                                                {sale.payment_status === 'pagado' ? 'Pagado' : 'Pendiente'}
-                                            </button>
+                                            {sale.payment_method !== 'transfer' || (['fallido', 'expirado', 'cancelado'] as const).includes(getEffectiveStatus(sale) as never) ? (
+                                                <span className={`payment-badge ${getEffectiveStatus(sale)}`}>
+                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    className={`payment-badge ${getEffectiveStatus(sale)}`}
+                                                    onClick={() => handleTogglePaymentStatus(sale)}
+                                                    title="Clic para cambiar estado"
+                                                >
+                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -391,13 +423,19 @@ const Sales = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            <button
-                                                className={`payment-badge ${sale.payment_status}`}
-                                                onClick={() => handleTogglePaymentStatus(sale)}
-                                                title="Clic para cambiar estado"
-                                            >
-                                                {sale.payment_status === 'pagado' ? 'Pagado' : 'Pendiente'}
-                                            </button>
+                                            {sale.payment_method !== 'transfer' || (['fallido', 'expirado', 'cancelado'] as const).includes(getEffectiveStatus(sale) as never) ? (
+                                                <span className={`payment-badge ${getEffectiveStatus(sale)}`}>
+                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    className={`payment-badge ${getEffectiveStatus(sale)}`}
+                                                    onClick={() => handleTogglePaymentStatus(sale)}
+                                                    title="Clic para cambiar estado"
+                                                >
+                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

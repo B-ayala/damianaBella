@@ -73,3 +73,11 @@ export const createMpPreference = async (
   const data = await res.json();
   return { init_point: data.init_point, order_id: data.order_id };
 };
+
+/** Cancela una orden MP pendiente (usuario volvió sin pagar). Restaura stock en el backend. */
+export const cancelMpOrder = async (orderId: string): Promise<void> => {
+  const apiBase = import.meta.env.VITE_API_URL_LOCAL ?? 'http://localhost:3000/api';
+  await apiFetch(`${apiBase}/orders/${orderId}/cancel`, { method: 'POST' }).catch(() => {
+    // Silent — el cron de expiración lo limpiará si falla
+  });
+};

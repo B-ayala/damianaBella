@@ -1,6 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiX, FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../../../store/cartStore';
+import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import './CartDrawer.css';
 
 interface CartDrawerProps {
@@ -9,8 +11,11 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
+  useBodyScrollLock(isOpen);
+  const navigate = useNavigate();
   const items = useCartStore((s) => s.items);
   const removeItem = useCartStore((s) => s.removeItem);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
 
   const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
@@ -45,7 +50,21 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   />
                   <div className="cart-drawer__item-info">
                     <span className="cart-drawer__item-name">{item.product.name}</span>
-                    <span className="cart-drawer__item-qty">x{item.quantity}</span>
+                    <div className="cart-drawer__qty-controls">
+                      <button
+                        className="cart-drawer__qty-btn"
+                        onClick={() => updateQuantity(item.product.id, -1)}
+                      >
+                        −
+                      </button>
+                      <span className="cart-drawer__item-qty">{item.quantity}</span>
+                      <button
+                        className="cart-drawer__qty-btn"
+                        onClick={() => updateQuantity(item.product.id, 1)}
+                      >
+                        +
+                      </button>
+                    </div>
                     <span className="cart-drawer__item-price">
                       ${(item.product.price * item.quantity).toFixed(2)}
                     </span>
@@ -69,7 +88,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               <button className="cart-drawer__clear" onClick={clearCart}>
                 Vaciar carrito
               </button>
-              <button className="cart-drawer__checkout">
+              <button
+                className="cart-drawer__checkout"
+                onClick={() => { onClose(); navigate('/checkout'); }}
+              >
                 Ir a pagar
               </button>
             </div>

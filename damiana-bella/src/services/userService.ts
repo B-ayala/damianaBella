@@ -4,6 +4,7 @@ import { apiFetch } from '../utils/apiFetch';
 interface CreateUserPayload {
   name: string;
   email: string;
+  phone?: string;
   password: string;
 }
 
@@ -35,6 +36,7 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
       options: {
         data: {
           name: payload.name,
+          ...(payload.phone ? { phone: payload.phone } : {}),
         },
         emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
       },
@@ -66,7 +68,10 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
     // Intento best-effort de actualizar, pero no falla si RLS lo bloquea (email no confirmado)
     await supabase
       .from('profiles')
-      .update({ name: payload.name })
+      .update({
+        name: payload.name,
+        ...(payload.phone ? { phone: payload.phone } : {}),
+      })
       .eq('id', authData.user.id);
 
     return {
@@ -302,6 +307,7 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 export interface AdminUserData {
   id: string;
   name: string;
+  phone?: string;
   email: string;
   role: string;
   created_at: string;

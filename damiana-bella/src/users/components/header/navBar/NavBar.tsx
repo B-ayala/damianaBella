@@ -1,6 +1,6 @@
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock } from 'react-icons/fi';
-import { useState, useEffect } from 'react';
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
 import logoImg from '../../../../assets/img/logo.jpeg';
 import AuthModal from '../../auth/AuthModal';
@@ -34,7 +34,19 @@ const NavBar = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartBump, setCartBump] = useState(false);
   const totalItems = useCartStore((s) => s.totalItems());
+  const prevTotalRef = React.useRef(totalItems);
+
+  useEffect(() => {
+    if (totalItems > prevTotalRef.current) {
+      setCartBump(true);
+      const t = setTimeout(() => setCartBump(false), 600);
+      prevTotalRef.current = totalItems;
+      return () => clearTimeout(t);
+    }
+    prevTotalRef.current = totalItems;
+  }, [totalItems]);
   const [categoryTree, setCategoryTree] = useState<Category[]>([]);
   // Mobile: track which level-1 and level-2 category the user drilled into
   const [mobileL1, setMobileL1] = useState<Category | null>(null);
@@ -350,7 +362,7 @@ const NavBar = () => {
               </button>
             </>
           )}
-          <button className="icon-btn cart-badge-wrapper" onClick={() => setIsCartOpen(true)}>
+          <button className={`icon-btn cart-badge-wrapper${cartBump ? ' cart-bump' : ''}`} onClick={() => setIsCartOpen(true)}>
             <FiShoppingCart className="icon" />
             {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
           </button>

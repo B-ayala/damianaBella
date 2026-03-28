@@ -170,8 +170,14 @@
 }
 
 .payment-badge:hover { opacity: 0.8; transform: scale(0.97); }
-.payment-badge.pagado   { background: #dcfce7; color: #166534; }
+.payment-badge.pagado    { background: #dcfce7; color: #166534; }
 .payment-badge.pendiente { background: #fef9c3; color: #92400e; }
+.payment-badge.expirado  { background: #f3f4f6; color: #6b7280; cursor: default; }
+.payment-badge.fallido   { background: #fee2e2; color: #991b1b; cursor: default; }
+.payment-badge.cancelado { background: #f3f4f6; color: #6b7280; cursor: default; }
+.payment-badge.expirado:hover,
+.payment-badge.fallido:hover,
+.payment-badge.cancelado:hover { opacity: 1; transform: none; }
 
 /* Desktop table — hidden on mobile */
 .sales-table { display: none; }

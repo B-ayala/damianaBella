@@ -12,8 +12,8 @@
   "stateManagement": "zustand",
   "styling": "material-ui + emotion",
   "deployment": {
-    "frontend": "github-pages",
-    "basePath": "/LIA/"
+    "frontend": "vercel",
+    "basePath": "/"
   },
   "ports": {
     "frontend": 5173,

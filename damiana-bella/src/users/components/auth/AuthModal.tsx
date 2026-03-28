@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog, DialogContent, Grow, Box, Typography, Stack, Button,
-  useMediaQuery, Tabs, Tab, TextField, Alert, Link,
+  useMediaQuery, Tabs, Tab, TextField, Alert, Link, InputAdornment, IconButton,
 } from '@mui/material';
 import { FcGoogle } from 'react-icons/fc';
 import {
   FiLogIn, FiUserPlus, FiAlertCircle, FiCheckCircle, FiMail, FiArrowRight, FiMessageSquare,
+  FiEye, FiEyeOff, FiPhone,
 } from 'react-icons/fi';
 import { useAdminStore } from '../../../admin/store/adminStore';
 import { isValidEmail } from '../../../utils/validation';
@@ -17,6 +18,7 @@ import { EMAIL_CONFIRMED_CHANNEL } from '../../pages/auth/EmailConfirmation';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const labelSx = {
@@ -194,7 +196,7 @@ const fieldError = (msg?: string) =>
     </Box>
   ) : undefined;
 
-const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
+const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const navigate = useNavigate();
   const login = useAdminStore(state => state.login);
   const isMobile = useMediaQuery('(max-width:639px)');
@@ -207,8 +209,13 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   // Register form state
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
+
+  // Password visibility
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -252,6 +259,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setLoginPassword('');
     setRegisterName('');
     setRegisterEmail('');
+    setRegisterPhone('');
     setRegisterPassword('');
     setRegisterConfirmPassword('');
     setErrors({});
@@ -287,6 +295,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     if (!registerEmail.trim()) newErrors.registerEmail = 'El correo electrónico es requerido';
     else if (!isValidEmail(registerEmail)) newErrors.registerEmail = 'Ingresa un correo válido';
 
+    if (!registerPhone.trim()) newErrors.registerPhone = 'El número de celular es requerido';
+    else if (!/^\+?[\d\s\-()]{7,20}$/.test(registerPhone.trim())) newErrors.registerPhone = 'Ingresa un número de celular válido';
+
     if (!registerPassword.trim()) newErrors.registerPassword = 'La contraseña es requerida';
     else if (registerPassword.length < 6) newErrors.registerPassword = 'La contraseña debe tener al menos 6 caracteres';
 
@@ -312,6 +323,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         return;
       }
       // Login exitoso pero no es admin — cerrar modal normalmente
+      onSuccess?.();
       handleClose();
     } catch (err) {
       console.error('[AuthModal] login error:', err);
@@ -349,6 +361,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       await createUser({
         name: registerName.trim(),
         email: registerEmail.trim(),
+        phone: registerPhone.trim(),
         password: registerPassword,
       });
 
@@ -627,12 +640,39 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               </Stack>
 
               <Stack spacing={0.5}>
+                <Typography component="label" htmlFor="registerPhone" sx={labelSx}>
+                  Número de Celular
+                </Typography>
+                <TextField
+                  id="registerPhone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={registerPhone}
+                  onChange={(e) => setRegisterPhone(e.target.value)}
+                  error={!!errors.registerPhone}
+                  helperText={fieldError(errors.registerPhone)}
+                  variant="outlined"
+                  fullWidth
+                  sx={inputSx}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <FiPhone size={16} color="var(--primary-color)" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Stack>
+
+              <Stack spacing={0.5}>
                 <Typography component="label" htmlFor="registerPassword" sx={labelSx}>
                   Contraseña
                 </Typography>
                 <TextField
                   id="registerPassword"
-                  type="password"
+                  type={showRegisterPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={registerPassword}
                   onChange={(e) => setRegisterPassword(e.target.value)}
@@ -641,6 +681,22 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowRegisterPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showRegisterPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 
@@ -650,7 +706,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 </Typography>
                 <TextField
                   id="registerConfirmPassword"
-                  type="password"
+                  type={showRegisterConfirmPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={registerConfirmPassword}
                   onChange={(e) => setRegisterConfirmPassword(e.target.value)}
@@ -659,6 +715,22 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowRegisterConfirmPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showRegisterConfirmPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 

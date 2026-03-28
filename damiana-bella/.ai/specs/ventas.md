@@ -20,7 +20,7 @@ Sistema de registro y gestion de ordenes de compra. Soporta dos metodos de pago:
 | `total_price` | numeric | Precio total |
 | `units_config` | jsonb | Array de variantes por unidad `[{ talle: "S", color: "rojo" }, ...]` |
 | `payment_method` | text | `'mp'` o `'transfer'` |
-| `payment_status` | text | `'pendiente'` o `'pagado'` |
+| `payment_status` | text | `'pendiente'`, `'pagado'`, `'fallido'`, `'expirado'` o `'cancelado'` |
 | `shipping_method` | text / null | `'correo'`, `'moto'` o `'local'` |
 | `created_at` | timestamptz | Auto |
 
@@ -118,7 +118,7 @@ interface Sale {
   total_price: number;
   units_config: Record<string, string>[] | null;
   payment_method: string;
-  payment_status: 'pendiente' | 'pagado';
+  payment_status: 'pendiente' | 'pagado' | 'fallido' | 'expirado' | 'cancelado';
   shipping_method: string | null;
   created_at: string;
   current_stock?: number; // join desde productos
@@ -127,8 +127,26 @@ interface Sale {
 
 ---
 
+## Manejo de stock (Mercado Pago)
+
+El stock se descuenta **solo al confirmar el pago via webhook**, nunca antes. Flujo:
+
+1. Usuario hace click en "Continuar al pago" — se consulta el stock en tiempo real (Supabase). Si `stock < quantity` se muestra el error "El producto se quedó sin stock mientras realizabas el pago." y se bloquea el redirect.
+2. Si hay stock, se crea la preferencia MP y la orden queda en `payment_status = 'pendiente'`. El stock **no se reserva**.
+3. MP notifica `payment.approved` al webhook `POST /api/orders/mp-webhook`.
+4. El webhook abre una transacción PostgreSQL:
+   - `SELECT stock FROM public.productos WHERE id = ? FOR UPDATE`
+   - Si `stock >= quantity`: descuenta stock + marca `payment_status = 'pagado'`
+   - Si `stock < quantity`: marca `payment_status = 'fallido'` (sin rollback monetario automático — requiere gestión manual)
+5. Si MP notifica `rejected` o `cancelled`: `payment_status = 'fallido'`
+6. Si MP notifica `pending` / `in_process`: se deja como `'pendiente'`
+
+`payment_status` puede ser: `'pendiente'` | `'pagado'` | `'fallido'` | `'expirado'` | `'cancelado'`
+
+- `expirado`: orden MP pendiente con más de 15 min sin pago (marcada por el cron job cada 5 min, stock liberado)
+- `cancelado`: orden cancelada por fallo en la creación de preferencia MP
+
 ## Notas importantes
-- El stock **no se descuenta automaticamente** al crear una venta. Se hace manualmente o con un futuro trigger SQL
+- El stock de transferencia bancaria **no se descuenta automaticamente** — sigue siendo manual
 - `units_config` es JSONB para soportar variantes flexibles sin tablas relacionales adicionales
-- El webhook de Mercado Pago aun no esta implementado — `payment_status` para MP se actualiza manualmente igual que en transferencia
 - El carrito soporta un solo producto a la vez (by design en `cartStore.ts`) para simplificar el flujo de compra

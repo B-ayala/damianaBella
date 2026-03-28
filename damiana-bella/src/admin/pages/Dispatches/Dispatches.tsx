@@ -5,7 +5,7 @@ import { supabase } from '../../../config/supabaseClient';
 import './Dispatches.css';
 
 type DispatchStatus = 'pendiente' | 'en_preparacion' | 'despachado' | 'listo_para_retiro';
-type PaymentStatus = 'pendiente' | 'pagado';
+type PaymentStatus = 'pagado';
 
 interface Dispatch {
     id: string;
@@ -56,7 +56,6 @@ const Dispatches = () => {
     const [loading, setLoading] = useState(true);
     const [filterShipping, setFilterShipping] = useState('');
     const [filterDispatch, setFilterDispatch] = useState('');
-    const [filterPayment, setFilterPayment] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
 
     const loadDispatches = async () => {
@@ -65,6 +64,7 @@ const Dispatches = () => {
             const { data, error } = await supabase
                 .from('ventas')
                 .select('id, buyer_name, buyer_email, product_id, product_name, product_image, quantity, total_price, payment_method, payment_status, shipping_method, dispatch_status, created_at')
+                .eq('payment_status', 'pagado')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -96,14 +96,6 @@ const Dispatches = () => {
         loadDispatches();
     }, []);
 
-    const handleTogglePaymentStatus = async (d: Dispatch) => {
-        const newStatus: PaymentStatus = d.payment_status === 'pendiente' ? 'pagado' : 'pendiente';
-        const { error } = await supabase.from('ventas').update({ payment_status: newStatus }).eq('id', d.id);
-        if (!error) {
-            setDispatches((prev) => prev.map((x) => x.id === d.id ? { ...x, payment_status: newStatus } : x));
-        }
-    };
-
     const handleAdvanceDispatch = async (d: Dispatch) => {
         const newStatus = nextDispatchStatus(d.dispatch_status, d.shipping_method);
         if (newStatus === d.dispatch_status) return;
@@ -125,7 +117,6 @@ const Dispatches = () => {
     let filtered = dispatches;
     if (filterShipping) filtered = filtered.filter((d) => d.shipping_method === filterShipping);
     if (filterDispatch) filtered = filtered.filter((d) => d.dispatch_status === filterDispatch);
-    if (filterPayment) filtered = filtered.filter((d) => d.payment_status === filterPayment);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
     const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -181,15 +172,6 @@ const Dispatches = () => {
                         <option value="despachado">Despachado</option>
                         <option value="listo_para_retiro">Listo para retiro</option>
                     </select>
-                    <select
-                        className="filter-select"
-                        value={filterPayment}
-                        onChange={(e) => { setFilterPayment(e.target.value); setCurrentPage(1); }}
-                    >
-                        <option value="">Todos los pagos</option>
-                        <option value="pendiente">Pago pendiente</option>
-                        <option value="pagado">Pagado</option>
-                    </select>
                 </div>
             </div>
 
@@ -221,14 +203,14 @@ const Dispatches = () => {
                     <div className="dispatch-empty-state">
                         <SendHorizonal size={48} className="dispatch-empty-icon" />
                         <p className="dispatch-empty-title">
-                            {filterShipping || filterDispatch || filterPayment
+                            {filterShipping || filterDispatch
                                 ? 'No hay pedidos que coincidan con los filtros'
-                                : 'Todavía no hay pedidos registrados'}
+                                : 'Todavía no hay pedidos pagados'}
                         </p>
                         <p className="dispatch-empty-subtitle">
-                            {filterShipping || filterDispatch || filterPayment
+                            {filterShipping || filterDispatch
                                 ? 'Probá con otros criterios o limpiá los filtros.'
-                                : 'Los pedidos aparecerán aquí cuando los clientes completen una compra.'}
+                                : 'Los pedidos pagados aparecerán aquí automáticamente.'}
                         </p>
                     </div>
                 ) : (
@@ -281,16 +263,6 @@ const Dispatches = () => {
                                                     {d.shipping_method ? (SHIPPING_METHOD_LABEL[d.shipping_method] ?? d.shipping_method) : '—'}
                                                 </span>
                                             </div>
-                                            <div className="dispatch-card-field">
-                                                <span className="field-label">Estado pago</span>
-                                                <button
-                                                    className={`payment-status-badge ${d.payment_status}`}
-                                                    onClick={() => handleTogglePaymentStatus(d)}
-                                                    title="Clic para cambiar estado de pago"
-                                                >
-                                                    {d.payment_status === 'pagado' ? 'Pagado' : 'Pendiente'}
-                                                </button>
-                                            </div>
                                             <div className="dispatch-card-field full-width">
                                                 <span className="field-label">Estado despacho</span>
                                                 <div className="dispatch-status-row">
@@ -322,7 +294,6 @@ const Dispatches = () => {
                                     <th>Producto</th>
                                     <th>Fecha</th>
                                     <th>Envío</th>
-                                    <th>Estado pago</th>
                                     <th>Estado despacho</th>
                                 </tr>
                             </thead>
@@ -355,15 +326,6 @@ const Dispatches = () => {
                                                 <ShippingIcon method={d.shipping_method} />
                                                 {d.shipping_method ? (SHIPPING_METHOD_LABEL[d.shipping_method] ?? d.shipping_method) : '—'}
                                             </span>
-                                        </td>
-                                        <td>
-                                            <button
-                                                className={`payment-status-badge ${d.payment_status}`}
-                                                onClick={() => handleTogglePaymentStatus(d)}
-                                                title="Clic para cambiar estado de pago"
-                                            >
-                                                {d.payment_status === 'pagado' ? 'Pagado' : 'Pendiente'}
-                                            </button>
                                         </td>
                                         <td>
                                             <select

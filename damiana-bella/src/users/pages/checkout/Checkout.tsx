@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/cartStore';
+import { useAdminStore } from '../../../admin/store/adminStore';
 import { parseColorOption } from '../../../utils/constants';
 import { createOrder, createMpPreference } from '../../../services/orderService';
+import AuthModal from '../../components/auth/AuthModal';
 import './Checkout.css';
 
 type ShippingMethod = 'correo' | 'moto' | 'local';
@@ -236,12 +238,15 @@ const isAMBA = (provincia: string, municipio?: string): boolean => {
 
 const Checkout = () => {
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mpError, setMpError] = useState('');
+  const [mpReady, setMpReady] = useState(false);
+  const currentUser = useAdminStore((s) => s.currentUser);
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [selectedPayment, setSelectedPayment] = useState('mp');
-  const [selectedShipping, setSelectedShipping] = useState<ShippingMethod>('correo');
+  const [selectedShipping, setSelectedShipping] = useState<ShippingMethod>('moto');
   const [motoAddress, setMotoAddress] = useState('');
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [addrDireccion, setAddrDireccion] = useState('');
@@ -286,6 +291,13 @@ const Checkout = () => {
   }, []);
 
   useEffect(() => {
+    if (currentUser) {
+      setBuyerName(currentUser.name);
+      setBuyerEmail(currentUser.email);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     if (!loading && !item) {
       navigate('/products');
     }
@@ -296,6 +308,36 @@ const Checkout = () => {
       <div className="checkout-loading-screen">
         <div className="checkout-spinner"></div>
         <p className="checkout-loading-text">Preparando tu compra...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="checkout-loading-screen">
+        <p className="checkout-loading-text" style={{ marginBottom: '1rem' }}>
+          Debés iniciar sesión para continuar con la compra.
+        </p>
+        <button
+          onClick={() => setShowAuthModal(true)}
+          style={{
+            padding: '0.65rem 1.5rem',
+            background: 'var(--primary-color, #6366f1)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '0.95rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Iniciar sesión
+        </button>
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setShowAuthModal(false)}
+        />
       </div>
     );
   }
@@ -501,25 +543,8 @@ const Checkout = () => {
     setMpError('');
 
     if (selectedPayment === 'mp') {
-      setSubmitting(true);
-      try {
-        const { init_point } = await createMpPreference({
-          buyerName: buyerName.trim(),
-          buyerEmail: buyerEmail.trim(),
-          productId: String(product.id),
-          productName: product.name,
-          productImage: product.image,
-          quantity,
-          unitPrice,
-          totalPrice: grandTotal,
-          unitsConfig: unitVariants,
-          shippingMethod: selectedShipping,
-        });
-        window.location.href = init_point;
-      } catch (err) {
-        setMpError('No se pudo conectar con el sistema de pagos. Intentá de nuevo o elegí transferencia.');
-        setSubmitting(false);
-      }
+      // Mostrar pantalla de aviso antes de redirigir a MP
+      setMpReady(true);
       return;
     }
 
@@ -540,6 +565,36 @@ const Checkout = () => {
       const phoneNumber = '5491141442409';
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
       window.open(whatsappUrl, '_blank');
+    }
+  };
+
+  const handleConfirmMpRedirect = async () => {
+    setSubmitting(true);
+    setMpReady(false);
+    try {
+      const { init_point, order_id } = await createMpPreference({
+        buyerName: buyerName.trim(),
+        buyerEmail: buyerEmail.trim(),
+        productId: String(product.id),
+        productName: product.name,
+        productImage: product.image,
+        quantity,
+        unitPrice,
+        totalPrice: grandTotal,
+        unitsConfig: unitVariants,
+        shippingMethod: selectedShipping,
+      });
+      sessionStorage.setItem('mp_last_order', JSON.stringify({
+        productName: product.name,
+        productImage: product.image,
+        quantity,
+        grandTotal,
+      }));
+      sessionStorage.setItem('mp_order_id', order_id);
+      window.location.href = init_point;
+    } catch (err) {
+      setMpError(err instanceof Error ? err.message : 'No se pudo conectar con el sistema de pagos. Intentá de nuevo o elegí transferencia.');
+      setSubmitting(false);
     }
   };
 
@@ -630,6 +685,8 @@ const Checkout = () => {
                   placeholder="Ej: María González"
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
+                  readOnly={!!currentUser}
+                  style={currentUser ? { background: '#f5f5f5', color: '#555', cursor: 'default' } : undefined}
                 />
               </div>
               <div className="checkout-buyer-field">
@@ -641,6 +698,8 @@ const Checkout = () => {
                   placeholder="Ej: maria@ejemplo.com"
                   value={buyerEmail}
                   onChange={(e) => setBuyerEmail(e.target.value)}
+                  readOnly={!!currentUser}
+                  style={currentUser ? { background: '#f5f5f5', color: '#555', cursor: 'default' } : undefined}
                 />
               </div>
             </div>
@@ -654,16 +713,16 @@ const Checkout = () => {
 
               {/* Correo Argentino */}
               <div
-                className={`checkout-ship-card ${selectedShipping === 'correo' ? 'checkout-ship-card--selected' : ''}`}
-                onClick={() => setSelectedShipping('correo')}
+                className="checkout-ship-card checkout-ship-card--disabled"
               >
                 <div className="checkout-ship-main">
                   <div className="checkout-ship-left">
                     <input
                       type="radio"
                       name="shipping"
-                      checked={selectedShipping === 'correo'}
-                      onChange={() => setSelectedShipping('correo')}
+                      checked={false}
+                      disabled
+                      onChange={() => {}}
                     />
                     <div className="checkout-ship-info">
                       <p className="checkout-ship-title">Correo Argentino</p>
@@ -847,6 +906,33 @@ const Checkout = () => {
         </div>
       </div>
     </div>
+
+    {/* AVISO 15 MINUTOS ANTES DE REDIRIGIR A MP */}
+    {mpReady && (
+      <div className="checkout-modal-overlay" onClick={() => setMpReady(false)}>
+        <div className="checkout-modal checkout-mp-warning-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="checkout-mp-warning-icon">&#9203;</div>
+          <h3 className="checkout-mp-warning-title">Estás a un paso de finalizar tu compra</h3>
+          <p className="checkout-mp-warning-desc">
+            Tenés <strong>15 minutos</strong> para completar el pago en Mercado Pago. Si no se acredita en ese tiempo, la orden se cancelará automáticamente y el producto volverá a estar disponible.
+          </p>
+          <div className="checkout-mp-warning-actions">
+            <button
+              className="checkout-btn-primary"
+              onClick={handleConfirmMpRedirect}
+            >
+              Ir a Mercado Pago
+            </button>
+            <button
+              className="checkout-btn-secondary"
+              onClick={() => setMpReady(false)}
+            >
+              Volver
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* MODAL DOMICILIO MOTO */}
     {addressModalOpen && (

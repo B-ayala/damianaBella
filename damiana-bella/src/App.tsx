@@ -21,7 +21,7 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <BrowserRouter basename="/damianaBella">
+      <BrowserRouter>
         <AppContent />
       </BrowserRouter>
     </ThemeProvider>

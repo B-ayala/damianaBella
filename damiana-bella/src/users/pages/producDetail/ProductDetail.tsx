@@ -8,6 +8,7 @@ import PurchaseVariantModal from '../../components/PurchaseVariantModal/Purchase
 import { parseColorOption } from '../../../utils/constants';
 import { useCartStore } from '../../../store/cartStore';
 import type { UnitVariants } from '../../../store/cartStore';
+import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -27,7 +28,11 @@ const ProductDetail = () => {
   const [variantError, setVariantError] = useState('');
   const [missingVariants, setMissingVariants] = useState<string[]>([]);
   const [isShaking, setIsShaking] = useState(false);
-  const setCartItem = useCartStore((s) => s.setItem);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const addItem = useCartStore((s) => s.addItem);
+  const setItem = useCartStore((s) => s.setItem);
+
+  useBodyScrollLock(isImageModalOpen);
 
   useEffect(() => {
     fetchProductById(id!)
@@ -95,17 +100,31 @@ const ProductDetail = () => {
 
   const confirmPurchase = (unitVariants: UnitVariants[]) => {
     setIsVariantModalOpen(false);
-    const unitPrice = product!.discount
-      ? product!.price * (1 - product!.discount / 100)
-      : product!.price;
-    setCartItem({
+    setItem({
       product: product!,
       quantity,
       unitVariants,
-      unitPrice,
-      totalPrice: unitPrice * quantity,
+      unitPrice: discountedPrice,
+      totalPrice: discountedPrice * quantity,
     });
     navigate('/checkout');
+  };
+
+  const handleAddToCart = () => {
+    setVariantError('');
+    setMissingVariants([]);
+    const missing = getMissingVariants();
+    if (missing.length > 0) {
+      setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
+      setMissingVariants(missing);
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    addItem(product!, quantity);
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
   };
 
   const handleBuy = () => {
@@ -348,6 +367,7 @@ const ProductDetail = () => {
                 Comprar ahora
               </button>
               <button
+                onClick={handleAddToCart}
                 disabled={stock === 0}
                 style={{
                   display: 'flex',
@@ -355,20 +375,20 @@ const ProductDetail = () => {
                   justifyContent: 'center',
                   width: '100%',
                   padding: '14px 24px',
-                  background: '#ffffff',
-                  color: '#3483fa',
-                  border: '2px solid #3483fa',
+                  background: addedToCart ? '#2ecc71' : '#ffffff',
+                  color: addedToCart ? '#ffffff' : '#3483fa',
+                  border: `2px solid ${addedToCart ? '#2ecc71' : '#3483fa'}`,
                   borderRadius: '8px',
                   fontSize: '16px',
                   fontWeight: 600,
                   cursor: stock === 0 ? 'not-allowed' : 'pointer',
                   boxSizing: 'border-box',
                   fontFamily: 'inherit',
-                  transition: 'background 0.2s',
+                  transition: 'background 0.2s, color 0.2s, border-color 0.2s',
                   opacity: stock === 0 ? 0.6 : 1,
                 }}
               >
-                Agregar al carrito
+                {addedToCart ? '¡Agregado al carrito!' : 'Agregar al carrito'}
               </button>
             </div>
 

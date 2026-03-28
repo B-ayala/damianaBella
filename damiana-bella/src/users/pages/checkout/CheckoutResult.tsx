@@ -1,10 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Clock, XCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useCartStore } from '../../../store/cartStore';
+import { cancelMpOrder } from '../../../services/orderService';
 import './CheckoutResult.css';
 
 type ResultStatus = 'approved' | 'pending' | 'failure' | 'unknown';
+
+interface LastOrder {
+    productName: string;
+    productImage: string;
+    quantity: number;
+    grandTotal: number;
+}
 
 const CONTENT: Record<ResultStatus, { icon: React.ReactNode; title: string; desc: string; color: string }> = {
     approved: {
@@ -36,10 +44,13 @@ const CONTENT: Record<ResultStatus, { icon: React.ReactNode; title: string; desc
 const CheckoutResult = () => {
     const [params] = useSearchParams();
     const navigate = useNavigate();
-    const clearItem = useCartStore((s) => s.clearItem);
+    const setItem = useCartStore((s) => s.setItem);
+    const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
+    const cancelledRef = useRef(false);
 
-    // MP envía: collection_status=approved|pending|null, status=approved|pending|null
+    // MP envía: collection_status=approved|pending|null, status=approved|pending|null, external_reference=order_id
     const mpStatus = params.get('collection_status') ?? params.get('status') ?? '';
+    const externalRef = params.get('external_reference') ?? '';
 
     let status: ResultStatus = 'unknown';
     if (mpStatus === 'approved') status = 'approved';
@@ -47,12 +58,29 @@ const CheckoutResult = () => {
     else if (mpStatus === 'null' || mpStatus === 'rejected' || mpStatus === 'cancelled') status = 'failure';
 
     useEffect(() => {
-        if (status === 'approved') {
-            clearItem();
+        const raw = sessionStorage.getItem('mp_last_order');
+        if (raw) {
+            try { setLastOrder(JSON.parse(raw)); } catch { /* ignore */ }
+            sessionStorage.removeItem('mp_last_order');
         }
-    }, [status, clearItem]);
+
+        if (status === 'approved') {
+            setItem(null);
+            sessionStorage.removeItem('mp_order_id');
+        } else if (status === 'failure') {
+            setItem(null);
+            // Cancelar la orden en el backend para marcarla como 'fallido' y restaurar stock
+            const orderId = externalRef || sessionStorage.getItem('mp_order_id') || '';
+            sessionStorage.removeItem('mp_order_id');
+            if (orderId && !cancelledRef.current) {
+                cancelledRef.current = true;
+                cancelMpOrder(orderId);
+            }
+        }
+    }, [status, setItem, externalRef]);
 
     const { icon, title, desc, color } = CONTENT[status];
+    const fmt = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
     return (
         <div className="checkout-result-page">
@@ -60,6 +88,22 @@ const CheckoutResult = () => {
                 <div className="checkout-result-icon">{icon}</div>
                 <h1 className="checkout-result-title">{title}</h1>
                 <p className="checkout-result-desc">{desc}</p>
+
+                {lastOrder && (status === 'approved' || status === 'pending') && (
+                    <div className="checkout-result-product">
+                        <img
+                            src={lastOrder.productImage}
+                            alt={lastOrder.productName}
+                            className="checkout-result-product-img"
+                        />
+                        <div className="checkout-result-product-info">
+                            <p className="checkout-result-product-name">{lastOrder.productName}</p>
+                            <p className="checkout-result-product-qty">Cantidad: {lastOrder.quantity}</p>
+                            <p className="checkout-result-product-total">Total: ${fmt(lastOrder.grandTotal)}</p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="checkout-result-actions">
                     <button
                         className="checkout-result-btn primary"
@@ -70,9 +114,9 @@ const CheckoutResult = () => {
                     {status === 'failure' && (
                         <button
                             className="checkout-result-btn secondary"
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate('/checkout')}
                         >
-                            <ArrowLeft size={16} /> Volver al checkout
+                            Volver al checkout
                         </button>
                     )}
                 </div>

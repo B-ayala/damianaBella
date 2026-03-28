@@ -1,9 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiShoppingCart } from 'react-icons/fi';
 import type { Product } from '../../../types/product';
 import { parseColorOption } from '../../../utils/constants';
-import { useCartStore } from '../../../store/cartStore';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -13,7 +11,6 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
   const navigate = useNavigate();
-  const addItem = useCartStore((s) => s.addItem);
 
   const handleReadMore = () => {
     if (onReadMore) {
@@ -61,13 +58,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
             onClick={handleReadMore}
           >
             Leer más
-          </button>
-          <button
-            className="product-card__cart-btn"
-            onClick={() => addItem(product)}
-            title="Agregar al carrito"
-          >
-            <FiShoppingCart />
           </button>
         </div>
       </div>
