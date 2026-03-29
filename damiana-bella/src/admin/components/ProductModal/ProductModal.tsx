@@ -5,6 +5,7 @@ import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
 import type { Variant, Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
+import { calculateDiscountPercentage } from '../../../utils/pricing';
 import { apiFetch } from '../../../utils/apiFetch';
 import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
 import { Folder, FolderOpen, Dot, Plus, X } from 'lucide-react';
@@ -48,7 +49,9 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const [images, setImages] = useState<string[]>([]);
 
     // Promociones
+    const [originalPrice, setOriginalPrice] = useState('');
     const [discount, setDiscount] = useState('');
+    const [discountTouched, setDiscountTouched] = useState(false);
     const [freeShipping, setFreeShipping] = useState(false);
 
     // Descripción
@@ -121,6 +124,35 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             }))
     ), [dbCategories]);
 
+    const promotionReferencePrice = useMemo(() => {
+        if (product?.originalPrice && product.originalPrice > 0) return product.originalPrice;
+        if (product?.price && product.price > 0) return product.price;
+        return undefined;
+    }, [product]);
+
+    const syncPromotionFromPrice = (nextPriceValue: string, ignoreDiscountTouched = false) => {
+        if (!product || (discountTouched && !ignoreDiscountTouched)) return;
+
+        const nextPrice = parseFloat(nextPriceValue);
+        if (!promotionReferencePrice || !Number.isFinite(nextPrice) || nextPrice <= 0) return;
+
+        if (nextPrice < promotionReferencePrice) {
+            const nextDiscount = calculateDiscountPercentage(promotionReferencePrice, nextPrice);
+            setOriginalPrice(promotionReferencePrice.toString());
+            setDiscount(nextDiscount ? nextDiscount.toString() : '');
+            return;
+        }
+
+        if (product.originalPrice && nextPrice >= product.originalPrice) {
+            setOriginalPrice('');
+            setDiscount('');
+            return;
+        }
+
+        setOriginalPrice(product.originalPrice?.toString() || '');
+        setDiscount(product.discount?.toString() || '');
+    };
+
     useEffect(() => {
         if (isOpen) {
             const savedCategory = product?.category || '';
@@ -144,7 +176,9 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                         ? [...product.images]
                         : product.imageUrl ? [product.imageUrl] : []
                 );
+                setOriginalPrice(product.originalPrice?.toString() || '');
                 setDiscount(product.discount?.toString() || '');
+                setDiscountTouched(false);
                 setFreeShipping(product.freeShipping || false);
                 setDescription(product.description || '');
                 setFeaturesText((product.features || []).join('\n'));
@@ -173,7 +207,9 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         setCondition('new');
         setStatus('active');
         setImages([]);
+        setOriginalPrice('');
         setDiscount('');
+        setDiscountTouched(false);
         setFreeShipping(false);
         setDescription('');
         setFeaturesText('');
@@ -195,6 +231,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             name,
             category: category.trim().replace(/\b\w/g, c => c.toUpperCase()),
             price: parseFloat(price),
+            originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
             stock: parseInt(stock) || 0,
             imageUrl: validImages[0] || '',
             images: validImages,
@@ -571,7 +608,11 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                         type="number"
                                         placeholder="0.00"
                                         value={price}
-                                        onChange={e => { setPrice(e.target.value); if (fieldErrors.price) setFieldErrors(prev => { const n = {...prev}; delete n.price; return n; }); }}
+                                        onChange={e => {
+                                            setPrice(e.target.value);
+                                            syncPromotionFromPrice(e.target.value);
+                                            if (fieldErrors.price) setFieldErrors(prev => { const n = {...prev}; delete n.price; return n; });
+                                        }}
                                     />
                                     {fieldErrors.price && <span className="field-error-msg">{fieldErrors.price}</span>}
                                 </div>
@@ -906,8 +947,20 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                         value={discount}
                                         min="0"
                                         max="100"
-                                        onChange={e => setDiscount(e.target.value)}
+                                        onChange={e => {
+                                            setDiscountTouched(Boolean(e.target.value));
+                                            setDiscount(e.target.value);
+                                            if (!e.target.value) {
+                                                setOriginalPrice('');
+                                                syncPromotionFromPrice(price, true);
+                                            }
+                                        }}
                                     />
+                                    {originalPrice && price && (
+                                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                                            Precio original detectado: ${Number(originalPrice).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. El precio actual se guarda como precio final.
+                                        </p>
+                                    )}
                                     {discount && (
                                         <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
                                             Se mostrará como "{discount}% OFF" en la vista del producto

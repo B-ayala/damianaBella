@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Product } from '../../../types/product';
 import { parseColorOption } from '../../../utils/constants';
+import { getProductPricing } from '../../../utils/pricing';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -21,10 +22,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
   };
 
   const colorVariant = product.variants?.find(v => v.name.toLowerCase() === 'color');
+  const pricing = getProductPricing(product);
 
   return (
     <div className="product-card">
       <div className="product-card__image-container" onClick={handleReadMore}>
+        {pricing.hasPromotion && pricing.discountPercentage && (
+          <div className="product-card__discount-badge">-{pricing.discountPercentage}%</div>
+        )}
         <img 
           src={product.image} 
           alt={product.name}
@@ -34,7 +39,21 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
       
       <div className="product-card__content">
         <h3 className="product-card__name">{product.name}</h3>
-        <p className="product-card__price">${product.price.toFixed(2)}</p>
+
+        <div className="product-card__pricing">
+          {pricing.hasPromotion && pricing.originalPrice && pricing.discountPercentage && (
+            <div className="product-card__pricing-top">
+              <span className="product-card__original-price">
+                ${pricing.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="product-card__off-label">{pricing.discountPercentage}% OFF</span>
+            </div>
+          )}
+
+          <p className="product-card__price">
+            ${pricing.finalPrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
         
         {colorVariant && colorVariant.options && (
           <div className="product-card__colors">

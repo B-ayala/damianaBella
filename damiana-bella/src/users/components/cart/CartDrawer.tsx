@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiX, FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../../../store/cartStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
+import { getProductPricing } from '../../../utils/pricing';
 import './CartDrawer.css';
 
 interface CartDrawerProps {
@@ -18,7 +19,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
 
-  const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const total = items.reduce((sum, i) => sum + getProductPricing(i.product).finalPrice * i.quantity, 0);
 
   return (
     <>
@@ -41,43 +42,47 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         ) : (
           <>
             <ul className="cart-drawer__list">
-              {items.map((item) => (
-                <li key={item.product.id} className="cart-drawer__item">
-                  <img
-                    src={item.product.image}
-                    alt={item.product.name}
-                    className="cart-drawer__item-img"
-                  />
-                  <div className="cart-drawer__item-info">
-                    <span className="cart-drawer__item-name">{item.product.name}</span>
-                    <div className="cart-drawer__qty-controls">
-                      <button
-                        className="cart-drawer__qty-btn"
-                        onClick={() => updateQuantity(item.product.id, -1)}
-                      >
-                        −
-                      </button>
-                      <span className="cart-drawer__item-qty">{item.quantity}</span>
-                      <button
-                        className="cart-drawer__qty-btn"
-                        onClick={() => updateQuantity(item.product.id, 1)}
-                      >
-                        +
-                      </button>
+              {items.map((item) => {
+                const pricing = getProductPricing(item.product);
+
+                return (
+                  <li key={item.product.id} className="cart-drawer__item">
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="cart-drawer__item-img"
+                    />
+                    <div className="cart-drawer__item-info">
+                      <span className="cart-drawer__item-name">{item.product.name}</span>
+                      <div className="cart-drawer__qty-controls">
+                        <button
+                          className="cart-drawer__qty-btn"
+                          onClick={() => updateQuantity(item.product.id, -1)}
+                        >
+                          −
+                        </button>
+                        <span className="cart-drawer__item-qty">{item.quantity}</span>
+                        <button
+                          className="cart-drawer__qty-btn"
+                          onClick={() => updateQuantity(item.product.id, 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="cart-drawer__item-price">
+                        ${(pricing.finalPrice * item.quantity).toFixed(2)}
+                      </span>
                     </div>
-                    <span className="cart-drawer__item-price">
-                      ${(item.product.price * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
-                  <button
-                    className="cart-drawer__remove"
-                    onClick={() => removeItem(item.product.id)}
-                    title="Eliminar"
-                  >
-                    <FiTrash2 />
-                  </button>
-                </li>
-              ))}
+                    <button
+                      className="cart-drawer__remove"
+                      onClick={() => removeItem(item.product.id)}
+                      title="Eliminar"
+                    >
+                      <FiTrash2 />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="cart-drawer__footer">

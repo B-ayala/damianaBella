@@ -6,6 +6,7 @@ import Modal from '../../../components/common/Modal/Modal';
 import VariantTable from '../../../components/common/VariantTable/VariantTable';
 import PurchaseVariantModal from '../../components/PurchaseVariantModal/PurchaseVariantModal';
 import { parseColorOption } from '../../../utils/constants';
+import { getProductPricing } from '../../../utils/pricing';
 import { useCartStore } from '../../../store/cartStore';
 import type { UnitVariants } from '../../../store/cartStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
@@ -46,9 +47,8 @@ const ProductDetail = () => {
 
   const images = product.images || [product.image];
   const currentImage = images[currentImageIndex];
-  const discountedPrice = product.discount 
-    ? product.price * (1 - product.discount / 100)
-    : product.price;
+  const pricing = getProductPricing(product);
+  const discountedPrice = pricing.finalPrice;
 
   const handlePreviousImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -169,9 +169,9 @@ const ProductDetail = () => {
                 ›
               </button>
               
-              {product.discount && (
+              {pricing.hasPromotion && pricing.discountPercentage && (
                 <div className="gallery__discount-badge">
-                  -{product.discount}%
+                  -{pricing.discountPercentage}%
                 </div>
               )}
             </div>
@@ -213,10 +213,10 @@ const ProductDetail = () => {
 
             {/* Precio */}
             <div className="info__pricing">
-              {product.discount && (
+              {pricing.hasPromotion && pricing.originalPrice && pricing.discountPercentage && (
                 <div className="pricing__original">
-                  <span className="original-price">${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  <span className="discount-badge">{product.discount}% OFF</span>
+                  <span className="original-price">${pricing.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span className="discount-badge">{pricing.discountPercentage}% OFF</span>
                 </div>
               )}
               <div className="pricing__final">

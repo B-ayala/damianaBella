@@ -13,7 +13,7 @@ const AppContent = () => {
     <>
       <AppRouter />
       {!isAdmin && <Footer />}
-      {!isAdmin && <WhatsAppButton />}
+      {!isAdmin && !location.pathname.startsWith('/auth') && <WhatsAppButton />}
     </>
   );
 };

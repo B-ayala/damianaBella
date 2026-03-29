@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock } from 'react-icons/fi';
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
 import logoImg from '../../../../assets/img/logo.jpeg';
@@ -7,7 +7,8 @@ import AuthModal from '../../auth/AuthModal';
 import UserProfileDropdown from './UserProfileDropdown';
 import ChangePasswordModal from './ChangePasswordModal';
 import { useAdminStore } from '../../../../admin/store/adminStore';
-import { fetchCategoriesTree, type Category } from '../../../../services/productService';
+import { fetchCategoriesTree, searchProducts, type Category, type ProductSearchResult } from '../../../../services/productService';
+import { getProductPricing } from '../../../../utils/pricing';
 import { useCartStore } from '../../../../store/cartStore';
 import CartDrawer from '../../cart/CartDrawer';
 import './NavBar.css';
@@ -29,7 +30,14 @@ function buildChildMap(cats: Category[]): Map<string | null, Category[]> {
 }
 
 const NavBar = () => {
+  const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
@@ -79,6 +87,59 @@ const NavBar = () => {
   const handleMobileChangePassword = () => {
     closeMenu();
     setIsMobilePasswordModalOpen(true);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggleSearch = () => {
+    if (searchOpen) {
+      setSearchOpen(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      setShowResults(false);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    } else {
+      setSearchOpen(true);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!value.trim()) {
+      setSearchResults([]);
+      setShowResults(false);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowResults(true);
+
+    debounceRef.current = setTimeout(async () => {
+      const results = await searchProducts(value.trim());
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 300);
+  };
+
+  const handleResultClick = (id: string) => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+    navigate(`/product/${id}`);
   };
 
   return (
@@ -337,8 +398,8 @@ const NavBar = () => {
 
         {/* Right Side Icons */}
         <div className="navbar-right">
-          <div className="search-container">
-            <button className="icon-btn" onClick={() => setSearchOpen(!searchOpen)}>
+          <div className="search-container" ref={searchRef}>
+            <button className="icon-btn" onClick={handleToggleSearch}>
               <FiSearch className="icon" />
             </button>
             {searchOpen && (
@@ -347,7 +408,39 @@ const NavBar = () => {
                 placeholder="Buscar productos..."
                 className="search-input"
                 autoFocus
+                value={searchQuery}
+                onChange={handleSearchChange}
               />
+            )}
+            {searchOpen && showResults && (
+              <div className="search-results-dropdown">
+                {isSearching ? (
+                  <p className="search-loading">Buscando...</p>
+                ) : searchResults.length === 0 ? (
+                  <p className="search-no-results">No se encontraron productos</p>
+                ) : (
+                  searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      className="search-result-item"
+                      onClick={() => handleResultClick(result.id)}
+                    >
+                      {result.image && (
+                        <img
+                          src={result.image}
+                          alt={result.name}
+                          className="search-result-img"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
+                      <div className="search-result-info">
+                        <p className="search-result-name">{result.name}</p>
+                        <p className="search-result-price">$ {getProductPricing(result).finalPrice.toLocaleString('es-AR')}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             )}
           </div>
           {currentUser ? (

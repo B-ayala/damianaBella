@@ -6,6 +6,7 @@ export interface AdminProduct {
   id: string;
   name: string;
   price: number;
+  originalPrice?: number;
   stock: number;
   category: string;
   imageUrl: string;

@@ -8,6 +8,7 @@ const mapProductRow = (p: Record<string, unknown>): AdminProduct => ({
     id: String(p.id),
     name: p.name as string,
     price: p.price as number,
+    originalPrice: (p.original_price as number) || undefined,
     stock: p.stock as number,
     category: (p.category as string) || '',
     imageUrl: (p.image_url as string) || '',

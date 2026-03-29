@@ -11,9 +11,9 @@ import {
 } from 'react-icons/fi';
 import { useAdminStore } from '../../../admin/store/adminStore';
 import { isValidEmail } from '../../../utils/validation';
-import { createUser, resendConfirmationEmail } from '../../../services/userService';
+import { createUser, resendConfirmationEmail, requestPasswordReset } from '../../../services/userService';
 import Modal from '../../../components/common/Modal/Modal';
-import { EMAIL_CONFIRMED_CHANNEL } from '../../pages/auth/EmailConfirmation';
+import { EMAIL_CONFIRMED_CHANNEL, EMAIL_CONFIRMED_STORAGE_KEY } from '../../pages/auth/EmailConfirmation';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -227,6 +227,11 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [emailErrorType, setEmailErrorType] = useState<'confirmed' | 'pending' | null>(null);
 
+  // Forgot password state
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+
   // Email confirmation modal state
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
@@ -238,20 +243,58 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
 
   // Escuchar confirmación de email desde la otra pestaña
   useEffect(() => {
-    if (!showConfirmationModal) return;
+    if (!isOpen) return;
+
+    const applyEmailConfirmed = () => {
+      setShowConfirmationModal(false);
+      setConfirmationError('');
+      setEmailActuallySent(false);
+      setEmailConfirmedByLink(true);
+      setView('login');
+    };
+
+    const consumeStoredConfirmation = () => {
+      try {
+        const rawValue = window.localStorage.getItem(EMAIL_CONFIRMED_STORAGE_KEY);
+        if (!rawValue) return false;
+
+        const parsed = JSON.parse(rawValue) as { type?: string };
+        if (parsed?.type !== 'EMAIL_CONFIRMED') return false;
+
+        window.localStorage.removeItem(EMAIL_CONFIRMED_STORAGE_KEY);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (consumeStoredConfirmation()) {
+      applyEmailConfirmed();
+    }
+
     let channel: BroadcastChannel | null = null;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== EMAIL_CONFIRMED_STORAGE_KEY || !event.newValue) return;
+      if (consumeStoredConfirmation()) {
+        applyEmailConfirmed();
+      }
+    };
+
     try {
       channel = new BroadcastChannel(EMAIL_CONFIRMED_CHANNEL);
       channel.onmessage = (e) => {
         if (e.data?.type === 'EMAIL_CONFIRMED') {
-          setShowConfirmationModal(false);
-          setEmailConfirmedByLink(true);
-          setView('login');
+          applyEmailConfirmed();
         }
       };
     } catch { /* BroadcastChannel not supported */ }
-    return () => { channel?.close(); };
-  }, [showConfirmationModal]);
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [isOpen]);
 
   // Reset state when closing
   const handleClose = () => {
@@ -267,6 +310,9 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     setSuccessMessage('');
     setEmailErrorType(null);
     setView('login');
+    setForgotEmail('');
+    setForgotSent(false);
+    setShowForgotModal(false);
     setShowConfirmationModal(false);
     setConfirmedEmail('');
     setConfirmationError('');
@@ -328,6 +374,25 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     } catch (err) {
       console.error('[AuthModal] login error:', err);
       setServerError('Error al iniciar sesión. Verifica tus credenciales.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!forgotEmail.trim() || !isValidEmail(forgotEmail)) {
+      setErrors({ forgotEmail: 'Ingresá un correo electrónico válido' });
+      return;
+    }
+    setErrors({});
+    setServerError('');
+    setIsLoading(true);
+    try {
+      await requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Error al enviar el email');
     } finally {
       setIsLoading(false);
     }
@@ -471,6 +536,8 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             setSuccessMessage('');
             setEmailErrorType(null);
             setEmailConfirmedByLink(false);
+            setForgotEmail('');
+            setForgotSent(false);
             setView(v as 'login' | 'register');
           }}
           variant="fullWidth"
@@ -556,14 +623,19 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: '-0.25rem' }}>
                 <Link
-                  href="#"
+                  component="button"
+                  type="button"
                   underline="none"
+                  onClick={() => { setErrors({}); setServerError(''); setForgotEmail(''); setForgotSent(false); setShowForgotModal(true); }}
                   sx={{
                     fontSize: '0.875rem',
                     color: 'var(--primary-dark)',
                     fontWeight: 500,
                     position: 'relative',
                     transition: 'color 0.2s ease',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
                     '&:hover': { color: 'var(--primary-color)' },
                     '&::after': {
                       content: '""',
@@ -781,7 +853,8 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             </Box>
           )}
 
-          {/* Separator */}
+          {/* Separator + Google */}
+          <Box>
           <Box
             sx={{
               display: 'flex',
@@ -828,8 +901,144 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
           >
             Continuar con Google
           </Button>
+          </Box>
         </Box>
       </Box>
+
+      {/* Modal de recuperación de contraseña */}
+      <Dialog
+        open={showForgotModal}
+        onClose={() => { setShowForgotModal(false); setForgotEmail(''); setForgotSent(false); setErrors({}); setServerError(''); }}
+        fullScreen={isMobile}
+        fullWidth
+        maxWidth={false}
+        slots={{ transition: Grow }}
+        slotProps={{ transition: { timeout: 200 } }}
+        sx={{
+          zIndex: 2100,
+          '& .MuiBackdrop-root': {
+            background: 'linear-gradient(135deg, rgba(184,165,200,0.35) 0%, rgba(0,0,0,0.45) 100%)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          },
+          '& .MuiDialog-paper': {
+            background: 'linear-gradient(145deg, #ffffff 0%, #fafafa 100%)',
+            borderRadius: isMobile ? 0 : '20px',
+            boxShadow: '0 25px 80px -20px rgba(184,165,200,0.4), 0 15px 40px -10px rgba(0,0,0,0.2)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            overflow: 'hidden',
+            position: 'relative',
+            maxWidth: '480px',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 50%, var(--primary-color) 100%)',
+              zIndex: 1,
+            },
+          },
+        }}
+      >
+        <DialogContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: { xs: '1rem', sm: '1.25rem' },
+            p: { xs: '1.75rem 1.25rem', sm: '2rem 1.75rem' },
+          }}
+        >
+          {forgotSent ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', py: 1, textAlign: 'center' }}>
+              <Box
+                sx={{
+                  width: { xs: 56, sm: 64 },
+                  height: { xs: 56, sm: 64 },
+                  borderRadius: '50%',
+                  background: 'rgba(46,204,113,0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <FiCheckCircle size={30} color="#27ae60" />
+              </Box>
+
+              <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 700, color: 'var(--text-dark)' }}>
+                ¡Email enviado!
+              </Typography>
+
+              <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' }, color: '#666', lineHeight: 1.5, maxWidth: 340 }}>
+                Revisá tu bandeja de entrada (y carpeta de spam). Si el correo existe en nuestra base, recibirás el link en breve.
+              </Typography>
+
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => { setShowForgotModal(false); setForgotEmail(''); setForgotSent(false); }}
+                startIcon={<FiLogIn size={16} />}
+                sx={{
+                  mt: 1,
+                  color: 'var(--primary-dark)',
+                  borderColor: 'var(--primary-color)',
+                  borderWidth: 2,
+                  borderRadius: '10px',
+                  py: '0.75rem',
+                  fontWeight: 600,
+                  textTransform: 'none' as const,
+                  fontFamily: "'Poppins', sans-serif",
+                  '&:hover': { background: 'rgba(184,165,200,0.08)', borderColor: 'var(--primary-color)', borderWidth: 2 },
+                }}
+              >
+                Volver a Iniciar Sesión
+              </Button>
+            </Box>
+          ) : (
+            <Box component="form" onSubmit={handleForgotSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <Box>
+                <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 700, color: 'var(--text-dark)', mb: 0.5 }}>
+                  Recuperar contraseña
+                </Typography>
+                <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' }, color: '#888' }}>
+                  Ingresá tu correo y te enviaremos un link para restablecer tu contraseña.
+                </Typography>
+              </Box>
+
+              <Stack spacing={0.5}>
+                <Typography component="label" htmlFor="forgotEmailModal" sx={labelSx}>
+                  Correo Electrónico
+                </Typography>
+                <TextField
+                  id="forgotEmailModal"
+                  type="email"
+                  autoComplete="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  error={!!errors.forgotEmail}
+                  helperText={fieldError(errors.forgotEmail)}
+                  variant="outlined"
+                  fullWidth
+                  sx={inputSx}
+                />
+              </Stack>
+
+              {serverError && (
+                <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
+                  {serverError}
+                </Alert>
+              )}
+
+              <Button type="submit" disabled={isLoading} variant="contained" fullWidth sx={submitBtnSx}
+                startIcon={!isLoading ? <FiMail size={18} /> : undefined}
+              >
+                {isLoading ? 'Enviando...' : 'Enviar link de recuperación'}
+              </Button>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de confirmación de email */}
       <Dialog

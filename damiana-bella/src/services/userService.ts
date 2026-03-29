@@ -270,6 +270,30 @@ const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> =
 };
 
 /**
+ * Solicitar recuperación de contraseña por email
+ * Supabase envía un link mágico al correo con type=recovery
+ */
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
+  });
+  if (error) {
+    throw new Error(error.message || 'Error al enviar el email de recuperación');
+  }
+};
+
+/**
+ * Establecer nueva contraseña (se llama desde la página de reset, tras el link mágico)
+ * Requiere que Supabase ya haya establecido la sesión de recovery en el cliente
+ */
+export const resetPassword = async (newPassword: string): Promise<void> => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    throw new Error(error.message || 'Error al actualizar la contraseña');
+  }
+};
+
+/**
  * Cambiar la contraseña del usuario actual
  * Verifica la contraseña actual reautenticando, luego actualiza a la nueva
  */

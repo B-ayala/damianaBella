@@ -12,6 +12,7 @@ export const mapDbRowToProduct = (row: any): Product => {
     id: row.id,
     name: row.name,
     price: row.price,
+    originalPrice: row.original_price,
     image: images[0] || '',
     images,
     description: row.description,
@@ -285,6 +286,74 @@ export const fetchProducts = async () => {
   return data || [];
 };
 
+// Search products by name, category or description
+export interface ProductSearchResult {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  image: string;
+  category: string;
+}
+
+interface ProductSearchRow {
+  id: string;
+  name: string;
+  price: number;
+  original_price?: number | null;
+  discount?: number | null;
+  image_url?: string | null;
+  images?: string[] | null;
+  category: string;
+}
+
+export const searchProducts = async (query: string): Promise<ProductSearchResult[]> => {
+  if (!query.trim()) return [];
+
+  const q = query.trim();
+  let data;
+  let error;
+
+  ({ data, error } = await supabase
+    .from('productos')
+    .select('id, name, price, original_price, discount, image_url, images, category')
+    .eq('status', 'active')
+    .or(`name.ilike.%${q}%,category.ilike.%${q}%,description.ilike.%${q}%`)
+    .limit(8)
+    .order('name', { ascending: true }));
+
+  if (error && error.message?.includes('original_price')) {
+    ({ data, error } = await supabase
+      .from('productos')
+      .select('id, name, price, discount, image_url, images, category')
+      .eq('status', 'active')
+      .or(`name.ilike.%${q}%,category.ilike.%${q}%,description.ilike.%${q}%`)
+      .limit(8)
+      .order('name', { ascending: true }));
+  }
+
+  if (error) {
+    console.error('Search products error:', error);
+    return [];
+  }
+
+  const rows = (data || []) as ProductSearchRow[];
+
+  return rows.map((row) => {
+    const imgs: string[] = row.images && row.images.length > 0 ? row.images : [];
+    return {
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      originalPrice: row.original_price || undefined,
+      discount: row.discount || undefined,
+      image: imgs[0] || row.image_url || '',
+      category: row.category,
+    };
+  });
+};
+
 // Fetch single product
 export const fetchProductById = async (id: string) => {
   const { data, error } = await supabase
@@ -315,6 +384,7 @@ export const createProduct = async (
     body: JSON.stringify({
       name: product.name,
       price: product.price,
+      originalPrice: product.originalPrice,
       stock: product.stock,
       category: product.category,
       imageUrl: product.imageUrl,
@@ -356,6 +426,7 @@ export const updateProduct = async (
     body: JSON.stringify({
       name: product.name,
       price: product.price,
+      originalPrice: product.originalPrice,
       stock: product.stock,
       category: product.category,
       imageUrl: product.imageUrl,
@@ -501,6 +572,7 @@ export const supabaseProducts = {
         {
           name: product.name,
           price: product.price,
+          original_price: product.originalPrice,
           stock: product.stock,
           category: product.category,
           image_url: product.imageUrl,
@@ -526,7 +598,8 @@ export const supabaseProducts = {
   async update(id: string, product: Partial<AdminProduct>) {
     const updateData: Record<string, unknown> = {};
     if (product.name) updateData.name = product.name;
-    if (product.price) updateData.price = product.price;
+    if (product.price !== undefined) updateData.price = product.price;
+    if (product.originalPrice !== undefined) updateData.original_price = product.originalPrice;
     if (product.stock !== undefined) updateData.stock = product.stock;
     if (product.category) updateData.category = product.category;
     if (product.imageUrl) updateData.image_url = product.imageUrl;
