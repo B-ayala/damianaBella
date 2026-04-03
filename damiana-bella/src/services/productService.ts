@@ -477,6 +477,7 @@ export interface CarouselImageRow {
   url: string;
   order: number;
   isActive: boolean;
+  deviceType: 'desktop' | 'mobile';
 }
 
 const mapCarouselRow = (row: Record<string, unknown>): CarouselImageRow => ({
@@ -484,20 +485,22 @@ const mapCarouselRow = (row: Record<string, unknown>): CarouselImageRow => ({
   url: row.url as string,
   order: row.order as number,
   isActive: row.is_active as boolean,
+  deviceType: (row.device_type as 'desktop' | 'mobile') ?? 'desktop',
 });
 
-// Fetch active images (user-facing)
-export const fetchCarouselImages = async (): Promise<CarouselImageRow[]> => {
+// Fetch active images (user-facing) — filterable by deviceType
+export const fetchCarouselImages = async (deviceType: 'desktop' | 'mobile' = 'desktop'): Promise<CarouselImageRow[]> => {
   const { data, error } = await supabase
     .from('carousel_images')
     .select('*')
     .eq('is_active', true)
+    .eq('device_type', deviceType)
     .order('order', { ascending: true });
   if (error) throw error;
   return (data || []).map(mapCarouselRow);
 };
 
-// Fetch all images (admin)
+// Fetch all images (admin) — includes all device types
 export const fetchAllCarouselImages = async (): Promise<CarouselImageRow[]> => {
   const { data, error } = await supabase
     .from('carousel_images')
@@ -507,10 +510,14 @@ export const fetchAllCarouselImages = async (): Promise<CarouselImageRow[]> => {
   return (data || []).map(mapCarouselRow);
 };
 
-export const insertCarouselImage = async (url: string, order: number): Promise<CarouselImageRow> => {
+export const insertCarouselImage = async (
+  url: string,
+  order: number,
+  deviceType: 'desktop' | 'mobile' = 'desktop'
+): Promise<CarouselImageRow> => {
   const { data, error } = await supabase
     .from('carousel_images')
-    .insert([{ url, order, is_active: true }])
+    .insert([{ url, order, is_active: true, device_type: deviceType }])
     .select()
     .single();
   if (error) throw error;

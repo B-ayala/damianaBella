@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Reorder } from 'framer-motion';
-import { Trash2, GripVertical, EyeOff, Eye } from 'lucide-react';
+import { Trash2, Copy, GripVertical, EyeOff, Eye, Monitor, Smartphone } from 'lucide-react';
 import { useAdminStore, type CarouselImage } from '../../store/adminStore';
 import {
     fetchAllCarouselImages,
@@ -17,6 +17,7 @@ const CarouselManager = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
 
     useEffect(() => {
         fetchAllCarouselImages()
@@ -32,8 +33,9 @@ const CarouselManager = () => {
         setSaving(true);
         setError('');
         try {
-            const nextOrder = carouselImages.length + 1;
-            const newImg = await insertCarouselImage(url, nextOrder);
+            const filteredImages = carouselImages.filter(img => img.deviceType === viewMode);
+            const nextOrder = filteredImages.length + 1;
+            const newImg = await insertCarouselImage(url, nextOrder, viewMode);
             setCarouselImages([...carouselImages, newImg]);
             setNewImageUrl('');
         } catch {
@@ -73,11 +75,43 @@ const CarouselManager = () => {
         }
     };
 
+    const handleCopy = async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            setError('');
+        } catch {
+            setError('No se pudo copiar la URL.');
+        }
+    };
+
+    const filteredImages = carouselImages.filter(img => img.deviceType === viewMode);
+    const imgsPerSlide = viewMode === 'mobile' ? 2 : 3;
+
     return (
         <div className="admin-card carousel-manager">
-            <h2 className="admin-card-title">Gestión de Carrusel</h2>
+            <div className="carousel-manager-header">
+                <h2 className="admin-card-title">Gestión de Carrusel</h2>
+                <div className="view-mode-toggle">
+                    <button
+                        type="button"
+                        className={`view-mode-btn ${viewMode === 'desktop' ? 'active' : ''}`}
+                        onClick={() => setViewMode('desktop')}
+                    >
+                        <Monitor size={16} /> Desktop
+                    </button>
+                    <button
+                        type="button"
+                        className={`view-mode-btn ${viewMode === 'mobile' ? 'active' : ''}`}
+                        onClick={() => setViewMode('mobile')}
+                    >
+                        <Smartphone size={16} /> Mobile
+                    </button>
+                </div>
+            </div>
             <p className="admin-card-desc">
-                Cada slide muestra exactamente 3 imágenes. Las imágenes se agrupan automáticamente de 3 en 3 según el orden establecido.
+                {viewMode === 'desktop'
+                    ? 'Desktop: cada slide muestra 3 imágenes. Se agrupan de 3 en 3 según el orden establecido.'
+                    : 'Mobile: cada slide muestra 2 imágenes. Se agrupan de 2 en 2 según el orden establecido.'}
             </p>
 
             {error && (
@@ -102,25 +136,25 @@ const CarouselManager = () => {
                 <div className="empty-state">Cargando imágenes...</div>
             ) : (
                 <>
-                    {carouselImages.length > 0 && (
+                    {filteredImages.length > 0 && (
                         <div className="slides-summary">
                             <span className="slides-count">
-                                {Math.ceil(carouselImages.filter(img => img.isActive).length / 3)} slides activos
-                                ({carouselImages.filter(img => img.isActive).length} imágenes activas)
+                                {Math.ceil(filteredImages.filter(img => img.isActive).length / imgsPerSlide)} slides activos
+                                ({filteredImages.filter(img => img.isActive).length} imágenes activas)
                             </span>
                         </div>
                     )}
 
                     <Reorder.Group
                         axis="y"
-                        values={carouselImages}
+                        values={filteredImages}
                         onReorder={handleReorder}
                         className="carousel-list"
                     >
-                        {carouselImages.map((img, index) => {
-                            const slideNumber = Math.floor(index / 3) + 1;
-                            const positionInSlide = (index % 3) + 1;
-                            const isFirstInSlide = index % 3 === 0;
+                        {filteredImages.map((img, index) => {
+                            const slideNumber = Math.floor(index / imgsPerSlide) + 1;
+                            const positionInSlide = (index % imgsPerSlide) + 1;
+                            const isFirstInSlide = index % imgsPerSlide === 0;
 
                             return (
                                 <Reorder.Item
@@ -138,7 +172,7 @@ const CarouselManager = () => {
                                         <img src={img.url} alt={`Slide ${slideNumber} - Img ${positionInSlide}`} />
                                     </div>
                                     <div className="carousel-item-info">
-                                        <span className="carousel-order">#{img.order} (Posición {positionInSlide}/3)</span>
+                                        <span className="carousel-order">#{img.order} (Posición {positionInSlide}/{imgsPerSlide})</span>
                                         <button
                                             type="button"
                                             className={`status-toggle ${img.isActive ? 'active' : 'inactive'}`}
@@ -150,8 +184,17 @@ const CarouselManager = () => {
                                     <div className="carousel-item-actions">
                                         <button
                                             type="button"
+                                            className="action-btn copy"
+                                            onClick={() => handleCopy(img.url)}
+                                            title="Copiar URL"
+                                        >
+                                            <Copy size={18} />
+                                        </button>
+                                        <button
+                                            type="button"
                                             className="action-btn delete"
                                             onClick={() => handleDelete(img.id)}
+                                            title="Eliminar"
                                         >
                                             <Trash2 size={18} />
                                         </button>
@@ -161,8 +204,10 @@ const CarouselManager = () => {
                         })}
                     </Reorder.Group>
 
-                    {carouselImages.length === 0 && (
-                        <div className="empty-state">No hay imágenes en el carrusel.</div>
+                    {filteredImages.length === 0 && (
+                        <div className="empty-state">
+                            No hay imágenes {viewMode === 'mobile' ? 'para mobile' : 'para desktop'} en el carrusel.
+                        </div>
                     )}
                 </>
             )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, CircularProgress, IconButton, InputAdornment,
   Stack, TextField, Typography, Alert,
@@ -76,8 +76,9 @@ const labelSx = {
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  // 'waiting' | 'recovery' (via email link) | 'change' (logged-in user) | 'success' | 'invalid'
-  const [status, setStatus] = useState<'waiting' | 'recovery' | 'change' | 'success' | 'invalid'>('waiting');
+  // 'waiting' | 'recovery' (via email link) | 'change' (logged-in user) | 'success' | 'invalid' | 'error'
+  const [status, setStatus] = useState<'waiting' | 'recovery' | 'change' | 'success' | 'invalid' | 'error'>('waiting');
+  const [errorMessage, setErrorMessage] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -90,28 +91,83 @@ const ResetPassword = () => {
   const resolved = useRef(false);
 
   useEffect(() => {
-    // Supabase fires PASSWORD_RECOVERY when the user arrives via recovery email link
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    const initializeReset = async () => {
+      // Extract hash parameters (Supabase uses hash for OAuth flow)
+      const hash = window.location.hash.substring(1); // Remove the #
+      const params = new URLSearchParams(hash);
+
+      const errorParam = params.get('error');
+      const errorCode = params.get('error_code');
+      const errorDescription = params.get('error_description');
+      const accessToken = params.get('access_token');
+      const type = params.get('type');
+
+      console.log('🔍 ResetPassword Debug:', {
+        fullHash: window.location.hash,
+        hashParams: Object.fromEntries(params.entries()),
+        errorParam,
+        errorCode,
+        accessToken: accessToken ? '✓ present' : '✗ missing',
+        type,
+      });
+
+      // Case 1: Supabase returned an error (expired OTP, invalid token, etc.)
+      if (errorParam || errorCode) {
+        resolved.current = true;
+        setStatus('error');
+
+        // Map Supabase error codes to user-friendly messages
+        let message = 'El link de recuperación no es válido o ya expiró.';
+        if (errorCode === 'otp_expired') {
+          message = 'El link de recuperación ha expirado. Solicitá uno nuevo desde la pantalla de inicio de sesión.';
+        } else if (errorCode === 'otp_not_found' || errorCode === 'invalid_token') {
+          message = 'El link de recuperación es inválido. Solicitá uno nuevo desde la pantalla de inicio de sesión.';
+        } else if (errorDescription) {
+          message = decodeURIComponent(errorDescription);
+        }
+        setErrorMessage(message);
+        return;
+      }
+
+      // Case 2: Valid recovery link received (access_token + type=recovery)
+      if (accessToken && type === 'recovery') {
         resolved.current = true;
         setStatus('recovery');
-        subscription.unsubscribe();
+        return;
       }
-    });
 
-    // Fallback: if no recovery event, check if user is already logged in (change password flow)
-    const timer = setTimeout(async () => {
-      if (!resolved.current) {
-        const { data: { user } } = await supabase.auth.getUser();
-        setStatus(user ? 'change' : 'invalid');
-        subscription.unsubscribe();
+      // Case 3: Check if user is already logged in (change password flow)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        resolved.current = true;
+        setStatus('change');
+        return;
       }
-    }, 5000);
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timer);
+      // Case 4: No valid recovery token, not logged in, and no error
+      // Wait for onAuthStateChange event in case Supabase is still processing
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          resolved.current = true;
+          setStatus('recovery');
+          subscription.unsubscribe();
+        }
+      });
+
+      const timer = setTimeout(() => {
+        if (!resolved.current) {
+          setStatus('invalid');
+          subscription.unsubscribe();
+        }
+      }, 3000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
     };
+
+    initializeReset();
   }, []);
 
   const validate = () => {
@@ -189,6 +245,33 @@ const ResetPassword = () => {
             </Typography>
             <Typography sx={{ fontSize: '0.875rem', color: '#888', textAlign: 'center' }}>
               El link de recuperación no es válido o ya expiró. Solicitá uno nuevo desde la pantalla de inicio de sesión.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => navigate('/')}
+              sx={{ ...submitBtnSx, mt: 1 }}
+            >
+              Volver al inicio
+            </Button>
+          </Box>
+        )}
+
+        {status === 'error' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 1 }}>
+            <Box
+              sx={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: 'rgba(231,76,60,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <FiAlertCircle size={28} color="#e74c3c" />
+            </Box>
+            <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>
+              Error en la recuperación
+            </Typography>
+            <Typography sx={{ fontSize: '0.875rem', color: '#888', textAlign: 'center' }}>
+              {errorMessage}
             </Typography>
             <Button
               variant="contained"

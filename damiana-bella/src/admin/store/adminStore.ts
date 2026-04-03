@@ -38,6 +38,7 @@ export interface CarouselImage {
   url: string;
   order: number;
   isActive: boolean;
+  deviceType: 'desktop' | 'mobile';
 }
 
 export interface AboutInfo {
@@ -72,7 +73,7 @@ interface AdminState {
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   setCarouselImages: (images: CarouselImage[]) => void;
-  addCarouselImage: (url: string) => void;
+  addCarouselImage: (url: string, deviceType?: 'desktop' | 'mobile') => void;
   updateCarouselImage: (id: string, data: Partial<CarouselImage>) => void;
   deleteCarouselImage: (id: string) => void;
   setProducts: (products: AdminProduct[]) => void;
@@ -135,8 +136,8 @@ export const useAdminStore = create<AdminState>((set) => ({
     set({ isAuthenticated: false, currentUser: null });
   },
   setCarouselImages: (images) => set({ carouselImages: images }),
-  addCarouselImage: (url) => set((state) => ({
-    carouselImages: [...state.carouselImages, { id: Date.now().toString(), url, order: state.carouselImages.length + 1, isActive: true }]
+  addCarouselImage: (url, deviceType = 'desktop') => set((state) => ({
+    carouselImages: [...state.carouselImages, { id: Date.now().toString(), url, order: state.carouselImages.length + 1, isActive: true, deviceType }]
   })),
   updateCarouselImage: (id, data) => set((state) => ({
     carouselImages: state.carouselImages.map(img => img.id === id ? { ...img, ...data } : img)

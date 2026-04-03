@@ -214,6 +214,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
 
   // Password visibility
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
@@ -609,7 +610,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                 </Typography>
                 <TextField
                   id="loginPassword"
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
@@ -618,6 +619,22 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowLoginPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showLoginPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 

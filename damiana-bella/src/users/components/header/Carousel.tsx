@@ -27,18 +27,31 @@ const Carousel = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
+  // Detect mobile/desktop based on window width
   useEffect(() => {
-    fetchCarouselImages()
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch carousel images and group them based on device type
+  useEffect(() => {
+    const deviceType = isMobile ? 'mobile' : 'desktop';
+    const imgsPerSlide = isMobile ? 2 : 3;
+
+    fetchCarouselImages(deviceType)
       .then(images => {
         const grouped: Slide[] = [];
-        for (let i = 0; i < images.length; i += 3) {
-          grouped.push({ images: images.slice(i, i + 3).map(img => img.url) });
+        for (let i = 0; i < images.length; i += imgsPerSlide) {
+          grouped.push({ images: images.slice(i, i + imgsPerSlide).map(img => img.url) });
         }
         setSlides(grouped);
+        setCurrentSlide(0);
       })
       .catch(console.error);
-  }, []);
+  }, [isMobile]);
 
   const nextSlide = () => {
     setDirection(1);
