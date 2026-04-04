@@ -28,7 +28,7 @@ const AppRouter = () => {
   return (
     <>
       <ScrollToTop />
-      <Suspense fallback={null}>
+      <Suspense fallback={<div style={{ minHeight: '100vh', width: '100%', background: '#fff' }} />}>
         <Routes>
           {/* Auth Routes */}
           <Route path="/auth/confirm" element={<EmailConfirmation />} />

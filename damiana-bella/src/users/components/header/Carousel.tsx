@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { fetchCarouselImages } from '../../../services/productService';
+import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import './Carousel.css';
 
 interface Slide {
@@ -74,6 +75,25 @@ const Carousel = () => {
     return () => clearInterval(timer);
   }, [currentSlide, slides.length]);
 
+  // Inject preload link for the first carousel image for LCP optimization
+  useEffect(() => {
+    if (slides.length === 0) return;
+    const firstImg = slides[0]?.images[0];
+    if (!firstImg) return;
+    const optimizedUrl = buildCloudinaryUrl(firstImg, {
+      width: window.innerWidth <= 768 ? 600 : 1200,
+      quality: 'auto',
+      format: 'auto'
+    });
+    // Avoid duplicate preload links
+    if (document.querySelector(`link[rel="preload"][href="${optimizedUrl}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = optimizedUrl;
+    document.head.appendChild(link);
+  }, [slides]);
+
   if (slides.length === 0) return null;
 
   return (
@@ -94,10 +114,18 @@ const Carousel = () => {
         >
           <div className="carousel-images-container">
             {slides[currentSlide].images.map((img, idx) => (
-              <div
+              <img
                 key={idx}
+                src={buildCloudinaryUrl(img, {
+                  width: isMobile ? 600 : 1200,
+                  quality: 'auto',
+                  format: 'auto'
+                })}
+                alt=""
                 className="carousel-image"
-                style={{ backgroundImage: `url(${img})` }}
+                fetchPriority={idx === 0 && currentSlide === 0 ? 'high' : 'low'}
+                loading={idx === 0 && currentSlide === 0 ? 'eager' : 'lazy'}
+                decoding={idx === 0 && currentSlide === 0 ? 'sync' : 'async'}
               />
             ))}
             <div className="carousel-overlay" />

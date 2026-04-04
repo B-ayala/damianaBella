@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
 import { supabase } from '../../../config/supabaseClient';
+import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import './About.css';
 
 interface AboutInfo {
@@ -58,7 +59,19 @@ const About = () => {
           </div>
 
           <div className="about-image-section">
-            <img src={image} alt="Esencia de LIA" className="about-image" />
+            <img
+              src={buildCloudinaryUrl(image ?? '', {
+                width: 450,
+                quality: 'auto',
+                format: 'auto'
+              })}
+              alt="Esencia de LIA"
+              className="about-image"
+              loading="lazy"
+              decoding="async"
+              width={450}
+              height={600}
+            />
           </div>
         </div>
       </div>

@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock } from 'react-icons/fi';
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
-import logoImg from '../../../../assets/img/logo.jpeg';
+// @ts-ignore - vite-imagetools query param
+import logoImg from '../../../../assets/img/logo.jpeg?w=120&format=webp&quality=80';
 import AuthModal from '../../auth/AuthModal';
 import UserProfileDropdown from './UserProfileDropdown';
 import ChangePasswordModal from './ChangePasswordModal';
 import { useAdminStore } from '../../../../admin/store/adminStore';
 import { fetchCategoriesTree, searchProducts, type Category, type ProductSearchResult } from '../../../../services/productService';
 import { getProductPricing } from '../../../../utils/pricing';
+import { buildCloudinaryUrl } from '../../../../utils/cloudinary';
 import { useCartStore } from '../../../../store/cartStore';
 import CartDrawer from '../../cart/CartDrawer';
 import './NavBar.css';
@@ -486,9 +488,17 @@ const NavBar = () => {
                     >
                       {result.image && (
                         <img
-                          src={result.image}
+                          src={buildCloudinaryUrl(result.image, {
+                            width: 60,
+                            quality: 'auto',
+                            format: 'auto'
+                          })}
                           alt={result.name}
                           className="search-result-img"
+                          loading="lazy"
+                          decoding="async"
+                          width={60}
+                          height={60}
                           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                         />
                       )}

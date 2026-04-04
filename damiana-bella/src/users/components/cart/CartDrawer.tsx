@@ -4,6 +4,7 @@ import { FiX, FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../../../store/cartStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
+import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import './CartDrawer.css';
 
 interface CartDrawerProps {
@@ -48,9 +49,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 return (
                   <li key={item.product.id} className="cart-drawer__item">
                     <img
-                      src={item.product.image}
+                      src={buildCloudinaryUrl(item.product.image, {
+                        width: 80,
+                        quality: 'auto',
+                        format: 'auto'
+                      })}
                       alt={item.product.name}
                       className="cart-drawer__item-img"
+                      loading="lazy"
+                      decoding="async"
+                      width={80}
+                      height={80}
                     />
                     <div className="cart-drawer__item-info">
                       <span className="cart-drawer__item-name">{item.product.name}</span>
