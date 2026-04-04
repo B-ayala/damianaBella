@@ -63,7 +63,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const [returnPolicy, setReturnPolicy] = useState('');
 
     // Variantes
-    const [variants, setVariants] = useState<{ name: string; optionsText: string }[]>([]);
+    const [variants, setVariants] = useState<{ name: string; optionsText: string; stockByOption?: Record<string, number> }[]>([]);
     const [customColorName, setCustomColorName] = useState('');
     const [customColorHex, setCustomColorHex] = useState('#000000');
     const [customPaletteColors, setCustomPaletteColors] = useState<Record<string, string>>(() => {
@@ -190,6 +190,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                     (product.variants || []).map(v => ({
                         name: v.name,
                         optionsText: v.options.join(', '),
+                        stockByOption: v.stockByOption,
                     }))
                 );
                 setSpecifications(product.specifications ? [...product.specifications] : []);
@@ -229,29 +230,55 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
 
     const buildPayload = () => {
         const validImages = images.filter(url => url.trim() !== '');
+
+        // Construir variantes con stockByOption para talles
+        const builtVariants: Variant[] = variants.map(v => {
+            const isTalleVariant = v.name.toLowerCase().startsWith('talle');
+            const options = v.optionsText
+                .split(',')
+                .map(o => {
+                    const trimmed = o.trim();
+                    return isTalleVariant ? trimmed.toUpperCase() : trimmed;
+                })
+                .filter(Boolean)
+                .filter((val, idx, arr) => arr.indexOf(val) === idx);
+
+            const variant: Variant = {
+                name: v.name,
+                options,
+            };
+
+            // Si es variante de talle, agregar stockByOption
+            if (isTalleVariant && v.stockByOption) {
+                variant.stockByOption = {};
+                options.forEach(opt => {
+                    variant.stockByOption![opt] = v.stockByOption?.[opt] ?? 0;
+                });
+            }
+
+            return variant;
+        });
+
+        // Calcular stock total como suma del stock de talles si existe variante "Talle" con stockByOption
+        let totalStock = parseInt(stock) || 0;
+        const talleVariant = builtVariants.find(v => v.name.toLowerCase().startsWith('talle'));
+        if (talleVariant?.stockByOption) {
+            totalStock = Object.values(talleVariant.stockByOption).reduce((a, b) => a + b, 0);
+        }
+
         return {
             name,
             category: category.trim().replace(/\b\w/g, c => c.toUpperCase()),
             price: parseFloat(price),
             originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
-            stock: parseInt(stock) || 0,
+            stock: totalStock,
             imageUrl: validImages[0] || '',
             images: validImages,
             condition,
             description,
             discount: discount ? parseFloat(discount) : undefined,
             freeShipping,
-            variants: variants.map(v => ({
-                name: v.name,
-                options: v.optionsText
-                    .split(',')
-                    .map(o => {
-                        const trimmed = o.trim();
-                        return v.name.toLowerCase().startsWith('talle') ? trimmed.toUpperCase() : trimmed;
-                    })
-                    .filter(Boolean)
-                    .filter((val, idx, arr) => arr.indexOf(val) === idx),
-            })) as Variant[],
+            variants: builtVariants,
             specifications,
             features: featuresText.split('\n').map(f => f.trim()).filter(Boolean),
             faqs,
@@ -928,25 +955,62 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                     <label>Opciones disponibles</label>
                                                     <div className="options-editor">
                                                         <div className="options-list">
-                                                            {v.optionsText
-                                                                .split(',')
-                                                                .map(s => s.trim())
-                                                                .filter(Boolean)
-                                                                .map((option, optIdx, allOptions) => (
-                                                                    <div key={optIdx} className="option-tag">
-                                                                        <span>{option}</span>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="option-tag__remove"
-                                                                            onClick={() => {
-                                                                                const remaining = allOptions.filter((_, j) => j !== optIdx);
-                                                                                updateVariant(i, 'optionsText', remaining.join(', '));
-                                                                            }}
-                                                                        >
-                                                                            <X size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
+                                                            {(() => {
+                                                                const isTalleVariant = v.name.toLowerCase().startsWith('talle');
+                                                                const options = v.optionsText
+                                                                    .split(',')
+                                                                    .map(s => s.trim())
+                                                                    .filter(Boolean);
+
+                                                                return options.map((option, optIdx, allOptions) => {
+                                                                    const normalizedOption = v.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option;
+                                                                    const currentStock = v.stockByOption?.[normalizedOption] ?? 0;
+
+                                                                    return (
+                                                                        <div key={optIdx} className="option-tag" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                            <span>{option}</span>
+                                                                            {isTalleVariant && (
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    placeholder="Stock"
+                                                                                    value={currentStock}
+                                                                                    onChange={(e) => {
+                                                                                        const newStock = parseInt(e.target.value) || 0;
+                                                                                        const updated = [...variants];
+                                                                                        if (!updated[i].stockByOption) {
+                                                                                            updated[i].stockByOption = {};
+                                                                                        }
+                                                                                        updated[i].stockByOption![normalizedOption] = newStock;
+                                                                                        setVariants(updated);
+                                                                                    }}
+                                                                                    style={{
+                                                                                        width: '60px',
+                                                                                        padding: '0.25rem 0.5rem',
+                                                                                        fontSize: '0.85rem',
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                            <button
+                                                                                type="button"
+                                                                                className="option-tag__remove"
+                                                                                onClick={() => {
+                                                                                    const remaining = allOptions.filter((_, j) => j !== optIdx);
+                                                                                    updateVariant(i, 'optionsText', remaining.join(', '));
+                                                                                    // Al eliminar opción, eliminar su stock
+                                                                                    if (isTalleVariant && v.stockByOption) {
+                                                                                        const updated = [...variants];
+                                                                                        delete updated[i].stockByOption![normalizedOption];
+                                                                                        setVariants(updated);
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <X size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                });
+                                                            })()}
                                                         </div>
                                                         <div className="option-input-group">
                                                             <input

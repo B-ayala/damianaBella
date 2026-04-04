@@ -1,6 +1,7 @@
 export interface Variant {
   name: string;
   options: string[];
+  stockByOption?: Record<string, number>; // Stock por opción de variante (ej: para talles)
 }
 
 export interface Specification {

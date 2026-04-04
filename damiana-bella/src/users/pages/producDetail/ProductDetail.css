@@ -287,6 +287,11 @@
   gap: 10px;
 }
 
+.variant__option-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .variant__option {
   padding: 8px 18px;
   border: 2px solid #e5e5e5;
@@ -299,8 +304,55 @@
   box-sizing: border-box;
 }
 
+.variant__option-text {
+  position: relative;
+  z-index: 1;
+}
+
 .variant__option:hover            { border-color: #3483fa; }
 .variant__option--selected        { border-color: #3483fa; background: #e8f1ff; font-weight: 600; }
+.variant__option--soldout {
+  color: #7e6554;
+  border-color: #e6ddd5;
+  background: linear-gradient(180deg, #fdfaf7 0%, #f5efe9 100%);
+  cursor: not-allowed;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.variant__option--soldout:hover {
+  border-color: #dccdc1;
+}
+
+.variant__option--soldout:disabled {
+  opacity: 1;
+}
+
+.variant__option-wrap--soldout .variant__option {
+  padding-right: 20px;
+}
+
+.variant__option-wrap--soldout .variant__option-text {
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(255, 252, 248, 0.9);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.variant__option-strike {
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  right: 1px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(156, 122, 98, 0) 0%, rgba(156, 122, 98, 0.45) 18%, #9c7a62 50%, rgba(156, 122, 98, 0.45) 82%, rgba(156, 122, 98, 0) 100%);
+  transform: rotate(-32deg);
+  transform-origin: center;
+  box-shadow: 0 0 0 2px rgba(255, 250, 245, 0.55);
+  pointer-events: none;
+  z-index: 0;
+}
 
 .variant__color-circle {
   width: 32px;
@@ -320,21 +372,22 @@
 /* Guía de talles */
 .size-guide-btn {
   margin-top: 12px;
-  padding: 8px 16px;
-  background: transparent;
-  color: #3483fa;
-  border: 1px solid #3483fa;
+  padding: 10px 18px;
+  background: #fff;
+  color: #111;
+  border: 2px solid #111;
   border-radius: 6px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: opacity 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   box-sizing: border-box;
 }
 
-.size-guide-btn:hover { background: #e8f1ff; }
+.size-guide-btn:hover { opacity: 0.82; }
 
 /* ---------- Cantidad ---------- */
 .info__quantity {
@@ -424,19 +477,19 @@
 
 .shipping-calculator__btn {
   padding: 10px 16px;
-  background: #3483fa;
+  background: #111;
   color: #fff;
-  border: none;
+  border: 2px solid #111;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: opacity 0.2s ease;
   white-space: nowrap;
   box-sizing: border-box;
 }
 
-.shipping-calculator__btn:hover { background: #2968c8; }
+.shipping-calculator__btn:hover:not(:disabled) { opacity: 0.82; }
 
 .shipping-calculator__result {
   margin-top: 12px;
@@ -483,20 +536,26 @@
 }
 
 .action-btn--primary {
-  background: #3483fa;
+  background: #111;
   color: #fff !important;
-  border: 2px solid #3483fa;
+  border: 2px solid #111;
 }
 
-.action-btn--primary:hover:not(:disabled) { background: #2968c8; border-color: #2968c8; }
+.action-btn--primary:hover:not(:disabled) { opacity: 0.82; }
 
 .action-btn--secondary {
   background: #fff;
-  color: #3483fa !important;
-  border: 2px solid #3483fa;
+  color: #111 !important;
+  border: 2px solid #111;
 }
 
-.action-btn--secondary:hover:not(:disabled) { background: #e8f1ff; }
+.action-btn--secondary:hover:not(:disabled) { opacity: 0.82; }
+
+.action-btn--secondary-added {
+  background: #fff;
+  color: #111 !important;
+  border-color: #111;
+}
 
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 

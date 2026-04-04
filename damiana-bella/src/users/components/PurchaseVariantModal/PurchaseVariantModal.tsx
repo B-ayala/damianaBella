@@ -126,11 +126,16 @@ interface VariantSelectorProps {
 
 const VariantSelector = ({ variant, selected, onChange }: VariantSelectorProps) => {
   const isColor = variant.name.toLowerCase() === 'color';
+  const isTalle = variant.name.toLowerCase().startsWith('talle');
+
   return (
     <div className="pvm-variant">
       <label className="pvm-variant-label">{variant.name}:</label>
       <div className="pvm-variant-options">
         {variant.options.map(option => {
+          // Verificar si este talle tiene stock
+          const isTalleOutOfStock = isTalle && variant.stockByOption && variant.stockByOption[option] === 0;
+
           const { name: colorName, hex } = isColor
             ? parseColorOption(option)
             : { name: option, hex: '' };
@@ -141,15 +146,49 @@ const VariantSelector = ({ variant, selected, onChange }: VariantSelectorProps) 
               style={{ backgroundColor: hex }}
               title={colorName}
               onClick={() => onChange(option)}
+              disabled={isTalleOutOfStock}
             />
           ) : (
-            <button
+            <div
               key={option}
-              className={`pvm-option-btn ${selected === option ? 'pvm-option-btn--selected' : ''}`}
-              onClick={() => onChange(option)}
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                ...(isTalleOutOfStock && { opacity: 0.5 })
+              }}
             >
-              {variant.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option}
-            </button>
+              <button
+                className={`pvm-option-btn ${selected === option ? 'pvm-option-btn--selected' : ''}`}
+                onClick={() => {
+                  if (!isTalleOutOfStock) {
+                    onChange(option);
+                  }
+                }}
+                disabled={isTalleOutOfStock}
+                style={{
+                  cursor: isTalleOutOfStock ? 'not-allowed' : 'pointer',
+                  pointerEvents: isTalleOutOfStock ? 'none' : 'auto',
+                }}
+              >
+                {isTalle ? option.toUpperCase() : option}
+              </button>
+              {isTalleOutOfStock && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: -4,
+                    right: -4,
+                    height: '2px',
+                    backgroundColor: 'currentColor',
+                    transform: 'rotate(-45deg)',
+                    transformOrigin: 'center',
+                    pointerEvents: 'none',
+                    opacity: 0.8,
+                  }}
+                />
+              )}
+            </div>
           );
         })}
       </div>

@@ -238,9 +238,15 @@ const ProductDetail = () => {
                     <div className="variant__options">
                       {variant.options.map((option) => {
                         const isColor = variant.name.toLowerCase() === 'color';
+                        const isTalle = variant.name.toLowerCase().startsWith('talle');
+
+                        // Verificar si este talle tiene stock
+                        const isTalleOutOfStock = isTalle && variant.stockByOption && variant.stockByOption[option] === 0;
+
                         const { name: colorName, hex: colorHex } = isColor
                           ? parseColorOption(option)
                           : { name: option, hex: '' };
+
                         return isColor ? (
                           <button
                             key={option}
@@ -248,15 +254,30 @@ const ProductDetail = () => {
                             style={{ backgroundColor: colorHex }}
                             title={colorName}
                             onClick={() => handleVariantChange(variant.name, option)}
+                            disabled={isTalleOutOfStock}
                           />
                         ) : (
-                          <button
+                          <div
                             key={option}
-                            className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''}`}
-                            onClick={() => handleVariantChange(variant.name, option)}
+                            className={`variant__option-wrap ${isTalleOutOfStock ? 'variant__option-wrap--soldout' : ''}`}
                           >
-                            {variant.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option}
-                          </button>
+                            <button
+                              className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''} ${isTalleOutOfStock ? 'variant__option--soldout' : ''}`}
+                              onClick={() => {
+                                if (!isTalleOutOfStock) {
+                                  handleVariantChange(variant.name, option);
+                                }
+                              }}
+                              disabled={isTalleOutOfStock}
+                            >
+                              <span className="variant__option-text">
+                                {isTalle ? option.toUpperCase() : option}
+                              </span>
+                            </button>
+                            {isTalleOutOfStock && (
+                              <span className="variant__option-strike" aria-hidden="true" />
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -343,50 +364,16 @@ const ProductDetail = () => {
             )}
             <div className="info__actions">
               <button
+                className="action-btn action-btn--primary"
                 onClick={handleBuy}
                 disabled={stock === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  padding: '14px 24px',
-                  background: stock === 0 ? '#a0bcf8' : '#3483fa',
-                  color: '#ffffff',
-                  border: '2px solid #3483fa',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.2s',
-                  opacity: stock === 0 ? 0.6 : 1,
-                }}
               >
                 Comprar ahora
               </button>
               <button
+                className={`action-btn action-btn--secondary${addedToCart ? ' action-btn--secondary-added' : ''}`}
                 onClick={handleAddToCart}
                 disabled={stock === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  padding: '14px 24px',
-                  background: addedToCart ? '#2ecc71' : '#ffffff',
-                  color: addedToCart ? '#ffffff' : '#3483fa',
-                  border: `2px solid ${addedToCart ? '#2ecc71' : '#3483fa'}`,
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.2s, color 0.2s, border-color 0.2s',
-                  opacity: stock === 0 ? 0.6 : 1,
-                }}
               >
                 {addedToCart ? '¡Agregado al carrito!' : 'Agregar al carrito'}
               </button>
