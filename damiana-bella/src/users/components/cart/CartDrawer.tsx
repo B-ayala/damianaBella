@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiX, FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../../../store/cartStore';
+import type { UnitVariants } from '../../../store/cartStore';
+import { useAdminStore } from '../../../admin/store/adminStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
+import AuthModal from '../auth/AuthModal';
+import PurchaseVariantModal from '../PurchaseVariantModal/PurchaseVariantModal';
 import './CartDrawer.css';
 
 interface CartDrawerProps {
@@ -13,14 +17,70 @@ interface CartDrawerProps {
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    document.body.classList.toggle('cart-drawer-open', isOpen);
+
+    return () => {
+      document.body.classList.remove('cart-drawer-open');
+    };
+  }, [isOpen]);
+
   const navigate = useNavigate();
+  const currentUser = useAdminStore((s) => s.currentUser);
   const items = useCartStore((s) => s.items);
+  const setItem = useCartStore((s) => s.setItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
 
   const total = items.reduce((sum, i) => sum + getProductPricing(i.product).finalPrice * i.quantity, 0);
+
+  const continueToCheckout = (unitVariants: UnitVariants[]) => {
+    const cartItem = items[0];
+    if (!cartItem) {
+      return;
+    }
+
+    const pricing = getProductPricing(cartItem.product);
+    setItem({
+      product: cartItem.product,
+      quantity: cartItem.quantity,
+      unitVariants,
+      unitPrice: pricing.finalPrice,
+      totalPrice: pricing.finalPrice * cartItem.quantity,
+      source: 'cart',
+    });
+
+    setIsVariantModalOpen(false);
+    onClose();
+
+    if (currentUser) {
+      navigate('/checkout');
+      return;
+    }
+
+    setIsAuthModalOpen(true);
+  };
+
+  const handleCheckout = () => {
+    const cartItem = items[0];
+    if (!cartItem) {
+      return;
+    }
+
+    const hasVariants = (cartItem.product.variants?.length ?? 0) > 0;
+
+    if (cartItem.quantity > 1 && hasVariants) {
+      setIsVariantModalOpen(true);
+      return;
+    }
+
+    continueToCheckout(cartItem.unitVariants);
+  };
 
   return (
     <>
@@ -104,7 +164,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               </button>
               <button
                 className="cart-drawer__checkout"
-                onClick={() => { onClose(); navigate('/checkout'); }}
+                onClick={handleCheckout}
               >
                 Ir a pagar
               </button>
@@ -112,6 +172,26 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           </>
         )}
       </div>
+
+      {items[0] && (
+        <PurchaseVariantModal
+          isOpen={isVariantModalOpen}
+          onClose={() => setIsVariantModalOpen(false)}
+          onConfirm={continueToCheckout}
+          product={items[0].product}
+          quantity={items[0].quantity}
+          initialVariants={items[0].unitVariants[0] ?? {}}
+        />
+      )}
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAuthModalOpen(false);
+          navigate('/checkout');
+        }}
+      />
     </>
   );
 };

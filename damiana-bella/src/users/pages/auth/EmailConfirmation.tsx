@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../config/supabaseClient';
 import { verifyEmailConfirmation } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './EmailConfirmation.css';
 
 export const EMAIL_CONFIRMED_CHANNEL = 'db_email_confirmation';
@@ -17,6 +18,8 @@ const EmailConfirmation = () => {
   const [message, setMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const resolved = useRef(false);
+
+  useInitialLoadTask('route', status === 'loading');
 
   const broadcastAndShow = () => {
     if (resolved.current) return;

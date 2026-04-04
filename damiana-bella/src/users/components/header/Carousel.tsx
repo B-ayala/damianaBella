@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { fetchCarouselImages } from '../../../services/productService';
@@ -7,6 +7,10 @@ import './Carousel.css';
 
 interface Slide {
   images: string[];
+}
+
+interface CarouselProps {
+  onReady?: () => void;
 }
 
 const slideVariants = {
@@ -24,11 +28,21 @@ const slideVariants = {
   })
 };
 
-const Carousel = () => {
+const Carousel = ({ onReady }: CarouselProps) => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const hasReportedReady = useRef(false);
+
+  const notifyReady = () => {
+    if (hasReportedReady.current) {
+      return;
+    }
+
+    hasReportedReady.current = true;
+    onReady?.();
+  };
 
   // Detect mobile/desktop based on window width
   useEffect(() => {
@@ -41,6 +55,7 @@ const Carousel = () => {
   useEffect(() => {
     const deviceType = isMobile ? 'mobile' : 'desktop';
     const imgsPerSlide = isMobile ? 2 : 3;
+    hasReportedReady.current = false;
 
     fetchCarouselImages(deviceType)
       .then(images => {
@@ -50,9 +65,49 @@ const Carousel = () => {
         }
         setSlides(grouped);
         setCurrentSlide(0);
+        if (grouped.length === 0) {
+          notifyReady();
+        }
       })
-      .catch(console.error);
-  }, [isMobile]);
+      .catch((error) => {
+        console.error(error);
+        notifyReady();
+      });
+  }, [isMobile, onReady]);
+
+  useEffect(() => {
+    if (slides.length === 0) {
+      return;
+    }
+
+    const firstImg = slides[0]?.images[0];
+    if (!firstImg) {
+      notifyReady();
+      return;
+    }
+
+    const optimizedUrl = buildCloudinaryUrl(firstImg, {
+      width: window.innerWidth <= 768 ? 600 : 1200,
+      quality: 'auto',
+      format: 'auto'
+    });
+
+    const image = new Image();
+    image.src = optimizedUrl;
+
+    if (image.complete) {
+      notifyReady();
+      return;
+    }
+
+    image.onload = notifyReady;
+    image.onerror = notifyReady;
+
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [slides, isMobile, onReady]);
 
   const nextSlide = () => {
     setDirection(1);

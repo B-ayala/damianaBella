@@ -22,6 +22,7 @@ interface ProductModalProps {
 
 
 const tabs = ['Datos Básicos', 'Variantes', 'Promociones', 'Descripción', 'Especificaciones', 'FAQ'];
+const DEFAULT_VISIBLE_VARIANT_OPTIONS = 6;
 
 const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) => {
     const { addProduct, updateProduct } = useAdminStore();
@@ -64,6 +65,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
 
     // Variantes
     const [variants, setVariants] = useState<{ name: string; optionsText: string; stockByOption?: Record<string, number> }[]>([]);
+    const [expandedVariantOptions, setExpandedVariantOptions] = useState<Record<number, boolean>>({});
     const [customColorName, setCustomColorName] = useState('');
     const [customColorHex, setCustomColorHex] = useState('#000000');
     const [customPaletteColors, setCustomPaletteColors] = useState<Record<string, string>>(() => {
@@ -158,6 +160,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     useEffect(() => {
         if (isOpen) {
             const savedCategory = product?.category || '';
+            setExpandedVariantOptions({});
             fetchCategoriesTree().then(cats => {
                 setDbCategories(cats);
                 // Normaliza: busca la categoría de forma case-insensitive y usa el
@@ -219,6 +222,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         setWarranty('');
         setReturnPolicy('');
         setVariants([]);
+        setExpandedVariantOptions({});
         setSpecifications([]);
         setFaqs([]);
         setCustomColorName('');
@@ -413,12 +417,118 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         setImages(prev => [...prev, ...newUrls]);
     };
 
-    const addVariant = () => setVariants([...variants, { name: '', optionsText: '' }]);
-    const removeVariant = (i: number) => setVariants(variants.filter((_, j) => j !== i));
+    const normalizeVariantOption = (variantName: string, option: string) => {
+        const trimmed = option.trim();
+        if (!trimmed) return '';
+        return variantName.toLowerCase().startsWith('talle') ? trimmed.toUpperCase() : trimmed;
+    };
+
+    const getNormalizedVariantOptions = (variantName: string, optionsText: string) => (
+        optionsText
+            .split(',')
+            .map(option => normalizeVariantOption(variantName, option))
+            .filter(Boolean)
+            .filter((value, index, list) => list.indexOf(value) === index)
+    );
+
+    const syncVariantState = (
+        variantName: string,
+        optionsText: string,
+        stockByOption?: Record<string, number>
+    ) => {
+        const options = getNormalizedVariantOptions(variantName, optionsText);
+        const isSizeVariant = variantName.toLowerCase().startsWith('talle');
+
+        return {
+            optionsText: options.join(', '),
+            stockByOption: isSizeVariant
+                ? options.reduce<Record<string, number>>((acc, option) => {
+                    acc[option] = Math.max(0, stockByOption?.[option] ?? 0);
+                    return acc;
+                }, {})
+                : undefined,
+        };
+    };
+
+    const toggleVariantOptions = (variantIndex: number) => {
+        setExpandedVariantOptions(prev => ({
+            ...prev,
+            [variantIndex]: !prev[variantIndex],
+        }));
+    };
+
+    const updateVariantOptionStock = (variantIndex: number, option: string, rawValue: string) => {
+        const nextStock = Math.max(0, Number.parseInt(rawValue.replace(/\D/g, ''), 10) || 0);
+
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== variantIndex) return variant;
+
+            return {
+                ...variant,
+                stockByOption: {
+                    ...(variant.stockByOption || {}),
+                    [option]: nextStock,
+                },
+            };
+        }));
+    };
+
+    const addVariantOption = (variantIndex: number, rawValue: string) => {
+        let added = false;
+
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== variantIndex) return variant;
+
+            const candidate = normalizeVariantOption(variant.name, rawValue);
+            if (!candidate) return variant;
+
+            const currentOptions = getNormalizedVariantOptions(variant.name, variant.optionsText);
+            if (currentOptions.includes(candidate)) return variant;
+
+            added = true;
+            const syncedState = syncVariantState(
+                variant.name,
+                [...currentOptions, candidate].join(', '),
+                variant.stockByOption
+            );
+
+            return {
+                ...variant,
+                ...syncedState,
+            };
+        }));
+
+        return added;
+    };
+
+    const addVariant = () => setVariants(prev => [...prev, { name: '', optionsText: '' }]);
+    const removeVariant = (i: number) => {
+        setVariants(variants.filter((_, j) => j !== i));
+        setExpandedVariantOptions(prev => {
+            const next: Record<number, boolean> = {};
+            Object.entries(prev).forEach(([key, value]) => {
+                const numericKey = Number(key);
+                if (numericKey < i) next[numericKey] = value;
+                if (numericKey > i) next[numericKey - 1] = value;
+            });
+            return next;
+        });
+    };
     const updateVariant = (i: number, field: 'name' | 'optionsText', value: string) => {
-        const updated = [...variants];
-        updated[i] = { ...updated[i], [field]: value };
-        setVariants(updated);
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== i) return variant;
+
+            const nextName = field === 'name' ? value : variant.name;
+            const nextOptionsText = field === 'optionsText' ? value : variant.optionsText;
+            const syncedState = syncVariantState(nextName, nextOptionsText, variant.stockByOption);
+
+            return {
+                ...variant,
+                [field]: value,
+                ...syncedState,
+                name: nextName,
+            };
+        }));
     };
 
     const addSpec = () => setSpecifications([...specifications, { label: '', value: '' }]);
@@ -777,15 +887,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                 const selectedColors = v.optionsText
                                     .split(',').map(s => s.trim()).filter(Boolean);
                                 return (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: '0.5rem',
-                                            padding: '1rem',
-                                            marginBottom: '0.75rem',
-                                        }}
-                                    >
+                                    <div key={i} className="variant-card">
                                         <div className="admin-form-grid">
                                             <div className="form-group">
                                                 <label>Nombre de variante</label>
@@ -957,45 +1059,45 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                         <div className="options-list">
                                                             {(() => {
                                                                 const isTalleVariant = v.name.toLowerCase().startsWith('talle');
-                                                                const options = v.optionsText
-                                                                    .split(',')
-                                                                    .map(s => s.trim())
-                                                                    .filter(Boolean);
+                                                                const options = getNormalizedVariantOptions(v.name, v.optionsText);
+                                                                const shouldCollapseOptions = options.length > DEFAULT_VISIBLE_VARIANT_OPTIONS;
+                                                                const isExpanded = expandedVariantOptions[i] || false;
+                                                                const visibleOptions = shouldCollapseOptions && !isExpanded
+                                                                    ? options.slice(0, DEFAULT_VISIBLE_VARIANT_OPTIONS)
+                                                                    : options;
 
-                                                                return options.map((option, optIdx, allOptions) => {
-                                                                    const normalizedOption = v.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option;
+                                                                return visibleOptions.map((option) => {
+                                                                    const normalizedOption = normalizeVariantOption(v.name, option);
                                                                     const currentStock = v.stockByOption?.[normalizedOption] ?? 0;
 
                                                                     return (
-                                                                        <div key={optIdx} className="option-tag" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                            <span>{option}</span>
-                                                                            {isTalleVariant && (
-                                                                                <input
-                                                                                    type="number"
-                                                                                    min="0"
-                                                                                    placeholder="Stock"
-                                                                                    value={currentStock}
-                                                                                    onChange={(e) => {
-                                                                                        const newStock = parseInt(e.target.value) || 0;
-                                                                                        const updated = [...variants];
-                                                                                        if (!updated[i].stockByOption) {
-                                                                                            updated[i].stockByOption = {};
-                                                                                        }
-                                                                                        updated[i].stockByOption![normalizedOption] = newStock;
-                                                                                        setVariants(updated);
-                                                                                    }}
-                                                                                    style={{
-                                                                                        width: '60px',
-                                                                                        padding: '0.25rem 0.5rem',
-                                                                                        fontSize: '0.85rem',
-                                                                                    }}
-                                                                                />
-                                                                            )}
+                                                                        <div key={normalizedOption} className={`option-tag${isTalleVariant ? ' option-tag--size' : ''}`}>
+                                                                            <div className="option-tag__content">
+                                                                                <span className="option-tag__label">{option}</span>
+                                                                                {isTalleVariant && (
+                                                                                    <label className="option-tag__stock-field">
+                                                                                        <span className="option-tag__stock-label">Stock</span>
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            inputMode="numeric"
+                                                                                            pattern="[0-9]*"
+                                                                                            placeholder="0"
+                                                                                            value={currentStock}
+                                                                                            onChange={(e) => {
+                                                                                                updateVariantOptionStock(i, normalizedOption, e.target.value);
+                                                                                            }}
+                                                                                            className="option-tag__stock-input"
+                                                                                            aria-label={`Stock para talle ${option}`}
+                                                                                        />
+                                                                                    </label>
+                                                                                )}
+                                                                            </div>
                                                                             <button
                                                                                 type="button"
                                                                                 className="option-tag__remove"
+                                                                                aria-label={`Eliminar opción ${option}`}
                                                                                 onClick={() => {
-                                                                                    const remaining = allOptions.filter((_, j) => j !== optIdx);
+                                                                                    const remaining = options.filter(currentOption => currentOption !== normalizedOption);
                                                                                     updateVariant(i, 'optionsText', remaining.join(', '));
                                                                                     // Al eliminar opción, eliminar su stock
                                                                                     if (isTalleVariant && v.stockByOption) {
@@ -1012,6 +1114,23 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                                 });
                                                             })()}
                                                         </div>
+                                                        {(() => {
+                                                            const totalOptions = getNormalizedVariantOptions(v.name, v.optionsText).length;
+                                                            if (totalOptions <= DEFAULT_VISIBLE_VARIANT_OPTIONS) return null;
+
+                                                            const isExpanded = expandedVariantOptions[i] || false;
+                                                            const hiddenCount = totalOptions - DEFAULT_VISIBLE_VARIANT_OPTIONS;
+
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    className="options-toggle-btn"
+                                                                    onClick={() => toggleVariantOptions(i)}
+                                                                >
+                                                                    {isExpanded ? 'Ver menos' : `Ver más (${hiddenCount})`}
+                                                                </button>
+                                                            );
+                                                        })()}
                                                         <div className="option-input-group">
                                                             <input
                                                                 type="text"
@@ -1019,10 +1138,8 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter') {
                                                                         e.preventDefault();
-                                                                        const newVal = e.currentTarget.value.trim();
-                                                                        if (newVal && !v.optionsText.split(',').map(s => s.trim()).includes(newVal)) {
-                                                                            const current = v.optionsText.split(',').map(s => s.trim()).filter(Boolean);
-                                                                            updateVariant(i, 'optionsText', [...current, newVal].join(', '));
+                                                                        const added = addVariantOption(i, e.currentTarget.value);
+                                                                        if (added) {
                                                                             e.currentTarget.value = '';
                                                                         }
                                                                     }
@@ -1034,10 +1151,8 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                                 onClick={(e) => {
                                                                     const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
                                                                     if (input) {
-                                                                        const newVal = input.value.trim();
-                                                                        if (newVal && !v.optionsText.split(',').map(s => s.trim()).includes(newVal)) {
-                                                                            const current = v.optionsText.split(',').map(s => s.trim()).filter(Boolean);
-                                                                            updateVariant(i, 'optionsText', [...current, newVal].join(', '));
+                                                                        const added = addVariantOption(i, input.value);
+                                                                        if (added) {
                                                                             input.value = '';
                                                                             input.focus();
                                                                         }

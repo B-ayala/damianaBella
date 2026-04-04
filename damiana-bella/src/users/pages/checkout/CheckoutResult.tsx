@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useCartStore } from '../../../store/cartStore';
 import { cancelMpOrder } from '../../../services/orderService';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './CheckoutResult.css';
 
 type ResultStatus = 'approved' | 'pending' | 'failure' | 'unknown';
@@ -51,6 +52,8 @@ const CheckoutResult = () => {
     // MP envía: collection_status=approved|pending|null, status=approved|pending|null, external_reference=order_id
     const mpStatus = params.get('collection_status') ?? params.get('status') ?? '';
     const externalRef = params.get('external_reference') ?? '';
+
+    useInitialLoadTask('route', false);
 
     let status: ResultStatus = 'unknown';
     if (mpStatus === 'approved') status = 'approved';

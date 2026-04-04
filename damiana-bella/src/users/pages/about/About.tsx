@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
 import { supabase } from '../../../config/supabaseClient';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './About.css';
 
 interface AboutInfo {
@@ -16,26 +17,39 @@ interface AboutInfo {
 const About = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [aboutInfo, setAboutInfo] = useState<AboutInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isImageReady, setIsImageReady] = useState(false);
+
+  const image = aboutInfo?.imageUrl;
+
+  useInitialLoadTask('route', isLoading || (!!image && !isImageReady));
 
   useEffect(() => {
     const loadAbout = async () => {
-      const { data } = await supabase
-        .from('site_content')
-        .select('value')
-        .eq('key', 'about')
-        .single();
+      try {
+        const { data } = await supabase
+          .from('site_content')
+          .select('value')
+          .eq('key', 'about')
+          .single();
 
-      if (data) {
-        setAboutInfo(data.value as AboutInfo);
+        if (data) {
+          setAboutInfo(data.value as AboutInfo);
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadAbout();
   }, []);
 
+  useEffect(() => {
+    setIsImageReady(!image);
+  }, [image]);
+
   const title = aboutInfo?.title;
   const description = aboutInfo?.description;
-  const image = aboutInfo?.imageUrl;
 
   return (
     <div className="about-page">
@@ -71,6 +85,8 @@ const About = () => {
               decoding="async"
               width={450}
               height={600}
+              onLoad={() => setIsImageReady(true)}
+              onError={() => setIsImageReady(true)}
             />
           </div>
         </div>

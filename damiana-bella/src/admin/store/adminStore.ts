@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { loginUser, logoutUser } from '../../services/userService';
+import { getCurrentUser, loginUser, logoutUser } from '../../services/userService';
 import type { Variant, Specification, FAQ } from '../../types/product';
 
 export interface AdminProduct {
@@ -66,10 +66,12 @@ export interface FooterInfo {
 
 interface AdminState {
   isAuthenticated: boolean;
+  authInitialized: boolean;
   currentUser: { id: string; name: string; email: string; role: string } | null;
   products: AdminProduct[];
   users: AdminUser[];
   carouselImages: CarouselImage[];
+  initializeAuth: () => Promise<void>;
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => void;
   setCarouselImages: (images: CarouselImage[]) => void;
@@ -89,6 +91,7 @@ interface AdminState {
 
 export const useAdminStore = create<AdminState>((set) => ({
   isAuthenticated: false,
+  authInitialized: false,
   currentUser: null,
   products: [],
   users: [],
@@ -107,6 +110,22 @@ export const useAdminStore = create<AdminState>((set) => ({
     mapQuery: '',
     copyright: '',
   },
+  initializeAuth: async () => {
+    const user = await getCurrentUser();
+
+    set({
+      currentUser: user
+        ? {
+            id: user.id || '',
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          }
+        : null,
+      isAuthenticated: user?.role === 'admin',
+      authInitialized: true,
+    });
+  },
   login: async (email, pass) => {
     const response = await loginUser({ email, password: pass });
     console.log('[adminStore] loginUser response:', JSON.stringify(response));
@@ -121,11 +140,12 @@ export const useAdminStore = create<AdminState>((set) => ({
       if (response.data.role === 'admin') {
         set({
           isAuthenticated: true,
+          authInitialized: true,
           currentUser: userData
         });
         return true;
       } else {
-        set({ currentUser: userData });
+        set({ currentUser: userData, isAuthenticated: false, authInitialized: true });
         return false;
       }
     }
@@ -133,7 +153,7 @@ export const useAdminStore = create<AdminState>((set) => ({
   },
   logout: async () => {
     await logoutUser();
-    set({ isAuthenticated: false, currentUser: null });
+    set({ isAuthenticated: false, currentUser: null, authInitialized: true });
   },
   setCarouselImages: (images) => set({ carouselImages: images }),
   addCarouselImage: (url, deviceType = 'desktop') => set((state) => ({

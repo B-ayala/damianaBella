@@ -7,9 +7,11 @@ import VariantTable from '../../../components/common/VariantTable/VariantTable';
 import PurchaseVariantModal from '../../components/PurchaseVariantModal/PurchaseVariantModal';
 import { parseColorOption } from '../../../utils/constants';
 import { getProductPricing } from '../../../utils/pricing';
+import { INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
 import { useCartStore } from '../../../store/cartStore';
 import type { UnitVariants } from '../../../store/cartStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -30,10 +32,16 @@ const ProductDetail = () => {
   const [missingVariants, setMissingVariants] = useState<string[]>([]);
   const [isShaking, setIsShaking] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [isMainImageReady, setIsMainImageReady] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const setItem = useCartStore((s) => s.setItem);
 
   useBodyScrollLock(isImageModalOpen);
+
+  const images = product?.images || (product?.image ? [product.image] : []);
+  const currentImage = images[currentImageIndex] || '';
+
+  useInitialLoadTask('route', !product || (!!currentImage && !isMainImageReady));
 
   useEffect(() => {
     fetchProductById(id!)
@@ -41,14 +49,21 @@ const ProductDetail = () => {
       .catch(() => navigate('/products'));
   }, [id, navigate]);
 
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    setIsMainImageReady(currentImage === '');
+  }, [currentImage, product]);
+
   if (!product) {
     return <div className="loading">Cargando...</div>;
   }
 
-  const images = product.images || [product.image];
-  const currentImage = images[currentImageIndex];
   const pricing = getProductPricing(product);
   const discountedPrice = pricing.finalPrice;
+  const hasValidPrice = Number.isFinite(discountedPrice) && discountedPrice > 0;
 
   const handlePreviousImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -99,6 +114,11 @@ const ProductDetail = () => {
   };
 
   const confirmPurchase = (unitVariants: UnitVariants[]) => {
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
     setIsVariantModalOpen(false);
     setItem({
       product: product!,
@@ -106,6 +126,7 @@ const ProductDetail = () => {
       unitVariants,
       unitPrice: discountedPrice,
       totalPrice: discountedPrice * quantity,
+      source: 'direct',
     });
     navigate('/checkout');
   };
@@ -113,6 +134,11 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     setVariantError('');
     setMissingVariants([]);
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
     const missing = getMissingVariants();
     if (missing.length > 0) {
       setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
@@ -122,7 +148,8 @@ const ProductDetail = () => {
       document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    addItem(product!, quantity);
+    const cartUnitVariants: UnitVariants[] = Array.from({ length: quantity }, () => ({ ...selectedVariants }));
+    addItem(product!, quantity, cartUnitVariants);
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   };
@@ -130,6 +157,11 @@ const ProductDetail = () => {
   const handleBuy = () => {
     setVariantError('');
     setMissingVariants([]);
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
     const missing = getMissingVariants();
     if (missing.length > 0) {
       setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
@@ -164,6 +196,8 @@ const ProductDetail = () => {
                 alt={product.name}
                 className="gallery__image"
                 onClick={() => setIsImageModalOpen(true)}
+                onLoad={() => setIsMainImageReady(true)}
+                onError={() => setIsMainImageReady(true)}
               />
               <button className="gallery__arrow gallery__arrow--right" onClick={handleNextImage}>
                 ›
@@ -222,6 +256,11 @@ const ProductDetail = () => {
               <div className="pricing__final">
                 ${discountedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </div>
+              {!hasValidPrice && (
+                <p className="pricing__warning">
+                  Este producto no esta disponible para compra porque todavia no tiene un precio asignado.
+                </p>
+              )}
               {product.freeShipping && (
                 <div className="pricing__shipping">
                   <span className="shipping-badge">Envío gratis</span>
@@ -366,14 +405,14 @@ const ProductDetail = () => {
               <button
                 className="action-btn action-btn--primary"
                 onClick={handleBuy}
-                disabled={stock === 0}
+                disabled={stock === 0 || !hasValidPrice}
               >
                 Comprar ahora
               </button>
               <button
                 className={`action-btn action-btn--secondary${addedToCart ? ' action-btn--secondary-added' : ''}`}
                 onClick={handleAddToCart}
-                disabled={stock === 0}
+                disabled={stock === 0 || !hasValidPrice}
               >
                 {addedToCart ? '¡Agregado al carrito!' : 'Agregar al carrito'}
               </button>

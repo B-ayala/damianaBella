@@ -7,6 +7,7 @@ import {
 import { FiAlertCircle, FiCheckCircle, FiEye, FiEyeOff, FiLock } from 'react-icons/fi';
 import { supabase } from '../../../config/supabaseClient';
 import { resetPassword, changePassword } from '../../../services/userService';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 
 const cardSx = {
   background: '#fff',
@@ -89,6 +90,8 @@ const ResetPassword = () => {
   const [serverError, setServerError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const resolved = useRef(false);
+
+  useInitialLoadTask('route', status === 'waiting');
 
   useEffect(() => {
     const initializeReset = async () => {

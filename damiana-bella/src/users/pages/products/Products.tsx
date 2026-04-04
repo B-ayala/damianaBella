@@ -4,6 +4,7 @@ import './Products.css';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import { fetchProducts, mapDbRowToProduct, fetchCategoriesTree, type Category } from '../../../services/productService';
 import type { Product } from '../../../types/product';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 
 function getAllDescendantNames(categories: Category[], rootName: string): Set<string> {
   const root = categories.find(c => c.name.toLowerCase() === rootName.toLowerCase());
@@ -27,6 +28,8 @@ const Products = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useInitialLoadTask('route', loading);
 
   const activeCategory = searchParams.get('category') || 'Todos';
   const activeSubcategory = searchParams.get('subcategory') || '';

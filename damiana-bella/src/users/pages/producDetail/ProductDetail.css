@@ -260,6 +260,14 @@
   margin-bottom: 8px;
 }
 
+.pricing__warning {
+  margin: 0 0 8px;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .pricing__shipping { margin-top: 8px; }
 
 .shipping-badge {
@@ -511,6 +519,10 @@
   margin-bottom: 24px;
   width: 100%;
   box-sizing: border-box;
+}
+
+body.cart-drawer-open .info__actions {
+  display: none;
 }
 
 .action-btn {

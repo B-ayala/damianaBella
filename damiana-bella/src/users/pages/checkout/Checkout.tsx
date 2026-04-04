@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/cartStore';
 import { useAdminStore } from '../../../admin/store/adminStore';
 import { parseColorOption } from '../../../utils/constants';
-import { createOrder, createMpPreference } from '../../../services/orderService';
+import { getProductPricing } from '../../../utils/pricing';
+import { createOrder, createMpPreference, INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
 import AuthModal from '../../components/auth/AuthModal';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './Checkout.css';
 
 type ShippingMethod = 'correo' | 'moto' | 'local';
@@ -243,6 +245,7 @@ const Checkout = () => {
   const [mpError, setMpError] = useState('');
   const [mpReady, setMpReady] = useState(false);
   const currentUser = useAdminStore((s) => s.currentUser);
+  const authInitialized = useAdminStore((s) => s.authInitialized);
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [selectedPayment, setSelectedPayment] = useState('mp');
@@ -263,6 +266,11 @@ const Checkout = () => {
   const [cityManual, setCityManual] = useState(false);
   const modalBodyRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const cartItems = useCartStore((s) => s.items);
+  const item = useCartStore((s) => s.item);
+  const setItem = useCartStore((s) => s.setItem);
+
+  useInitialLoadTask('route', loading);
 
   const confirmEnabled = (addrDireccion.trim() !== '' || addrNoNumber) && !!addrProvince && !!addrCity && !postalOutOfArea && !postalRestrictedZone;
 
@@ -283,7 +291,28 @@ const Checkout = () => {
       setPostalRestrictedZone(true);
     }
   }, [addrCity]);
-  const item = useCartStore((s) => s.item);
+
+  useEffect(() => {
+    if (item || cartItems.length !== 1) {
+      return;
+    }
+
+    const cartItem = cartItems[0];
+    const unitPrice = getProductPricing(cartItem.product).finalPrice;
+
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return;
+    }
+
+    setItem({
+      product: cartItem.product,
+      quantity: cartItem.quantity,
+      unitVariants: cartItem.unitVariants,
+      unitPrice,
+      totalPrice: unitPrice * cartItem.quantity,
+      source: 'cart',
+    });
+  }, [cartItems, item, setItem]);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
@@ -308,6 +337,15 @@ const Checkout = () => {
       <div className="checkout-loading-screen">
         <div className="checkout-spinner"></div>
         <p className="checkout-loading-text">Preparando tu compra...</p>
+      </div>
+    );
+  }
+
+  if (!authInitialized) {
+    return (
+      <div className="checkout-loading-screen">
+        <div className="checkout-spinner"></div>
+        <p className="checkout-loading-text">Recuperando tu sesión...</p>
       </div>
     );
   }
@@ -345,9 +383,11 @@ const Checkout = () => {
   if (!item) return null;
 
   const { product, quantity, unitVariants, unitPrice, totalPrice } = item;
+  const hasValidPrice = Number.isFinite(unitPrice) && unitPrice > 0 && Number.isFinite(totalPrice) && totalPrice > 0;
   const shippingCost = SHIPPING_COSTS[selectedShipping];
   const grandTotal = totalPrice + (shippingCost ?? 0);
   const canProceed =
+    hasValidPrice &&
     buyerName.trim() !== '' &&
     buyerEmail.trim() !== '' &&
     (selectedShipping !== 'moto' || motoAddress.trim() !== '');
@@ -542,6 +582,11 @@ const Checkout = () => {
   const handlePaymentSubmit = async () => {
     setMpError('');
 
+    if (!hasValidPrice) {
+      setMpError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
     if (selectedPayment === 'mp') {
       // Mostrar pantalla de aviso antes de redirigir a MP
       setMpReady(true);
@@ -549,26 +594,36 @@ const Checkout = () => {
     }
 
     if (selectedPayment === 'transfer') {
-      createOrder({
-        buyerName: buyerName.trim(),
-        buyerEmail: buyerEmail.trim(),
-        productId: String(product.id),
-        productName: product.name,
-        productImage: product.image,
-        quantity,
-        unitPrice,
-        totalPrice: grandTotal,
-        unitsConfig: unitVariants,
-        paymentMethod: 'transfer',
-        shippingMethod: selectedShipping,
-      });
-      const phoneNumber = '5491141442409';
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
-      window.open(whatsappUrl, '_blank');
+      try {
+        await createOrder({
+          buyerName: buyerName.trim(),
+          buyerEmail: buyerEmail.trim(),
+          productId: String(product.id),
+          productName: product.name,
+          productImage: product.image,
+          quantity,
+          unitPrice,
+          totalPrice: grandTotal,
+          unitsConfig: unitVariants,
+          paymentMethod: 'transfer',
+          shippingMethod: selectedShipping,
+        });
+        const phoneNumber = '5491141442409';
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
+        window.open(whatsappUrl, '_blank');
+      } catch (err) {
+        setMpError(err instanceof Error ? err.message : 'No se pudo iniciar la compra. Intenta nuevamente.');
+      }
     }
   };
 
   const handleConfirmMpRedirect = async () => {
+    if (!hasValidPrice) {
+      setMpError(INVALID_PRODUCT_PRICE_MESSAGE);
+      setMpReady(false);
+      return;
+    }
+
     setSubmitting(true);
     setMpReady(false);
     try {
@@ -890,6 +945,9 @@ const Checkout = () => {
 
             {mpError && (
               <p className="checkout-mp-error">{mpError}</p>
+            )}
+            {!hasValidPrice && !mpError && (
+              <p className="checkout-mp-error">{INVALID_PRODUCT_PRICE_MESSAGE}</p>
             )}
             <button
               className="checkout-btn-primary"

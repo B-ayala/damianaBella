@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import UserLayout from '../users/layout/UserLayout';
 import EmailConfirmation from '../users/pages/auth/EmailConfirmation';
 import ScrollToTop from '../components/common/ScrollToTop';
+import { InitialRouteReady } from '../components/common/InitialLoad/InitialLoadProvider';
 
 const Home = lazy(() => import('../users/pages/home/Home'));
 const Products = lazy(() => import('../users/pages/products/Products'));
@@ -28,7 +29,7 @@ const AppRouter = () => {
   return (
     <>
       <ScrollToTop />
-      <Suspense fallback={<div style={{ minHeight: '100vh', width: '100%', background: '#fff' }} />}>
+      <Suspense fallback={null}>
         <Routes>
           {/* Auth Routes */}
           <Route path="/auth/confirm" element={<EmailConfirmation />} />
@@ -36,7 +37,7 @@ const AppRouter = () => {
 
           {/* Admin Routes */}
           <Route element={<AdminProtectedRoute />}>
-            <Route path="/admin" element={<AdminLayout />}>
+            <Route path="/admin" element={<InitialRouteReady><AdminLayout /></InitialRouteReady>}>
               <Route index element={<HomeManager />} />
               <Route path="home" element={<HomeManager />} />
               <Route path="products" element={<AdminProducts />} />
@@ -55,8 +56,8 @@ const AppRouter = () => {
             <Route path="/products" element={<Products />} />
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route path="/checkout/result" element={<CheckoutResult />} />
-            <Route path="/contact" element={<Contact />} />
+            <Route path="/checkout/result" element={<InitialRouteReady><CheckoutResult /></InitialRouteReady>} />
+            <Route path="/contact" element={<InitialRouteReady><Contact /></InitialRouteReady>} />
             <Route path="/about" element={<About />} />
           </Route>
         </Routes>

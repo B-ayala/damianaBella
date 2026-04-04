@@ -13,6 +13,7 @@ import { getProductPricing } from '../../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../../utils/cloudinary';
 import { useCartStore } from '../../../../store/cartStore';
 import CartDrawer from '../../cart/CartDrawer';
+import { useInitialLoadTask } from '../../../../components/common/InitialLoad/InitialLoadProvider';
 import './NavBar.css';
 
 const staticNavBefore = [{ name: 'Inicio', path: '/' }];
@@ -58,6 +59,7 @@ const NavBar = () => {
     prevTotalRef.current = totalItems;
   }, [totalItems]);
   const [categoryTree, setCategoryTree] = useState<Category[]>([]);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   // Mobile: track which level-1 and level-2 category the user drilled into
   const [mobileL1, setMobileL1] = useState<Category | null>(null);
   const [mobileL2, setMobileL2] = useState<Category | null>(null);
@@ -66,9 +68,13 @@ const NavBar = () => {
   const logout = useAdminStore(state => state.logout);
 
   useBodyScrollLock(mobileMenuOpen);
+  useInitialLoadTask('public-layout', isCategoriesLoading);
 
   useEffect(() => {
-    fetchCategoriesTree().then(setCategoryTree).catch(console.error);
+    fetchCategoriesTree()
+      .then(setCategoryTree)
+      .catch(console.error)
+      .finally(() => setIsCategoriesLoading(false));
   }, []);
 
   const childMap = buildChildMap(categoryTree);
