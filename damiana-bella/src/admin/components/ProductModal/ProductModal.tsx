@@ -8,7 +8,8 @@ import { COLOR_MAP } from '../../../utils/constants';
 import { calculateDiscountPercentage } from '../../../utils/pricing';
 import { apiFetch } from '../../../utils/apiFetch';
 import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
-import { Folder, FolderOpen, Dot, Plus, X } from 'lucide-react';
+import { Folder, FolderOpen, Dot, Plus, X, Images } from 'lucide-react';
+import CloudinaryImagePicker from '../CloudinaryImagePicker/CloudinaryImagePicker';
 import './ProductModal.css';
 import './ProductModalStylesExtension.css';
 
@@ -47,6 +48,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const [condition, setCondition] = useState<'new' | 'used'>('new');
     const [status, setStatus] = useState<'active' | 'inactive'>('active');
     const [images, setImages] = useState<string[]>([]);
+    const [pickerOpen, setPickerOpen] = useState(false);
 
     // Promociones
     const [originalPrice, setOriginalPrice] = useState('');
@@ -379,6 +381,11 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         });
     };
 
+    const handlePickerSelect = (selectedUrls: string[]) => {
+        const newUrls = selectedUrls.filter(url => !images.includes(url));
+        setImages(prev => [...prev, ...newUrls]);
+    };
+
     const addVariant = () => setVariants([...variants, { name: '', optionsText: '' }]);
     const removeVariant = (i: number) => setVariants(variants.filter((_, j) => j !== i));
     const updateVariant = (i: number, field: 'name' | 'optionsText', value: string) => {
@@ -709,13 +716,22 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                             </div>
                                         ))}
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="admin-btn-secondary mt-2"
-                                        onClick={addImage}
-                                    >
-                                        + Agregar imagen
-                                    </button>
+                                    <div className="img-manager__actions">
+                                        <button
+                                            type="button"
+                                            className="admin-btn-secondary"
+                                            onClick={addImage}
+                                        >
+                                            + Agregar imagen
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="admin-btn-secondary"
+                                            onClick={() => setPickerOpen(true)}
+                                        >
+                                            <Images size={14} /> Seleccionar de Cloudinary
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -728,6 +744,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                             <p style={{ color: '#666', fontSize: '0.88rem', marginBottom: '1rem' }}>
                                 Ej: nombre "Color" con opciones desde la paleta — nombre "Talle" con opciones "S, M, L, XL"
                             </p>
+                            <div className="variants-container">
                             {variants.map((v, i) => {
                                 const isColorVariant = v.name.toLowerCase() === 'color';
                                 const selectedColors = v.optionsText
@@ -908,13 +925,65 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                 </div>
                                             ) : (
                                                 <div className="form-group">
-                                                    <label>Opciones (separadas por coma)</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="S, M, L, XL"
-                                                        value={v.optionsText}
-                                                        onChange={e => updateVariant(i, 'optionsText', e.target.value)}
-                                                    />
+                                                    <label>Opciones disponibles</label>
+                                                    <div className="options-editor">
+                                                        <div className="options-list">
+                                                            {v.optionsText
+                                                                .split(',')
+                                                                .map(s => s.trim())
+                                                                .filter(Boolean)
+                                                                .map((option, optIdx, allOptions) => (
+                                                                    <div key={optIdx} className="option-tag">
+                                                                        <span>{option}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="option-tag__remove"
+                                                                            onClick={() => {
+                                                                                const remaining = allOptions.filter((_, j) => j !== optIdx);
+                                                                                updateVariant(i, 'optionsText', remaining.join(', '));
+                                                                            }}
+                                                                        >
+                                                                            <X size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                        <div className="option-input-group">
+                                                            <input
+                                                                type="text"
+                                                                placeholder={`Ej: ${v.name === 'Talle' ? 'XL' : v.name === 'Material' ? 'Algodón' : 'Nueva opción'}`}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        const newVal = e.currentTarget.value.trim();
+                                                                        if (newVal && !v.optionsText.split(',').map(s => s.trim()).includes(newVal)) {
+                                                                            const current = v.optionsText.split(',').map(s => s.trim()).filter(Boolean);
+                                                                            updateVariant(i, 'optionsText', [...current, newVal].join(', '));
+                                                                            e.currentTarget.value = '';
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="option-add-btn"
+                                                                onClick={(e) => {
+                                                                    const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
+                                                                    if (input) {
+                                                                        const newVal = input.value.trim();
+                                                                        if (newVal && !v.optionsText.split(',').map(s => s.trim()).includes(newVal)) {
+                                                                            const current = v.optionsText.split(',').map(s => s.trim()).filter(Boolean);
+                                                                            updateVariant(i, 'optionsText', [...current, newVal].join(', '));
+                                                                            input.value = '';
+                                                                            input.focus();
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Plus size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -928,9 +997,12 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                     </div>
                                 );
                             })}
-                            <button className="admin-btn-secondary mt-2" onClick={addVariant}>
-                                + Agregar variante
-                            </button>
+                            </div>
+                            <div className="add-variant-btn-wrapper">
+                                <button className="admin-btn-secondary" style={{ width: '100%' }} onClick={addVariant}>
+                                    + Agregar variante
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -1441,6 +1513,12 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             actionButtonText="Eliminar"
             cancelButtonText="Cancelar"
             onActionClick={confirmDeleteCategory}
+        />
+
+        <CloudinaryImagePicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            onSelect={handlePickerSelect}
         />
 
         </>

@@ -59,6 +59,7 @@ const NavBar = () => {
   // Mobile: track which level-1 and level-2 category the user drilled into
   const [mobileL1, setMobileL1] = useState<Category | null>(null);
   const [mobileL2, setMobileL2] = useState<Category | null>(null);
+  const [mobileInProductsMenu, setMobileInProductsMenu] = useState(false);
   const currentUser = useAdminStore(state => state.currentUser);
   const logout = useAdminStore(state => state.logout);
 
@@ -71,14 +72,13 @@ const NavBar = () => {
   const childMap = buildChildMap(categoryTree);
   const level1Cats = childMap.get(null) ?? [];
 
-  // 0 = main menu, 1 = level-2 subcategories, 2 = level-3 sub-subcategories
-  const mobileLevel = mobileL1 === null ? 0 : mobileL2 === null ? 1 : 2;
 
   const closeMenu = () => {
     setMobileMenuOpen(false);
     setTimeout(() => {
       setMobileL1(null);
       setMobileL2(null);
+      setMobileInProductsMenu(false);
     }, 300);
   };
 
@@ -254,7 +254,7 @@ const NavBar = () => {
         <div className={`nav-menu-slider ${mobileMenuOpen ? 'active' : ''}`}>
 
           {/* Panel 0: Menú Principal */}
-          <div className={`nav-menu-level level-main ${mobileLevel > 0 ? 'slide-out' : ''}`}>
+          <div className={`nav-menu-level level-main ${mobileInProductsMenu ? 'slide-out' : ''}`}>
             <div className="nav-menu-header">
               <span className="nav-menu-title">Menú</span>
               <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
@@ -294,6 +294,56 @@ const NavBar = () => {
                   <Link to={item.path} className="nav-link" onClick={closeMenu}>{item.name}</Link>
                 </li>
               ))}
+
+              {/* Productos - Expandible para mostrar categorías */}
+              {level1Cats.length > 0 && (
+                <li className="nav-menu-item">
+                  <button
+                    className="nav-link-btn"
+                    onClick={() => setMobileInProductsMenu(true)}
+                  >
+                    Productos
+                    <FiChevronRight className="nav-link-arrow" />
+                  </button>
+                </li>
+              )}
+
+              {staticNavAfter.map(item => (
+                <li key={item.name} className="nav-menu-item">
+                  <Link to={item.path} className="nav-link" onClick={closeMenu}>{item.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Panel 1: Categorías de nivel 1 (dentro de Productos) */}
+          <div className={`nav-menu-level level-sub ${
+            mobileInProductsMenu && mobileL1 === null
+              ? 'slide-in'
+              : mobileInProductsMenu && mobileL1 !== null
+                ? 'slide-out'
+                : ''
+          }`}>
+            <div className="nav-menu-header">
+              <button
+                className="nav-menu-back"
+                onClick={() => setMobileInProductsMenu(false)}
+              >
+                <FiArrowLeft />
+              </button>
+              <span className="nav-menu-title">PRODUCTOS</span>
+              <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
+            </div>
+            <ul className="nav-menu-list">
+              <li className="nav-menu-item">
+                <Link
+                  to="/products"
+                  className="nav-link view-all-link"
+                  onClick={closeMenu}
+                >
+                  Ver todos los productos
+                </Link>
+              </li>
               {level1Cats.map(cat => {
                 const hasSubs = (childMap.get(cat.id) ?? []).length > 0;
                 return (
@@ -304,25 +354,32 @@ const NavBar = () => {
                         <FiChevronRight className="nav-link-arrow" />
                       </button>
                     ) : (
-                      <Link to={`/products?category=${cat.name}`} className="nav-link" onClick={closeMenu}>
+                      <Link
+                        to={`/products?category=${cat.name}`}
+                        className="nav-link"
+                        onClick={closeMenu}
+                      >
                         {cat.name}
                       </Link>
                     )}
                   </li>
                 );
               })}
-              {staticNavAfter.map(item => (
-                <li key={item.name} className="nav-menu-item">
-                  <Link to={item.path} className="nav-link" onClick={closeMenu}>{item.name}</Link>
-                </li>
-              ))}
             </ul>
           </div>
 
-          {/* Panel 1: Subcategorías del nivel 1 seleccionado */}
-          <div className={`nav-menu-level level-sub ${mobileLevel === 1 ? 'slide-in' : mobileLevel > 1 ? 'slide-out' : ''}`}>
+          {/* Panel 2: Subcategorías del nivel 1 seleccionado */}
+          <div className={`nav-menu-level level-sub ${
+            mobileInProductsMenu && mobileL1 !== null && mobileL2 === null
+              ? 'slide-in'
+              : mobileInProductsMenu && mobileL2 !== null
+                ? 'slide-out'
+                : ''
+          }`}>
             <div className="nav-menu-header">
-              <button className="nav-menu-back" onClick={() => setMobileL1(null)}><FiArrowLeft /></button>
+              <button className="nav-menu-back" onClick={() => setMobileL1(null)}>
+                <FiArrowLeft />
+              </button>
               <span className="nav-menu-title">{mobileL1?.name.toUpperCase()}</span>
               <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
             </div>
@@ -362,8 +419,10 @@ const NavBar = () => {
             </ul>
           </div>
 
-          {/* Panel 2: Sub-subcategorías del nivel 2 seleccionado */}
-          <div className={`nav-menu-level level-sub ${mobileLevel === 2 ? 'slide-in' : ''}`}>
+          {/* Panel 3: Sub-subcategorías del nivel 2 seleccionado */}
+          <div className={`nav-menu-level level-sub ${
+            mobileInProductsMenu && mobileL2 !== null ? 'slide-in' : ''
+          }`}>
             <div className="nav-menu-header">
               <button className="nav-menu-back" onClick={() => setMobileL2(null)}><FiArrowLeft /></button>
               <span className="nav-menu-title">{mobileL2?.name.toUpperCase()}</span>

@@ -139,6 +139,29 @@ export const deleteCloudinaryImage = async (publicId: string, token: string) => 
   return response.json();
 };
 
+export interface CloudinaryUsage {
+  bytes: number;
+  max_bytes: number;
+  uploads: number;
+  resources: number;
+  derived_resources: number;
+  media_limit: number;
+  media_count: number;
+  transformations: number;
+  requests: number;
+  requests_limit: number;
+}
+
+// Fetch storage usage from Cloudinary
+export const fetchCloudinaryUsage = async (token: string): Promise<CloudinaryUsage> => {
+  const response = await apiFetch(`${API_URL}/cloudinary/usage`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch Cloudinary usage');
+  const data = await response.json();
+  return data.data as CloudinaryUsage;
+};
+
 export interface Category {
   id: string;
   name: string;

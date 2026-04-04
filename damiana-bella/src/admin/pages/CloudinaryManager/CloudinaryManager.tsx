@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   Trash2, Upload, Search, RefreshCw, X, Image,
@@ -17,6 +19,7 @@ import {
   type CloudinaryResource,
   type CloudinaryFolder,
 } from '../../../services/productService';
+import CloudinaryStorageUsage from '../../components/CloudinaryStorageUsage/CloudinaryStorageUsage';
 import './CloudinaryManager.css';
 
 interface ImageUsage {
@@ -324,6 +327,9 @@ const CloudinaryManager = () => {
           <button onClick={() => setError('')}><X size={14} /></button>
         </div>
       )}
+
+      {/* Storage usage bar */}
+      <CloudinaryStorageUsage onRefresh={() => loadImages(currentFolder)} />
 
       <div className="cloudinary-layout">
         {/* ── Folder sidebar ── */}

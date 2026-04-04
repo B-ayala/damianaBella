@@ -90,6 +90,12 @@
     border-radius: 3px;
 }
 
+.tab-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
 .tab-pane h3 {
     margin-top: 0;
     margin-bottom: 0.75rem;
@@ -97,6 +103,7 @@
     color: var(--text-dark);
     font-weight: 600;
     font-family: 'Poppins', sans-serif;
+    flex-shrink: 0;
 }
 
 .tab-pane p {
@@ -104,6 +111,37 @@
     font-size: 0.875rem;
     margin-bottom: 1rem;
     line-height: 1.6;
+    flex-shrink: 0;
+}
+
+/* Contenedor scrolleable interno para variantes */
+.tab-pane .variants-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    margin-bottom: 0.75rem;
+    padding-right: 0.25rem;
+}
+
+.tab-pane .variants-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tab-pane .variants-container::-webkit-scrollbar-track {
+    background: rgba(184, 165, 200, 0.1);
+    border-radius: 3px;
+}
+
+.tab-pane .variants-container::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+}
+
+/* Botón de agregar variante siempre visible al final */
+.tab-pane .add-variant-btn-wrapper {
+    flex-shrink: 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(184, 165, 200, 0.15);
 }
 
 /* Enhanced Footer */
@@ -1007,4 +1045,108 @@
     .cat-drop-trigger {
         font-size: 0.9rem;
     }
+}
+
+/* ── EDITOR DE OPCIONES (para variantes tipo Talle, Material, etc.) ── */
+.options-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.options-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 40px;
+    padding: 0.75rem;
+    background: rgba(184, 165, 200, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(184, 165, 200, 0.2);
+}
+
+.option-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: #fff;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif;
+    box-shadow: 0 2px 8px rgba(184, 165, 200, 0.2);
+}
+
+.option-tag__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    color: #fff;
+    padding: 0;
+    transition: all 0.15s;
+}
+
+.option-tag__remove:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(1.1);
+}
+
+.option-input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.option-input-group input {
+    flex: 1;
+    padding: 0.55rem 0.9rem;
+    border: 1.5px solid rgba(184, 165, 200, 0.4);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.option-input-group input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(184, 165, 200, 0.15);
+}
+
+.option-input-group input::placeholder {
+    color: #aaa;
+}
+
+.option-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.option-add-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(184, 165, 200, 0.35);
+}
+
+.option-add-btn:active {
+    transform: translateY(0) scale(0.95);
 }

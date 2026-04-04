@@ -498,3 +498,10 @@
 .img-manager__delete-btn:hover {
     background: #fecaca;
 }
+
+.img-manager__actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
