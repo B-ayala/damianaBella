@@ -14,15 +14,24 @@ interface AboutInfo {
   values?: { title: string; description: string }[];
 }
 
+interface HeroImageData {
+  imageUrl: string;
+  altText: string;
+  title: string;
+  backgroundPosition?: string;
+}
+
 const About = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [aboutInfo, setAboutInfo] = useState<AboutInfo | null>(null);
+  const [heroImage, setHeroImage] = useState<HeroImageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isImageReady, setIsImageReady] = useState(false);
+  const [isHeroImageReady, setIsHeroImageReady] = useState(false);
 
   const image = aboutInfo?.imageUrl;
 
-  useInitialLoadTask('route', isLoading || (!!image && !isImageReady));
+  useInitialLoadTask('route', isLoading || (!!image && !isImageReady) || (!!heroImage?.imageUrl && !isHeroImageReady));
 
   useEffect(() => {
     const loadAbout = async () => {
@@ -36,6 +45,21 @@ const About = () => {
         if (data) {
           setAboutInfo(data.value as AboutInfo);
         }
+
+        // Load hero image
+        const { data: heroData, error: heroError } = await supabase
+          .from('site_content')
+          .select('value')
+          .eq('key', 'hero_image')
+          .single();
+
+        if (heroError && heroError.code !== 'PGRST116') {
+          throw heroError;
+        }
+
+        if (heroData) {
+          setHeroImage(heroData.value as HeroImageData);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -48,14 +72,53 @@ const About = () => {
     setIsImageReady(!image);
   }, [image]);
 
+  useEffect(() => {
+    if (!heroImage?.imageUrl) {
+      setIsHeroImageReady(true);
+      return;
+    }
+
+    const img = new Image();
+    img.src = buildCloudinaryUrl(heroImage.imageUrl, {
+      width: window.innerWidth <= 768 ? 600 : 1200,
+      quality: 'auto',
+      format: 'auto'
+    });
+
+    if (img.complete) {
+      setIsHeroImageReady(true);
+      return;
+    }
+
+    img.onload = () => setIsHeroImageReady(true);
+    img.onerror = () => setIsHeroImageReady(true);
+  }, [heroImage]);
+
   const title = aboutInfo?.title;
   const description = aboutInfo?.description;
 
+  const heroBackgroundImage = heroImage?.imageUrl
+    ? buildCloudinaryUrl(heroImage.imageUrl, {
+        width: window.innerWidth <= 768 ? 600 : 1200,
+        quality: 'auto',
+        format: 'auto'
+      })
+    : undefined;
+
+  const heroBackgroundPosition = heroImage?.backgroundPosition || '50% 50%';
+
   return (
     <div className="about-page">
-      <div className="about-hero">
+      <div
+        className="about-hero"
+        style={heroBackgroundImage ? {
+          backgroundImage: `url('${heroBackgroundImage}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: heroBackgroundPosition
+        } : undefined}
+      >
         <div className="about-hero-content">
-          <h1 className="about-title">{title}</h1>
+          <h1 className="about-title">{heroImage?.title || title}</h1>
         </div>
       </div>
 
