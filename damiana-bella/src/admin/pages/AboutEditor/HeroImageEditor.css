@@ -136,19 +136,14 @@
   white-space: nowrap;
 }
 
-.info-item input {
+.info-item .MuiFormControl-root {
   width: 70px;
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  text-align: center;
 }
 
-.info-item input:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+.info-item .MuiInputBase-input {
+  text-align: center;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
 }
 
 .info-item span {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import { Button, TextField } from '@mui/material';
 import { useAdminStore } from '../../store/adminStore';
-import { supabase } from '../../../config/supabaseClient';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
+import { deleteSiteContent, getSiteContent, saveSiteContent } from '../../../services/siteContentService';
 import HeroImageEditor from './HeroImageEditor';
 import './AboutEditor.css';
 
@@ -34,18 +35,9 @@ const AboutEditor = () => {
     useEffect(() => {
         const loadAboutInfo = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('site_content')
-                    .select('value')
-                    .eq('key', 'about')
-                    .single();
+                const info = await getSiteContent<any>('about');
 
-                if (error && error.code !== 'PGRST116') {
-                    throw error;
-                }
-
-                if (data) {
-                    const info = data.value as any;
+                if (info) {
                     setTitle(info.title ?? '');
                     setDescription(info.description ?? '');
                     setImageUrl(info.imageUrl ?? '');
@@ -55,19 +47,9 @@ const AboutEditor = () => {
                     updateAboutInfo(info);
                 }
 
-                // Load hero image
-                const { data: heroData, error: heroError } = await supabase
-                    .from('site_content')
-                    .select('value')
-                    .eq('key', 'hero_image')
-                    .single();
+                const hero = await getSiteContent<HeroImageData>('hero_image');
 
-                if (heroError && heroError.code !== 'PGRST116') {
-                    throw heroError;
-                }
-
-                if (heroData) {
-                    const hero = heroData.value as HeroImageData;
+                if (hero) {
                     setHeroImageUrl(hero.imageUrl ?? '');
                     setHeroAltText(hero.altText ?? '');
                     setHeroTitle(hero.title ?? 'Lia – Tu estilo, tu esencia');
@@ -75,7 +57,7 @@ const AboutEditor = () => {
                 }
             } catch (err) {
                 console.error('Error loading data:', err);
-                setError('Error al cargar los datos.');
+                setError(err instanceof Error ? err.message : 'Error al cargar los datos.');
             } finally {
                 setLoading(false);
             }
@@ -102,22 +84,12 @@ const AboutEditor = () => {
         };
 
         try {
-            const { error: aboutError } = await supabase
-                .from('site_content')
-                .upsert({ key: 'about', value: newInfo, updated_at: new Date().toISOString() });
-
-            if (aboutError) {
-                throw aboutError;
-            }
+            await saveSiteContent('about', newInfo);
 
             if (heroImageUrl) {
-                const { error: heroError } = await supabase
-                    .from('site_content')
-                    .upsert({ key: 'hero_image', value: heroData, updated_at: new Date().toISOString() });
-
-                if (heroError) {
-                    throw heroError;
-                }
+                await saveSiteContent('hero_image', heroData);
+            } else {
+                await deleteSiteContent('hero_image');
             }
 
             updateAboutInfo(newInfo);
@@ -125,7 +97,7 @@ const AboutEditor = () => {
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {
             console.error('Error saving:', err);
-            setError('Error al guardar. Intentá de nuevo.');
+            setError(err instanceof Error ? err.message : 'Error al guardar. Intentá de nuevo.');
         }
     };
 
@@ -159,37 +131,41 @@ const AboutEditor = () => {
                         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#333' }}>Imagen Hero - Home</h2>
 
                         <div className="form-group">
-                            <label>Título del Hero</label>
-                            <input
-                                type="text"
+                            <TextField
+                                label="Título del Hero"
                                 value={heroTitle}
                                 onChange={(e) => setHeroTitle(e.target.value)}
                                 placeholder="Ej: Lia – Tu estilo, tu esencia"
+                                helperText="Este texto aparecerá como atributo alt si no especificas uno."
                                 required
+                                fullWidth
+                                size="small"
                             />
-                            <small>Este texto aparecerá como atributo alt si no especificas uno.</small>
                         </div>
 
                         <div className="form-group">
-                            <label>URL de la imagen de fondo</label>
-                            <input
+                            <TextField
+                                label="URL de la imagen de fondo"
                                 type="url"
                                 value={heroImageUrl}
                                 onChange={(e) => setHeroImageUrl(e.target.value)}
                                 placeholder="https://..."
+                                helperText="Pega la URL de Cloudinary o cualquier servicio de hosting de imágenes."
+                                fullWidth
+                                size="small"
                             />
-                            <small>Pega la URL de Cloudinary o cualquier servicio de hosting de imágenes.</small>
                         </div>
 
                         <div className="form-group">
-                            <label>Texto alternativo de la imagen</label>
-                            <input
-                                type="text"
+                            <TextField
+                                label="Texto alternativo de la imagen"
                                 value={heroAltText}
                                 onChange={(e) => setHeroAltText(e.target.value)}
                                 placeholder="Descripción para accesibilidad"
+                                helperText="Importante para SEO y accesibilidad."
+                                fullWidth
+                                size="small"
                             />
-                            <small>Importante para SEO y accesibilidad.</small>
                         </div>
 
                         {heroImageUrl && (
@@ -207,31 +183,37 @@ const AboutEditor = () => {
 
                     {/* About Section */}
                     <div className="form-group">
-                        <label>Título de la sección</label>
-                        <input
-                            type="text"
+                        <TextField
+                            label="Título de la sección"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             required
+                            fullWidth
+                            size="small"
                         />
                     </div>
 
                     <div className="form-group">
-                        <label>Descripción completa</label>
-                        <textarea
-                            rows={8}
+                        <TextField
+                            label="Descripción completa"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             required
-                        ></textarea>
+                            fullWidth
+                            size="small"
+                            multiline
+                            rows={8}
+                        />
                     </div>
 
                     <div className="form-group">
-                        <label>URL de la imagen principal</label>
-                        <input
+                        <TextField
+                            label="URL de la imagen principal"
                             type="url"
                             value={imageUrl}
                             onChange={(e) => setImageUrl(e.target.value)}
+                            fullWidth
+                            size="small"
                         />
                     </div>
 
@@ -245,59 +227,74 @@ const AboutEditor = () => {
                     )}
 
                     <div className="form-group">
-                        <label>Nuestra Misión</label>
-                        <textarea
-                            rows={4}
+                        <TextField
+                            label="Nuestra Misión"
                             value={mission}
                             onChange={(e) => setMission(e.target.value)}
                             required
-                        ></textarea>
+                            fullWidth
+                            size="small"
+                            multiline
+                            rows={4}
+                        />
                     </div>
 
                     <div className="form-group">
-                        <label>Nuestra Visión</label>
-                        <textarea
-                            rows={4}
+                        <TextField
+                            label="Nuestra Visión"
                             value={vision}
                             onChange={(e) => setVision(e.target.value)}
                             required
-                        ></textarea>
+                            fullWidth
+                            size="small"
+                            multiline
+                            rows={4}
+                        />
                     </div>
 
                     <div className="form-group">
-                        <label>Nuestros Valores</label>
+                        <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Nuestros Valores</p>
                         {values.map((value, index) => (
                             <div key={index} style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                                <input
-                                    type="text"
-                                    placeholder="Nombre del valor (ej: Autenticidad)"
+                                <TextField
+                                    label="Nombre del valor"
+                                    placeholder="Ej: Autenticidad"
                                     value={value.title}
                                     onChange={(e) => handleValueChange(index, 'title', e.target.value)}
-                                    style={{ marginBottom: '8px', width: '100%' }}
+                                    fullWidth
+                                    size="small"
+                                    sx={{ mb: 1 }}
                                 />
-                                <textarea
-                                    placeholder="Descripción"
-                                    rows={2}
+                                <TextField
+                                    label="Descripción"
                                     value={value.description}
                                     onChange={(e) => handleValueChange(index, 'description', e.target.value)}
-                                    style={{ marginBottom: '8px', width: '100%' }}
-                                ></textarea>
-                                <button
+                                    fullWidth
+                                    size="small"
+                                    multiline
+                                    rows={2}
+                                    sx={{ mb: 1 }}
+                                />
+                                <Button
                                     type="button"
                                     onClick={() => removeValue(index)}
-                                    style={{ backgroundColor: '#ff6b6b', color: 'white', padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                    variant="contained"
+                                    color="error"
+                                    size="small"
                                 >
                                     Eliminar
-                                </button>
+                                </Button>
                             </div>
                         ))}
-                        <button
+                        <Button
                             type="button"
                             onClick={addValue}
-                            style={{ backgroundColor: '#4CAF50', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            variant="contained"
+                            color="success"
+                            sx={{ alignSelf: 'flex-start' }}
                         >
                             + Agregar Valor
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="form-actions border-t pt-4 mt-6">

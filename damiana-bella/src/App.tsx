@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, useLocation } from 'react-router-dom';
-import { ThemeProvider } from './utils/ThemeProvider';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from './utils/theme';
 import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
@@ -73,6 +74,7 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProvider theme={theme}>
+      <CssBaseline />
       <BrowserRouter>
         <InitialLoadProvider>
           <AppContent />

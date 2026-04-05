@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import { Checkbox, FormControlLabel, TextField } from '@mui/material';
 import { useAdminStore } from '../../store/adminStore';
-import { supabase } from '../../../config/supabaseClient';
+import { getSiteContent, normalizeBannerInfo, saveSiteContent } from '../../../services/siteContentService';
+import type { BannerInfo } from '../../../services/siteContentService';
 import './FooterEditor.css';
 
 const FooterEditor = () => {
@@ -18,36 +20,44 @@ const FooterEditor = () => {
     const [address, setAddress] = useState(footerInfo.address);
     const [mapQuery, setMapQuery] = useState(footerInfo.mapQuery);
     const [copyright, setCopyright] = useState(footerInfo.copyright);
+    const [bannerText, setBannerText] = useState('');
+    const [bannerVisible, setBannerVisible] = useState(false);
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const loadFooterInfo = async () => {
-            const { data, error } = await supabase
-                .from('site_content')
-                .select('value')
-                .eq('key', 'footer')
-                .single();
+            try {
+                const info = await getSiteContent<typeof footerInfo>('footer');
 
-            if (error) {
-                setError('Error al cargar los datos.');
-            } else if (data) {
-                const info = data.value as typeof footerInfo;
-                setBrandName(info.brandName ?? '');
-                setDescription(info.description ?? '');
-                setWhatsapp(info.whatsapp ?? '');
-                setEmail(info.email ?? '');
-                setTiktokUser(info.tiktokUser ?? '');
-                setTiktokUrl(info.tiktokUrl ?? '');
-                setFacebookUser(info.facebookUser ?? '');
-                setFacebookUrl(info.facebookUrl ?? '');
-                setAddress(info.address ?? '');
-                setMapQuery(info.mapQuery ?? '');
-                setCopyright(info.copyright ?? '');
-                updateFooterInfo(info);
+                if (info) {
+                    setBrandName(info.brandName ?? '');
+                    setDescription(info.description ?? '');
+                    setWhatsapp(info.whatsapp ?? '');
+                    setEmail(info.email ?? '');
+                    setTiktokUser(info.tiktokUser ?? '');
+                    setTiktokUrl(info.tiktokUrl ?? '');
+                    setFacebookUser(info.facebookUser ?? '');
+                    setFacebookUrl(info.facebookUrl ?? '');
+                    setAddress(info.address ?? '');
+                    setMapQuery(info.mapQuery ?? '');
+                    setCopyright(info.copyright ?? '');
+                    updateFooterInfo(info);
+                }
+
+                const bannerValue = await getSiteContent<unknown>('banner');
+                const banner = normalizeBannerInfo(bannerValue);
+                if (banner) {
+                    setBannerText(banner.text ?? '');
+                    setBannerVisible(banner.visible ?? false);
+                }
+            } catch (err) {
+                console.error('Error loading site config:', err);
+                setError(err instanceof Error ? err.message : 'Error al cargar los datos.');
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         loadFooterInfo();
@@ -62,16 +72,27 @@ const FooterEditor = () => {
             address, mapQuery, copyright
         };
 
-        const { error } = await supabase
-            .from('site_content')
-            .upsert({ key: 'footer', value: newInfo, updated_at: new Date().toISOString() });
+        try {
+            console.log('[FooterEditor] Guardando footer:', newInfo);
+            await saveSiteContent('footer', newInfo);
+            console.log('[FooterEditor] Footer guardado ✅');
 
-        if (error) {
-            setError('Error al guardar. Intentá de nuevo.');
-        } else {
+            // Guardar banner
+            const bannerInfo: BannerInfo = {
+                text: bannerText,
+                visible: bannerVisible
+            };
+
+            console.log('[FooterEditor] Guardando banner:', bannerInfo);
+            await saveSiteContent('banner', bannerInfo);
+            console.log('[FooterEditor] Banner guardado ✅');
+
             updateFooterInfo(newInfo);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            console.error('[FooterEditor] Error general:', err);
+            setError(err instanceof Error ? err.message : 'Error al guardar. Intentá de nuevo.');
         }
     };
 
@@ -90,30 +111,25 @@ const FooterEditor = () => {
                     <h3 className="footer-editor-section-title">Marca</h3>
                     <div className="footer-editor-grid">
                         <div className="form-group">
-                            <label>Nombre de la marca</label>
-                            <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+                            <TextField label="Nombre de la marca" type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} required fullWidth size="small" />
                         </div>
                         <div className="form-group">
-                            <label>Copyright</label>
-                            <input type="text" value={copyright} onChange={(e) => setCopyright(e.target.value)} required />
+                            <TextField label="Copyright" type="text" value={copyright} onChange={(e) => setCopyright(e.target.value)} required fullWidth size="small" />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label>Descripción del footer</label>
-                        <textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} required></textarea>
+                        <TextField label="Descripción del footer" value={description} onChange={(e) => setDescription(e.target.value)} required fullWidth size="small" multiline rows={4} />
                     </div>
 
                     {/* Contacto */}
                     <h3 className="footer-editor-section-title">Contacto</h3>
                     <div className="footer-editor-grid">
                         <div className="form-group">
-                            <label>WhatsApp</label>
-                            <input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+                            <TextField label="WhatsApp" type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} fullWidth size="small" />
                         </div>
                         <div className="form-group">
-                            <label>Email</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                            <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth size="small" />
                         </div>
                     </div>
 
@@ -121,32 +137,26 @@ const FooterEditor = () => {
                     <h3 className="footer-editor-section-title">Redes sociales</h3>
                     <div className="footer-editor-grid">
                         <div className="form-group">
-                            <label>TikTok usuario</label>
-                            <input type="text" value={tiktokUser} onChange={(e) => setTiktokUser(e.target.value)} />
+                            <TextField label="TikTok usuario" type="text" value={tiktokUser} onChange={(e) => setTiktokUser(e.target.value)} fullWidth size="small" />
                         </div>
                         <div className="form-group">
-                            <label>TikTok URL</label>
-                            <input type="url" value={tiktokUrl} onChange={(e) => setTiktokUrl(e.target.value)} />
+                            <TextField label="TikTok URL" type="url" value={tiktokUrl} onChange={(e) => setTiktokUrl(e.target.value)} fullWidth size="small" />
                         </div>
                         <div className="form-group">
-                            <label>Facebook usuario</label>
-                            <input type="text" value={facebookUser} onChange={(e) => setFacebookUser(e.target.value)} />
+                            <TextField label="Facebook usuario" type="text" value={facebookUser} onChange={(e) => setFacebookUser(e.target.value)} fullWidth size="small" />
                         </div>
                         <div className="form-group">
-                            <label>Facebook URL</label>
-                            <input type="url" value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} />
+                            <TextField label="Facebook URL" type="url" value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} fullWidth size="small" />
                         </div>
                     </div>
 
                     {/* Ubicación */}
                     <h3 className="footer-editor-section-title">Ubicación</h3>
                     <div className="form-group">
-                        <label>Dirección</label>
-                        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
+                        <TextField label="Dirección" type="text" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth size="small" />
                     </div>
                     <div className="form-group">
-                        <label>Query del mapa (URL-encoded para Google Maps)</label>
-                        <input type="text" value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} />
+                        <TextField label="Query del mapa (URL-encoded para Google Maps)" type="text" value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} fullWidth size="small" />
                     </div>
 
                     {mapQuery && (
@@ -166,6 +176,25 @@ const FooterEditor = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* Banner */}
+                    <h3 className="footer-editor-section-title">Banner de la tienda</h3>
+                    <div className="form-group">
+                        <TextField
+                            label="Texto del banner"
+                            value={bannerText}
+                            onChange={(e) => setBannerText(e.target.value)}
+                            placeholder="ej: MEGA SALE – TAKE 10% OFF"
+                            fullWidth
+                            size="small"
+                        />
+                    </div>
+                    <div className="form-group">
+                        <FormControlLabel
+                            control={<Checkbox checked={bannerVisible} onChange={(e) => setBannerVisible(e.target.checked)} />}
+                            label="Mostrar banner"
+                        />
+                    </div>
 
                     <div className="form-actions border-t pt-4 mt-6">
                         <button type="submit" className="admin-btn-primary save-btn admin-flex-center gap-2">

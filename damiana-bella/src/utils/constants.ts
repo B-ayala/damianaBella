@@ -1,17 +1,3 @@
-// ─── Contacto & Redes ────────────────────────────────────────────────────────
-export const WHATSAPP_NUMBER = '5491141442409'; // +54 9 11 4144-2409
-export const WHATSAPP_NUMBER_DISPLAY = '+54 9 11 4144-2409';
-export const CONTACT_EMAIL = 'liazapatos2001@gmail.com';
-export const WHATSAPP_DEFAULT_MESSAGE = 'Hola, me gustaría recibir más información';
-
-export const SOCIAL_LINKS = {
-  whatsapp: `https://wa.me/${WHATSAPP_NUMBER}`,
-  tiktok: 'https://www.tiktok.com/@liazapatos',
-  tiktokUser: '@liazapatos',
-  facebook: 'https://www.facebook.com/zapatos.lia.2020/',
-  facebookUser: 'zapatos.lia.2020',
-} as const;
-
 // ─── Color Palette (Paleta centralizada) ──────────────────────────────────────
 export const COLOR_PALETTE = {
   // Brand colors

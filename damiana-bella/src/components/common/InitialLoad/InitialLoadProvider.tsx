@@ -87,8 +87,8 @@ export const InitialLoadProvider = ({ children }: PropsWithChildren) => {
 
   return (
     <InitialLoadContext.Provider value={value}>
-      {children}
       {isInitialLoading && <InitialLoadingScreen />}
+      {children}
     </InitialLoadContext.Provider>
   );
 };

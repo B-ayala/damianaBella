@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { TextField } from '@mui/material';
 import './HeroImageEditor.css';
 
 interface HeroImageEditorProps {
@@ -100,30 +101,34 @@ const HeroImageEditor = ({
           <div className="position-info">
             <div className="info-item">
               <label>Posición X:</label>
-              <input
+              <TextField
                 type="number"
-                min="0"
-                max="100"
                 value={currentPos.x}
                 onChange={(e) => {
                   const newPosition = formatPosition(parseInt(e.target.value) || 0, currentPos.y);
                   setPosition(newPosition);
                   onPositionChange(newPosition);
                 }}
+                size="small"
+                slotProps={{
+                  htmlInput: { min: 0, max: 100 },
+                }}
               />
               <span>%</span>
             </div>
             <div className="info-item">
               <label>Posición Y:</label>
-              <input
+              <TextField
                 type="number"
-                min="0"
-                max="100"
                 value={currentPos.y}
                 onChange={(e) => {
                   const newPosition = formatPosition(currentPos.x, parseInt(e.target.value) || 0);
                   setPosition(newPosition);
                   onPositionChange(newPosition);
+                }}
+                size="small"
+                slotProps={{
+                  htmlInput: { min: 0, max: 100 },
                 }}
               />
               <span>%</span>

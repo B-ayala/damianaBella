@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Trash2, RefreshCw, Shield, ShieldOff } from 'lucide-react';
-import { Pagination, Box } from '@mui/material';
+import { Trash2, RefreshCw, Shield, ShieldOff, Search } from 'lucide-react';
+import { Pagination, Box, InputAdornment, TextField } from '@mui/material';
 import { useAdminStore } from '../../store/adminStore';
 import { getAdminUsers, deleteAdminUser, updateUserRole, type AdminUserData } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
@@ -152,11 +152,21 @@ const Users = () => {
 
             <div className="admin-card users-toolbar">
                 <div className="search-input-wrapper admin-w-full admin-max-w-md">
-                    <input 
-                        type="text" 
+                    <TextField
                         placeholder="Buscar usuario por nombre o email..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        fullWidth
+                        size="small"
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search size={18} />
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
                     />
                 </div>
                 <button 

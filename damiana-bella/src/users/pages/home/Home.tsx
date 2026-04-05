@@ -3,13 +3,14 @@ import Carousel from '../../components/header/Carousel';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import { fetchFeaturedProducts, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
-import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
+import { useInitialLoadTask, useInitialLoad } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './Home.css';
 
 const Home = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(true);
   const [isCarouselReady, setIsCarouselReady] = useState(false);
+  const { isInitialLoading } = useInitialLoad();
 
   useInitialLoadTask('route', isFeaturedLoading || !isCarouselReady);
 
@@ -21,7 +22,7 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="home">
+    <div className="home" style={{ visibility: isInitialLoading ? 'hidden' : 'visible' }}>
       <Carousel onReady={() => setIsCarouselReady(true)} />
 
       <section className="home__featured-products">

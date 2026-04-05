@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Package, Truck, Store, User, Mail, SendHorizonal } from 'lucide-react';
-import { Box, Pagination } from '@mui/material';
+import { Box, MenuItem, Pagination, TextField } from '@mui/material';
 import { supabase } from '../../../config/supabaseClient';
 import './Dispatches.css';
 
@@ -50,6 +50,41 @@ function nextDispatchStatus(current: DispatchStatus, shippingMethod: string | nu
     if (current === 'en_preparacion') return shippingMethod === 'local' ? 'listo_para_retiro' : 'despachado';
     return current;
 }
+
+const getDispatchStatusFieldSx = (status: DispatchStatus) => {
+    const statusStyles = {
+        pendiente: { backgroundColor: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' },
+        en_preparacion: { backgroundColor: '#ffedd5', color: '#c2410c', borderColor: '#fdba74' },
+        despachado: { backgroundColor: '#dbeafe', color: '#1d4ed8', borderColor: '#93c5fd' },
+        listo_para_retiro: { backgroundColor: '#dcfce7', color: '#166534', borderColor: '#86efac' },
+    } satisfies Record<DispatchStatus, { backgroundColor: string; color: string; borderColor: string }>;
+
+    const selected = statusStyles[status];
+
+    return {
+        minWidth: 170,
+        '& .MuiOutlinedInput-root': {
+            borderRadius: '6px',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            backgroundColor: selected.backgroundColor,
+            color: selected.color,
+            '& fieldset': {
+                borderWidth: '1.5px',
+                borderColor: selected.borderColor,
+            },
+            '&:hover fieldset': {
+                borderColor: selected.borderColor,
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: selected.borderColor,
+            },
+        },
+        '& .MuiSelect-select': {
+            py: '6px',
+        },
+    };
+};
 
 const Dispatches = () => {
     const [dispatches, setDispatches] = useState<Dispatch[]>([]);
@@ -151,27 +186,33 @@ const Dispatches = () => {
             {/* Filters */}
             <div className="admin-card dispatch-toolbar">
                 <div className="toolbar-filters">
-                    <select
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterShipping}
                         onChange={(e) => { setFilterShipping(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
                     >
-                        <option value="">Todos los envíos</option>
-                        <option value="correo">Correo Argentino</option>
-                        <option value="moto">Envío por moto</option>
-                        <option value="local">Retiro en local</option>
-                    </select>
-                    <select
+                        <MenuItem value="">Todos los envíos</MenuItem>
+                        <MenuItem value="correo">Correo Argentino</MenuItem>
+                        <MenuItem value="moto">Envío por moto</MenuItem>
+                        <MenuItem value="local">Retiro en local</MenuItem>
+                    </TextField>
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterDispatch}
                         onChange={(e) => { setFilterDispatch(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
                     >
-                        <option value="">Todos los estados</option>
-                        <option value="pendiente">Pendiente</option>
-                        <option value="en_preparacion">En preparación</option>
-                        <option value="despachado">Despachado</option>
-                        <option value="listo_para_retiro">Listo para retiro</option>
-                    </select>
+                        <MenuItem value="">Todos los estados</MenuItem>
+                        <MenuItem value="pendiente">Pendiente</MenuItem>
+                        <MenuItem value="en_preparacion">En preparación</MenuItem>
+                        <MenuItem value="despachado">Despachado</MenuItem>
+                        <MenuItem value="listo_para_retiro">Listo para retiro</MenuItem>
+                    </TextField>
                 </div>
             </div>
 
@@ -328,21 +369,24 @@ const Dispatches = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            <select
-                                                className={`dispatch-status-select ${d.dispatch_status}`}
+                                            <TextField
+                                                select
+                                                className="dispatch-status-select"
                                                 value={d.dispatch_status}
                                                 onChange={(e) =>
                                                     handleChangeDispatchStatus(d, e.target.value as DispatchStatus)
                                                 }
+                                                size="small"
+                                                sx={getDispatchStatusFieldSx(d.dispatch_status)}
                                             >
-                                                <option value="pendiente">Pendiente</option>
-                                                <option value="en_preparacion">En preparación</option>
+                                                <MenuItem value="pendiente">Pendiente</MenuItem>
+                                                <MenuItem value="en_preparacion">En preparación</MenuItem>
                                                 {d.shipping_method === 'local' ? (
-                                                    <option value="listo_para_retiro">Listo para retiro</option>
+                                                    <MenuItem value="listo_para_retiro">Listo para retiro</MenuItem>
                                                 ) : (
-                                                    <option value="despachado">Despachado</option>
+                                                    <MenuItem value="despachado">Despachado</MenuItem>
                                                 )}
-                                            </select>
+                                            </TextField>
                                         </td>
                                     </tr>
                                 ))}

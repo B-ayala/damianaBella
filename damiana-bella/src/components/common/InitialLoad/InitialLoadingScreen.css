@@ -10,6 +10,7 @@
     radial-gradient(circle at top left, rgba(184, 165, 200, 0.32), transparent 38%),
     radial-gradient(circle at bottom right, rgba(184, 55, 125, 0.16), transparent 34%),
     linear-gradient(135deg, #fffdfc 0%, #f7f0fa 45%, #fdf7f7 100%);
+  pointer-events: auto;
 }
 
 .initial-loading-screen__glow {

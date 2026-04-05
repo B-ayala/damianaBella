@@ -30,10 +30,12 @@ const AdminLayout = () => {
             />
             <div className={`admin-main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
                 <AdminHeader toggleSidebar={toggleSidebar} />
-                <main className="admin-main-content" style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
                     {isNavigationLoading && <NavigationLoadingScreen />}
-                    <Outlet />
-                </main>
+                    <main className="admin-main-content">
+                        <Outlet />
+                    </main>
+                </div>
             </div>
         </div>
     );

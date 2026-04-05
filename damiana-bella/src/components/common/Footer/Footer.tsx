@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaWhatsapp, FaEnvelope, FaTiktok, FaFacebook, FaMapMarkerAlt } from 'react-icons/fa';
-import { supabase } from '../../../config/supabaseClient';
 import type { FooterInfo } from '../../../admin/store/adminStore';
+import { getSiteContent } from '../../../services/siteContentService';
 import './Footer.css';
 
 const emptyFooter: FooterInfo = {
@@ -23,14 +23,14 @@ const Footer = () => {
 
   useEffect(() => {
     const loadFooter = async () => {
-      const { data } = await supabase
-        .from('site_content')
-        .select('value')
-        .eq('key', 'footer')
-        .single();
+      try {
+        const data = await getSiteContent<FooterInfo>('footer');
 
-      if (data) {
-        setFooterInfo(data.value as FooterInfo);
+        if (data) {
+          setFooterInfo(data);
+        }
+      } catch (error) {
+        console.error('Error loading footer:', error);
       }
     };
 

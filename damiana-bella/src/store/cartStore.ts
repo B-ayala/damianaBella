@@ -32,12 +32,67 @@ interface CartState {
   setItem: (item: CheckoutItem | null) => void;
 }
 
+const getProductStockLimit = (product: Product): number => {
+  if (typeof product.stock !== 'number' || !Number.isFinite(product.stock)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.max(0, product.stock);
+};
+
+const clampQuantityToStock = (quantity: number, product: Product): number => {
+  const safeQuantity = Math.max(0, quantity);
+
+  return Math.min(safeQuantity, getProductStockLimit(product));
+};
+
 const buildUnitVariants = (qty: number, unitVariants?: UnitVariants[]): UnitVariants[] => {
   if (unitVariants && unitVariants.length > 0) {
     return unitVariants.slice(0, qty).map((variants) => ({ ...variants }));
   }
 
   return Array.from({ length: qty }, () => ({}));
+};
+
+const sanitizeCartItem = (cartItem: CartItem): CartItem | null => {
+  const quantity = clampQuantityToStock(cartItem.quantity, cartItem.product);
+
+  if (quantity <= 0) {
+    return null;
+  }
+
+  return {
+    ...cartItem,
+    quantity,
+    unitVariants: buildUnitVariants(quantity, cartItem.unitVariants),
+  };
+};
+
+const sanitizeCartItems = (items: CartItem[]): CartItem[] =>
+  items
+    .map((item) => sanitizeCartItem(item))
+    .filter((item): item is CartItem => item !== null);
+
+const sanitizeCheckoutItem = (item: CheckoutItem | null): CheckoutItem | null => {
+  if (!item) {
+    return null;
+  }
+
+  const quantity = clampQuantityToStock(item.quantity, item.product);
+
+  if (quantity <= 0) {
+    return null;
+  }
+
+  const { finalPrice } = getProductPricing(item.product);
+
+  return {
+    ...item,
+    quantity,
+    unitVariants: buildUnitVariants(quantity, item.unitVariants),
+    unitPrice: finalPrice,
+    totalPrice: finalPrice * quantity,
+  };
 };
 
 const buildCheckoutItemFromCartItem = (cartItem: CartItem): CheckoutItem => {
@@ -71,23 +126,31 @@ export const useCartStore = create<CartState>()(
       items: [],
       item: null,
 
-      setItem: (item) => set({ item }),
+      setItem: (item) => set({ item: sanitizeCheckoutItem(item) }),
 
       addItem: (product, qty = 1, unitVariants) =>
         set((state) => {
           const existing = state.items.find((i) => i.product.id === product.id);
-          const nextVariants = buildUnitVariants(qty, unitVariants);
+          const requestedQuantity = Math.max(0, qty);
+          const availableQuantity = Math.max(0, getProductStockLimit(product) - (existing?.quantity ?? 0));
+          const quantityToAdd = Math.min(requestedQuantity, availableQuantity);
+
+          if (quantityToAdd === 0) {
+            return state;
+          }
+
+          const nextVariants = buildUnitVariants(quantityToAdd, unitVariants);
           const items = existing
             ? state.items.map((i) =>
                 i.product.id === product.id
                   ? {
                       ...i,
-                      quantity: i.quantity + qty,
+                      quantity: i.quantity + quantityToAdd,
                       unitVariants: [...i.unitVariants, ...nextVariants],
                     }
                   : i
               )
-            : [...state.items, { product, quantity: qty, unitVariants: nextVariants }];
+            : [...state.items, { product, quantity: quantityToAdd, unitVariants: nextVariants }];
 
           return {
             items,
@@ -113,14 +176,19 @@ export const useCartStore = create<CartState>()(
                 return i;
               }
 
-              const nextQuantity = i.quantity + delta;
+              const nextQuantity = clampQuantityToStock(i.quantity + delta, i.product);
+
+              if (nextQuantity === i.quantity) {
+                return i;
+              }
+
               if (nextQuantity <= 0) {
                 return { ...i, quantity: nextQuantity };
               }
 
               if (delta > 0) {
                 const fallbackVariants = i.unitVariants[i.unitVariants.length - 1] ?? {};
-                const extraVariants = Array.from({ length: delta }, () => ({ ...fallbackVariants }));
+                const extraVariants = Array.from({ length: nextQuantity - i.quantity }, () => ({ ...fallbackVariants }));
 
                 return {
                   ...i,
@@ -147,6 +215,20 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
-    { name: 'damiana-bella-cart' }
+    {
+      name: 'damiana-bella-cart',
+      merge: (persistedState, currentState) => {
+        const persistedCartState = persistedState as Partial<CartState>;
+        const items = sanitizeCartItems(persistedCartState.items ?? currentState.items);
+        const item = sanitizeCheckoutItem(persistedCartState.item ?? currentState.item);
+
+        return {
+          ...currentState,
+          ...persistedCartState,
+          items,
+          item: syncCheckoutItemWithCart(items, item),
+        };
+      },
+    }
   )
 );

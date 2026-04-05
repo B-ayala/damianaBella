@@ -105,6 +105,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             <ul className="cart-drawer__list">
               {items.map((item) => {
                 const pricing = getProductPricing(item.product);
+                const stockLimit = item.product.stock ?? Number.POSITIVE_INFINITY;
+                const reachedStockLimit = Number.isFinite(stockLimit) && item.quantity >= stockLimit;
 
                 return (
                   <li key={item.product.id} className="cart-drawer__item">
@@ -127,6 +129,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         <button
                           className="cart-drawer__qty-btn"
                           onClick={() => updateQuantity(item.product.id, -1)}
+                          disabled={item.quantity <= 1}
                         >
                           −
                         </button>
@@ -134,10 +137,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                         <button
                           className="cart-drawer__qty-btn"
                           onClick={() => updateQuantity(item.product.id, 1)}
+                          disabled={reachedStockLimit}
                         >
                           +
                         </button>
                       </div>
+                      {reachedStockLimit && (
+                        <span className="cart-drawer__item-stock-limit">Stock máximo alcanzado</span>
+                      )}
                       <span className="cart-drawer__item-price">
                         ${(pricing.finalPrice * item.quantity).toFixed(2)}
                       </span>

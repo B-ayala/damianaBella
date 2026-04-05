@@ -10,7 +10,7 @@
 
 .top-navbar-track {
   display: flex;
-  width: fit-content;
+  width: max-content;
   animation: scroll-infinite 20s linear infinite;
 }
 
@@ -20,11 +20,6 @@
   letter-spacing: 1px;
   white-space: nowrap;
   padding-right: 100vw;
-}
-
-.top-navbar-text::after {
-  content: 'MEGA SALE – TAKE 10% OFF';
-  padding-left: 100vw;
 }
 
 @keyframes scroll-infinite {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, RefreshCw, ShoppingBag, User, Mail } from 'lucide-react';
-import { Box, Pagination } from '@mui/material';
+import { Box, InputAdornment, MenuItem, Pagination, TextField } from '@mui/material';
 import { supabase } from '../../../config/supabaseClient';
 import './Sales.css';
 
@@ -200,44 +200,62 @@ const Sales = () => {
             {/* Toolbar */}
             <div className="admin-card sales-toolbar">
                 <div className="search-input-wrapper">
-                    <Search size={18} className="search-icon" />
-                    <input
-                        type="text"
+                    <TextField
                         placeholder="Buscar por producto, comprador o email..."
                         value={searchTerm}
                         onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search size={18} />
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
                     />
                 </div>
                 <div className="toolbar-filters">
-                    <select
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterPaymentStatus}
                         onChange={(e) => { setFilterPaymentStatus(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
                     >
-                        <option value="">Todos los pagos</option>
-                        <option value="pendiente">Pendiente</option>
-                        <option value="pagado">Pagado</option>
-                        <option value="expirado">Expirado</option>
-                        <option value="fallido">Fallido</option>
-                    </select>
-                    <select
+                        <MenuItem value="">Todos los pagos</MenuItem>
+                        <MenuItem value="pendiente">Pendiente</MenuItem>
+                        <MenuItem value="pagado">Pagado</MenuItem>
+                        <MenuItem value="expirado">Expirado</MenuItem>
+                        <MenuItem value="fallido">Fallido</MenuItem>
+                    </TextField>
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterPaymentMethod}
                         onChange={(e) => { setFilterPaymentMethod(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
                     >
-                        <option value="">Todos los métodos</option>
-                        <option value="mp">Mercado Pago</option>
-                        <option value="transfer">Transferencia</option>
-                    </select>
-                    <select
+                        <MenuItem value="">Todos los métodos</MenuItem>
+                        <MenuItem value="mp">Mercado Pago</MenuItem>
+                        <MenuItem value="transfer">Transferencia</MenuItem>
+                    </TextField>
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterStock}
                         onChange={(e) => { setFilterStock(e.target.value); setCurrentPage(1); }}
+                        fullWidth
+                        size="small"
                     >
-                        <option value="">Todo el stock</option>
-                        <option value="low_stock">Stock bajo (≤5)</option>
-                        <option value="out_of_stock">Sin stock</option>
-                    </select>
+                        <MenuItem value="">Todo el stock</MenuItem>
+                        <MenuItem value="low_stock">Stock bajo (≤5)</MenuItem>
+                        <MenuItem value="out_of_stock">Sin stock</MenuItem>
+                    </TextField>
                 </div>
             </div>
 

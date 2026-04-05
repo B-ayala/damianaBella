@@ -16,9 +16,9 @@
     width: 100%;
 }
 
-.sales-toolbar .search-input-wrapper input {
-    min-height: 44px;
-    width: 100%;
+.sales-toolbar .filter-select {
+    flex: 1;
+    min-width: 150px;
 }
 
 /* Summary badges */

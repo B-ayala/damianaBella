@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
-import { supabase } from '../../../config/supabaseClient';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
+import { getSiteContent } from '../../../services/siteContentService';
 import './About.css';
 
 interface AboutInfo {
@@ -36,30 +36,19 @@ const About = () => {
   useEffect(() => {
     const loadAbout = async () => {
       try {
-        const { data } = await supabase
-          .from('site_content')
-          .select('value')
-          .eq('key', 'about')
-          .single();
+        const data = await getSiteContent<AboutInfo>('about');
 
         if (data) {
-          setAboutInfo(data.value as AboutInfo);
+          setAboutInfo(data);
         }
 
-        // Load hero image
-        const { data: heroData, error: heroError } = await supabase
-          .from('site_content')
-          .select('value')
-          .eq('key', 'hero_image')
-          .single();
-
-        if (heroError && heroError.code !== 'PGRST116') {
-          throw heroError;
-        }
+        const heroData = await getSiteContent<HeroImageData>('hero_image');
 
         if (heroData) {
-          setHeroImage(heroData.value as HeroImageData);
+          setHeroImage(heroData);
         }
+      } catch (error) {
+        console.error('Error loading about content:', error);
       } finally {
         setIsLoading(false);
       }

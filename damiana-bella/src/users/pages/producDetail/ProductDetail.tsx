@@ -33,6 +33,7 @@ const ProductDetail = () => {
   const [isShaking, setIsShaking] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [isMainImageReady, setIsMainImageReady] = useState(false);
+  const cartItems = useCartStore((s) => s.items);
   const addItem = useCartStore((s) => s.addItem);
   const setItem = useCartStore((s) => s.setItem);
 
@@ -74,10 +75,14 @@ const ProductDetail = () => {
   };
 
   const stock = product.stock ?? 0;
+  const currentCartQuantity = cartItems.find((item) => item.product.id === product.id)?.quantity ?? 0;
+  const remainingCartCapacity = Math.max(0, stock - currentCartQuantity);
+  const canAddSelectedQuantityToCart = remainingCartCapacity > 0 && quantity <= remainingCartCapacity;
 
   const handleQuantityChange = (delta: number) => {
     const newQuantity = quantity + delta;
     if (newQuantity >= 1 && newQuantity <= stock) {
+      setVariantError('');
       setQuantity(newQuantity);
     }
   };
@@ -86,21 +91,35 @@ const ProductDetail = () => {
     setSelectedVariants(prev => ({ ...prev, [variantName]: option }));
   };
 
-  const calculateShipping = () => {
+  const calculateShipping = async () => {
     if (postalCode.length < 4) {
       alert('Por favor ingresa un código postal válido');
       return;
     }
-    
-    // Simulación de cálculo de envío
-    if (product.freeShipping) {
-      setShippingCost(0);
-      setShippingDays('3-5 días hábiles');
-    } else {
-      // Simulación: costo aleatorio entre 500 y 1500
-      const cost = Math.floor(Math.random() * 1000) + 500;
-      setShippingCost(cost);
-      setShippingDays('5-7 días hábiles');
+
+    try {
+      // Si tiene envío gratis, no llama al backend
+      if (product.freeShipping) {
+        setShippingCost(0);
+        setShippingDays('3-5 días hábiles');
+        return;
+      }
+
+      // Llamar al endpoint real de shipping
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL_LOCAL}/shipping?postalCode=${encodeURIComponent(postalCode)}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al calcular envío');
+      }
+
+      const data = await response.json();
+      setShippingCost(data.cost ?? 0);
+      setShippingDays(data.days ?? '5-7 días hábiles');
+    } catch (error) {
+      console.error('Error calculating shipping:', error);
+      alert('Error al calcular el costo de envío. Por favor intenta nuevamente.');
     }
   };
 
@@ -134,6 +153,17 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     setVariantError('');
     setMissingVariants([]);
+
+    if (remainingCartCapacity <= 0) {
+      setVariantError('Ya agregaste al carrito todas las unidades disponibles de este producto.');
+      return;
+    }
+
+    if (quantity > remainingCartCapacity) {
+      setVariantError(`Solo podés agregar ${remainingCartCapacity} ${remainingCartCapacity === 1 ? 'unidad' : 'unidades'} más de este producto.`);
+      return;
+    }
+
     if (!hasValidPrice) {
       setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
       return;
@@ -357,7 +387,13 @@ const ProductDetail = () => {
                 </button>
               </div>
               <span className={`quantity__available${stock === 0 ? ' quantity__available--out' : ''}`}>
-                {stock === 0 ? 'Sin stock' : `(${stock} disponibles)`}
+                {stock === 0
+                  ? 'Sin stock'
+                  : currentCartQuantity > 0
+                    ? remainingCartCapacity > 0
+                      ? `(${stock} disponibles, ${remainingCartCapacity} para agregar)`
+                      : '(Ya agregaste el stock disponible al carrito)'
+                    : `(${stock} disponibles)`}
               </span>
             </div>
 
@@ -412,9 +448,13 @@ const ProductDetail = () => {
               <button
                 className={`action-btn action-btn--secondary${addedToCart ? ' action-btn--secondary-added' : ''}`}
                 onClick={handleAddToCart}
-                disabled={stock === 0 || !hasValidPrice}
+                disabled={stock === 0 || !hasValidPrice || !canAddSelectedQuantityToCart}
               >
-                {addedToCart ? '¡Agregado al carrito!' : 'Agregar al carrito'}
+                {remainingCartCapacity <= 0
+                  ? 'Stock máximo en carrito'
+                  : addedToCart
+                    ? '¡Agregado al carrito!'
+                    : 'Agregar al carrito'}
               </button>
             </div>
 

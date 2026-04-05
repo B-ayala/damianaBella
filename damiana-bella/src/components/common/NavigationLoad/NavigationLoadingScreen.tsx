@@ -1,10 +1,14 @@
 import { GiClothes } from 'react-icons/gi';
 import './NavigationLoadingScreen.css';
 
-const NavigationLoadingScreen = () => {
+interface NavigationLoadingScreenProps {
+  isExiting?: boolean;
+}
+
+const NavigationLoadingScreen = ({ isExiting = false }: NavigationLoadingScreenProps) => {
   return (
     <div
-      className="navigation-loading-screen"
+      className={`navigation-loading-screen ${isExiting ? 'exit' : ''}`}
       role="status"
       aria-live="polite"
       aria-label="Cargando nueva sección"
