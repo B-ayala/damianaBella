@@ -7,9 +7,10 @@ El sistema de loading de navegación ya está **completamente integrado** en tu 
 ### ✅ Lo que hace automáticamente:
 
 1. **Detecta cambios de ruta** — Cuando el usuario hace clic en cualquier link
-2. **Muestra indicador visual** — Pantalla de carga centrada con ícono de ropa
-3. **Previene parpadeos** — Mantiene visible por mínimo 300ms
-4. **Oculta automáticamente** — Cuando el contenido nuevo está listo
+2. **Muestra indicador visual** — Overlay en el área de contenido principal con ícono de ropa
+3. **Mantiene navbar/sidebar visibles** — El loading solo cubre el contenido, no la navegación
+4. **Previene parpadeos** — Mantiene visible por mínimo 300ms
+5. **Oculta automáticamente** — Cuando el contenido nuevo está listo
 
 ## 📍 Dónde se ve el loading
 
@@ -26,21 +27,40 @@ El sistema de loading de navegación ya está **completamente integrado** en tu 
 
 ## 🎨 Lo que verá el usuario
 
+### Vista General (Sección Pública):
 ```
-┌──────────────────────────────────────┐
-│                                      │
-│         🧥  (ícono girando)          │
-│        ↻                             │
-│      Cargando...                     │
-│                                      │
-└──────────────────────────────────────┘
+┌────────────────────────────────┐
+│  🏠  [Inicio] [Productos] ...   │  ← NavBar SIEMPRE VISIBLE
+├────────────────────────────────┤
+│                                │
+│   🧥 (ícono girando)           │
+│  ↻                              │  ← SOLO EL CONTENIDO
+│ Cargando...                    │
+│                                │
+└────────────────────────────────┘
+```
+
+### Vista General (Sección Admin):
+```
+┌──────┬──────────────────────────┐
+│ Logo │ [Admin]                  │  ← Header SIEMPRE VISIBLE
+├──────┼──────────────────────────┤
+│      │                          │
+│ Menu │  🧥 (ícono girando)      │
+│ Pad  │ ↻                         │  ← SOLO EL CONTENIDO
+│ ●    │ Cargando...             │
+│ ●    │                          │
+│ ●    │                          │
+│      └──────────────────────────┘
 ```
 
 ### Comportamiento visual:
-- **Aparece**: Fade in suave (200ms)
-- **Ícono**: Flota arriba-abajo con rotación del spinner
-- **Fondo**: Blur semi-transparente blanco
-- **Desaparece**: Automático después de cargar
+- **Aparece**: Fade in suave (150ms) en el área de contenido
+- **Ícono**: Flota arriba-abajo (64x64px) con rotación del spinner
+- **Fondo**: Blur semi-transparente blanco (70% opacidad)
+- **Posición**: Centrado en el área de contenido principal
+- **NavBar/Sidebar**: Permanecen siempre visibles y funcionales
+- **Desaparece**: Automático después de cargar con fade-out
 
 ## ⏱️ Timeline de carga
 
