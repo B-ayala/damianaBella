@@ -4,6 +4,7 @@ import UserLayout from '../users/layout/UserLayout';
 import EmailConfirmation from '../users/pages/auth/EmailConfirmation';
 import ScrollToTop from '../components/common/ScrollToTop';
 import { InitialRouteReady } from '../components/common/InitialLoad/InitialLoadProvider';
+import { NavigationLoadProvider } from '../components/common/NavigationLoad/NavigationLoadProvider';
 
 const Home = lazy(() => import('../users/pages/home/Home'));
 const Products = lazy(() => import('../users/pages/products/Products'));
@@ -27,7 +28,7 @@ const AdminDispatches = lazy(() => import('../admin/pages/Dispatches/Dispatches'
 
 const AppRouter = () => {
   return (
-    <>
+    <NavigationLoadProvider>
       <ScrollToTop />
       <Suspense fallback={null}>
         <Routes>
@@ -62,7 +63,7 @@ const AppRouter = () => {
           </Route>
         </Routes>
       </Suspense>
-    </>
+    </NavigationLoadProvider>
   );
 };
 
