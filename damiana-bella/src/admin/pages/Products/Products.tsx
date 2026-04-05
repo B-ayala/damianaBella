@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, BarChart2 } from 'lucide-react';
+import { MenuItem, TextField } from '@mui/material';
 import ProductTable from '../../components/ProductTable/ProductTable';
 import ProductModal from '../../components/ProductModal/ProductModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
@@ -40,6 +41,12 @@ const Products = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const filterSelectSlotProps = {
+        select: {
+            displayEmpty: true,
+        },
+    } as const;
 
     const categories = useMemo(() => {
         const unique = [...new Set(products.map(p => p.category).filter(Boolean))];
@@ -100,35 +107,47 @@ const Products = () => {
                     />
                 </div>
                 <div className="toolbar-filters">
-                    <select
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
+                        fullWidth
+                        size="small"
+                        slotProps={filterSelectSlotProps}
                     >
-                        <option value="">Todas las categorías</option>
+                        <MenuItem value="">Todas las categorías</MenuItem>
                         {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
+                            <MenuItem key={cat} value={cat}>{cat}</MenuItem>
                         ))}
-                    </select>
-                    <select
+                    </TextField>
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
+                        fullWidth
+                        size="small"
+                        slotProps={filterSelectSlotProps}
                     >
-                        <option value="">Todos los estados</option>
-                        <option value="active">Activo</option>
-                        <option value="inactive">Inactivo</option>
-                    </select>
-                    <select
+                        <MenuItem value="">Todos los estados</MenuItem>
+                        <MenuItem value="active">Activo</MenuItem>
+                        <MenuItem value="inactive">Inactivo</MenuItem>
+                    </TextField>
+                    <TextField
+                        select
                         className="filter-select"
                         value={filterStock}
                         onChange={(e) => setFilterStock(e.target.value)}
+                        fullWidth
+                        size="small"
+                        slotProps={filterSelectSlotProps}
                     >
-                        <option value="">Todo el stock</option>
-                        <option value="in_stock">En stock</option>
-                        <option value="low_stock">Stock bajo (≤5)</option>
-                        <option value="out_of_stock">Sin stock</option>
-                    </select>
+                        <MenuItem value="">Todo el stock</MenuItem>
+                        <MenuItem value="in_stock">En stock</MenuItem>
+                        <MenuItem value="low_stock">Stock bajo (≤5)</MenuItem>
+                        <MenuItem value="out_of_stock">Sin stock</MenuItem>
+                    </TextField>
                 </div>
             </div>
 

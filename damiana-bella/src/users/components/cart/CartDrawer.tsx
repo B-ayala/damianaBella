@@ -7,7 +7,7 @@ import { useAdminStore } from '../../../admin/store/adminStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
-import { areUnitVariantSelectionsValid } from '../../../utils/productVariants';
+import { areUnitVariantSelectionsValid, canAddAnotherUnitWithSelection } from '../../../utils/productVariants';
 import AuthModal from '../auth/AuthModal';
 import PurchaseVariantModal from '../PurchaseVariantModal/PurchaseVariantModal';
 import './CartDrawer.css';
@@ -97,8 +97,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             <ul className="cart-drawer__list">
               {items.map((item) => {
                 const pricing = getProductPricing(item.product);
-                const stockLimit = item.product.stock ?? Number.POSITIVE_INFINITY;
-                const reachedStockLimit = Number.isFinite(stockLimit) && item.quantity >= stockLimit;
+                const reachedStockLimit = !canAddAnotherUnitWithSelection(item.product, item.unitVariants);
 
                 return (
                   <li key={item.product.id} className="cart-drawer__item">

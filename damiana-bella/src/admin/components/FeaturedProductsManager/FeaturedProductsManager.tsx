@@ -167,7 +167,7 @@ const FeaturedProductsManager = () => {
                                         </div>
                                     </div>
                                     <button
-                                        className="action-btn delete"
+                                        className="admin-action-btn delete"
                                         onClick={() => handleRemove(prod.id)}
                                         disabled={togglingIds.has(prod.id)}
                                         title="Quitar del home"

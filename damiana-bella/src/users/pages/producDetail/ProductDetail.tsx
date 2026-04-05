@@ -14,10 +14,13 @@ import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import {
   areUnitVariantSelectionsValid,
+  countReservedQuantityForSelection,
+  getAvailableQuantityForSelection,
   getInvalidVariantSelections,
   getMissingVariantSelections,
   isVariantOptionAvailable,
   sanitizeSelectedVariants,
+  getSelectionStockLimit,
 } from '../../../utils/productVariants';
 import './ProductDetail.css';
 
@@ -83,12 +86,7 @@ const ProductDetail = () => {
     });
   }, [product]);
 
-  if (!product) {
-    return <div className="loading">Cargando...</div>;
-  }
-
-  const pricing = getProductPricing(product);
-  const discountedPrice = pricing.finalPrice;
+  const discountedPrice = product ? getProductPricing(product).finalPrice : 0;
   const hasValidPrice = Number.isFinite(discountedPrice) && discountedPrice > 0;
 
   const handlePreviousImage = () => {
@@ -99,14 +97,42 @@ const ProductDetail = () => {
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  const stock = product.stock ?? 0;
-  const currentCartQuantity = cartItems.find((item) => item.product.id === product.id)?.quantity ?? 0;
-  const remainingCartCapacity = Math.max(0, stock - currentCartQuantity);
+  const stock = product?.stock ?? 0;
+  const currentCartItem = product
+    ? cartItems.find((item) => item.product.id === product.id)
+    : undefined;
+  const selectionStockLimit = product ? getSelectionStockLimit(product, selectedVariants) : 0;
+  const currentSelectionCartQuantity = product
+    ? countReservedQuantityForSelection(product, currentCartItem?.unitVariants ?? [], selectedVariants)
+    : 0;
+  const remainingCartCapacity = product
+    ? getAvailableQuantityForSelection(product, selectedVariants, currentCartItem?.unitVariants ?? [])
+    : 0;
+  const quantityStockLimit = Number.isFinite(selectionStockLimit) ? selectionStockLimit : stock;
   const canAddSelectedQuantityToCart = remainingCartCapacity > 0 && quantity <= remainingCartCapacity;
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    if (quantityStockLimit <= 0) {
+      setQuantity(1);
+      return;
+    }
+
+    setQuantity((prev) => Math.min(prev, quantityStockLimit));
+  }, [quantityStockLimit]);
+
+  if (!product) {
+    return <div className="loading">Cargando...</div>;
+  }
+
+  const pricing = getProductPricing(product);
 
   const handleQuantityChange = (delta: number) => {
     const newQuantity = quantity + delta;
-    if (newQuantity >= 1 && newQuantity <= stock) {
+    if (newQuantity >= 1 && newQuantity <= quantityStockLimit) {
       setVariantError('');
       setQuantity(newQuantity);
     }
@@ -422,32 +448,32 @@ const ProductDetail = () => {
                 <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(-1)}
-                  disabled={quantity <= 1 || stock === 0}
+                  disabled={quantity <= 1 || quantityStockLimit === 0}
                 >
                   -
                 </button>
                 <input
                   type="text"
                   className="quantity__input"
-                  value={stock === 0 ? 0 : quantity}
+                  value={quantityStockLimit === 0 ? 0 : quantity}
                   readOnly
                 />
                 <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(1)}
-                  disabled={stock === 0 || quantity >= stock}
+                  disabled={quantityStockLimit === 0 || quantity >= quantityStockLimit}
                 >
                   +
                 </button>
               </div>
-              <span className={`quantity__available${stock === 0 ? ' quantity__available--out' : ''}`}>
-                {stock === 0
+              <span className={`quantity__available${quantityStockLimit === 0 ? ' quantity__available--out' : ''}`}>
+                {quantityStockLimit === 0
                   ? 'Sin stock'
-                  : currentCartQuantity > 0
+                  : currentSelectionCartQuantity > 0
                     ? remainingCartCapacity > 0
-                      ? `(${stock} disponibles, ${remainingCartCapacity} para agregar)`
+                      ? `(${quantityStockLimit} disponibles${selectionStockLimit !== stock ? ' para este talle' : ''}, ${remainingCartCapacity} para agregar)`
                       : '(Ya agregaste el stock disponible al carrito)'
-                    : `(${stock} disponibles)`}
+                    : `(${quantityStockLimit} disponibles${selectionStockLimit !== stock ? ' para este talle' : ''})`}
               </span>
             </div>
 
@@ -495,14 +521,14 @@ const ProductDetail = () => {
               <button
                 className="action-btn action-btn--primary"
                 onClick={handleBuy}
-                disabled={stock === 0 || !hasValidPrice}
+                disabled={quantityStockLimit === 0 || !hasValidPrice}
               >
                 Comprar ahora
               </button>
               <button
                 className={`action-btn action-btn--secondary${addedToCart ? ' action-btn--secondary-added' : ''}`}
                 onClick={handleAddToCart}
-                disabled={stock === 0 || !hasValidPrice || !canAddSelectedQuantityToCart}
+                disabled={quantityStockLimit === 0 || !hasValidPrice || !canAddSelectedQuantityToCart}
               >
                 {remainingCartCapacity <= 0
                   ? 'Stock máximo en carrito'

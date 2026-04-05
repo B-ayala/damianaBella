@@ -26,54 +26,25 @@
     box-sizing: border-box;
 }
 
-.admin-main-content .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.admin-main-content .form-group label {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: #334155;
-}
-
-.admin-main-content .form-group input:not([type='checkbox']):not([type='radio']),
-.admin-main-content .form-group select,
-.admin-main-content .form-group textarea,
+/* Admin search input inherits global form styles */
 .admin-main-content .search-input-wrapper input {
     width: 100%;
     min-height: 44px;
     padding: 0.625rem 0.75rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
     outline: none;
     font-size: 0.875rem;
     font-family: inherit;
     color: #0f172a;
-    background: #ffffff;
+    background: var(--white);
     box-sizing: border-box;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.admin-main-content .form-group textarea {
-    resize: vertical;
-    min-height: 120px;
-}
-
-.admin-main-content .form-group input:not([type='checkbox']):not([type='radio']):focus,
-.admin-main-content .form-group select:focus,
-.admin-main-content .form-group textarea:focus,
 .admin-main-content .search-input-wrapper input:focus {
-    border-color: #0f172a;
-    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
-}
-
-.admin-main-content .form-group input[type='checkbox'],
-.admin-main-content .form-group input[type='radio'] {
-    width: 16px;
-    height: 16px;
-    accent-color: #0f172a;
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(184, 165, 200, 0.15);
 }
 
 /* Tablet */
@@ -82,13 +53,6 @@
         padding: 1.5rem;
     }
 
-    .admin-main-content .form-group label {
-        font-size: 0.875rem;
-    }
-
-    .admin-main-content .form-group input:not([type='checkbox']):not([type='radio']),
-    .admin-main-content .form-group select,
-    .admin-main-content .form-group textarea,
     .admin-main-content .search-input-wrapper input {
         padding: 0.75rem 1rem;
     }
@@ -104,9 +68,6 @@
         padding: 2rem;
     }
 
-    .admin-main-content .form-group input:not([type='checkbox']):not([type='radio']),
-    .admin-main-content .form-group select,
-    .admin-main-content .form-group textarea,
     .admin-main-content .search-input-wrapper input {
         font-size: 0.9375rem;
     }

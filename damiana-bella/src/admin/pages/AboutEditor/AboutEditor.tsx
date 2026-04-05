@@ -130,42 +130,44 @@ const AboutEditor = () => {
                     <div style={{ borderBottom: '2px solid #eee', paddingBottom: '2rem', marginBottom: '2rem' }}>
                         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#333' }}>Imagen Hero - Home</h2>
 
-                        <div className="form-group">
-                            <TextField
-                                label="Título del Hero"
-                                value={heroTitle}
-                                onChange={(e) => setHeroTitle(e.target.value)}
-                                placeholder="Ej: Lia – Tu estilo, tu esencia"
-                                helperText="Este texto aparecerá como atributo alt si no especificas uno."
-                                required
-                                fullWidth
-                                size="small"
-                            />
-                        </div>
+                        <div className="about-hero-fields">
+                            <div className="form-group">
+                                <TextField
+                                    label="Título del Hero"
+                                    value={heroTitle}
+                                    onChange={(e) => setHeroTitle(e.target.value)}
+                                    placeholder="Ej: Lia – Tu estilo, tu esencia"
+                                    helperText="Este texto aparecerá como atributo alt si no especificas uno."
+                                    required
+                                    fullWidth
+                                    size="small"
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <TextField
-                                label="URL de la imagen de fondo"
-                                type="url"
-                                value={heroImageUrl}
-                                onChange={(e) => setHeroImageUrl(e.target.value)}
-                                placeholder="https://..."
-                                helperText="Pega la URL de Cloudinary o cualquier servicio de hosting de imágenes."
-                                fullWidth
-                                size="small"
-                            />
-                        </div>
+                            <div className="form-group">
+                                <TextField
+                                    label="URL de la imagen de fondo"
+                                    type="url"
+                                    value={heroImageUrl}
+                                    onChange={(e) => setHeroImageUrl(e.target.value)}
+                                    placeholder="https://..."
+                                    helperText="Pega la URL de Cloudinary o cualquier servicio de hosting de imágenes."
+                                    fullWidth
+                                    size="small"
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <TextField
-                                label="Texto alternativo de la imagen"
-                                value={heroAltText}
-                                onChange={(e) => setHeroAltText(e.target.value)}
-                                placeholder="Descripción para accesibilidad"
-                                helperText="Importante para SEO y accesibilidad."
-                                fullWidth
-                                size="small"
-                            />
+                            <div className="form-group">
+                                <TextField
+                                    label="Texto alternativo de la imagen"
+                                    value={heroAltText}
+                                    onChange={(e) => setHeroAltText(e.target.value)}
+                                    placeholder="Descripción para accesibilidad"
+                                    helperText="Importante para SEO y accesibilidad."
+                                    fullWidth
+                                    size="small"
+                                />
+                            </div>
                         </div>
 
                         {heroImageUrl && (

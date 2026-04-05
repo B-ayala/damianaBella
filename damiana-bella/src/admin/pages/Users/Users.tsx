@@ -170,7 +170,7 @@ const Users = () => {
                     />
                 </div>
                 <button 
-                    className="action-btn refresh" 
+                    className="admin-action-btn refresh" 
                     onClick={loadUsers} 
                     title="Recargar usuarios"
                     disabled={isLoading}
@@ -251,7 +251,7 @@ const Users = () => {
                                                         </button>
                                                         <button
                                                             onClick={() => handleDeleteClick(user)}
-                                                            className="action-btn delete"
+                                                            className="admin-action-btn delete"
                                                             title={isSelf ? 'No puedes eliminarte' : 'Eliminar usuario'}
                                                             disabled={isSelf}
                                                         >

@@ -64,6 +64,12 @@ const SHIPPING_METHOD_LABEL: Record<string, string> = {
 
 const ITEMS_PER_PAGE = 10;
 
+const filterSelectSlotProps = {
+    select: {
+        displayEmpty: true,
+    },
+} as const;
+
 const Sales = () => {
     const [sales, setSales] = useState<Sale[]>([]);
     const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
@@ -225,6 +231,7 @@ const Sales = () => {
                         onChange={(e) => { setFilterPaymentStatus(e.target.value); setCurrentPage(1); }}
                         fullWidth
                         size="small"
+                        slotProps={filterSelectSlotProps}
                     >
                         <MenuItem value="">Todos los pagos</MenuItem>
                         <MenuItem value="pendiente">Pendiente</MenuItem>
@@ -239,6 +246,7 @@ const Sales = () => {
                         onChange={(e) => { setFilterPaymentMethod(e.target.value); setCurrentPage(1); }}
                         fullWidth
                         size="small"
+                        slotProps={filterSelectSlotProps}
                     >
                         <MenuItem value="">Todos los métodos</MenuItem>
                         <MenuItem value="mp">Mercado Pago</MenuItem>
@@ -251,6 +259,7 @@ const Sales = () => {
                         onChange={(e) => { setFilterStock(e.target.value); setCurrentPage(1); }}
                         fullWidth
                         size="small"
+                        slotProps={filterSelectSlotProps}
                     >
                         <MenuItem value="">Todo el stock</MenuItem>
                         <MenuItem value="low_stock">Stock bajo (≤5)</MenuItem>

@@ -167,4 +167,6 @@ CartItem       { product, quantity, unitVariants[], unitPrice, totalPrice }
 
 - Tema MUI personalizado en `utils/theme.ts`, provisto por `utils/ThemeProvider.tsx`
 - Emotion para estilos inline/CSS-in-JS
+- Antes de agregar estilos nuevos, reutilizar estilos globales, tema y patrones visuales existentes para mantener consistencia y evitar duplicacion
+- Si un componente necesita estilos propios, definirlos de forma aislada en su archivo colindante o en su capa local de estilos, evitando impacto sobre otros componentes
 - Deployment a GitHub Pages con `basePath: /LIA/` — los imports de assets deben respetar `import.meta.env.BASE_URL`

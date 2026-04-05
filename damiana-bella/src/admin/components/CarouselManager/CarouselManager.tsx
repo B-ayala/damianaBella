@@ -184,7 +184,7 @@ const CarouselManager = () => {
                                     <div className="carousel-item-actions">
                                         <button
                                             type="button"
-                                            className="action-btn copy"
+                                            className="admin-action-btn copy"
                                             onClick={() => handleCopy(img.url)}
                                             title="Copiar URL"
                                         >
@@ -192,7 +192,7 @@ const CarouselManager = () => {
                                         </button>
                                         <button
                                             type="button"
-                                            className="action-btn delete"
+                                            className="admin-action-btn delete"
                                             onClick={() => handleDelete(img.id)}
                                             title="Eliminar"
                                         >

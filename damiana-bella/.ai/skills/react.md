@@ -41,6 +41,12 @@ src/
    - Clases: kebab-case con prefijo descriptivo (ej: `admin-sales-page`, `sale-card-buyer`)
    - Responsive: mobile-first con `@media (min-width: 640px)` y `@media (min-width: 1024px)`
 
+## Reglas para cambios visuales
+- Reutilizar estilos existentes antes de crear estilos nuevos
+- Priorizar estilos globales, tema y patrones visuales ya presentes para mantener consistencia y evitar codigo duplicado
+- Si hace falta estilo especifico de un componente, definirlo de forma aislada en el propio componente o su CSS colindante, evitando efectos colaterales sobre otros elementos
+- No introducir overrides globales nuevos si el requerimiento se puede resolver reutilizando clases, tokens, variantes o estilos ya existentes
+
 ## Patrones de datos
 - Leer Supabase directo (publico/admin): `supabase.from('tabla').select().order()`
 - Llamar backend Express: `apiFetch()` wrapper o `fetch()` directo con `VITE_API_URL_LOCAL`

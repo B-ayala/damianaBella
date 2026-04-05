@@ -4,6 +4,7 @@ import AdminSidebar from './AdminSidebar';
 import AdminHeader from './AdminHeader';
 import { useNavigationLoad } from '../../components/common/NavigationLoad/NavigationLoadProvider';
 import NavigationLoadingScreen from '../../components/common/NavigationLoad/NavigationLoadingScreen';
+import '../styles/adminShared.css';
 import './AdminLayout.css';
 
 const AdminLayout = () => {

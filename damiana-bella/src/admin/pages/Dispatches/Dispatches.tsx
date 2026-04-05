@@ -38,6 +38,12 @@ const DISPATCH_STATUS_LABEL: Record<DispatchStatus, string> = {
 
 const ITEMS_PER_PAGE = 10;
 
+const filterSelectSlotProps = {
+    select: {
+        displayEmpty: true,
+    },
+} as const;
+
 function ShippingIcon({ method }: { method: string | null }) {
     if (method === 'correo') return <Package size={14} className="shipping-icon correo" />;
     if (method === 'moto') return <Truck size={14} className="shipping-icon moto" />;
@@ -193,6 +199,7 @@ const Dispatches = () => {
                         onChange={(e) => { setFilterShipping(e.target.value); setCurrentPage(1); }}
                         fullWidth
                         size="small"
+                        slotProps={filterSelectSlotProps}
                     >
                         <MenuItem value="">Todos los envíos</MenuItem>
                         <MenuItem value="correo">Correo Argentino</MenuItem>
@@ -206,6 +213,7 @@ const Dispatches = () => {
                         onChange={(e) => { setFilterDispatch(e.target.value); setCurrentPage(1); }}
                         fullWidth
                         size="small"
+                        slotProps={filterSelectSlotProps}
                     >
                         <MenuItem value="">Todos los estados</MenuItem>
                         <MenuItem value="pendiente">Pendiente</MenuItem>

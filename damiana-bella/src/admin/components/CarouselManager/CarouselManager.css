@@ -1,11 +1,4 @@
 /* Mobile-first CarouselManager */
-.admin-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 0.75rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    border: 1px solid #f1f5f9;
-}
 
 .carousel-manager-header {
     display: flex;
@@ -54,20 +47,6 @@
     color: #334155;
 }
 
-.admin-card-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #0f172a;
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-}
-
-.admin-card-desc {
-    color: #64748b;
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
-}
-
 .add-carousel-form {
     display: flex;
     flex-direction: column;
@@ -88,21 +67,6 @@
 
 .add-carousel-form input:focus {
     border-color: #000;
-}
-
-.admin-btn-primary {
-    background: #000;
-    color: #fff;
-    border: none;
-    padding: 0 1.25rem;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    min-height: 44px;
-}
-
-.admin-btn-primary:hover {
-    background: #333;
 }
 
 .carousel-list {
@@ -228,7 +192,7 @@
     flex-shrink: 0;
 }
 
-.action-btn {
+.admin-action-btn {
     background: none;
     border: none;
     cursor: pointer;
@@ -242,31 +206,31 @@
     min-height: 36px;
 }
 
-.action-btn:hover {
+.admin-action-btn:hover {
     background: #e2e8f0;
 }
 
-.action-btn.delete {
+.admin-action-btn.delete {
     color: #ef4444;
 }
 
-.action-btn.delete:hover {
+.admin-action-btn.delete:hover {
     background: #fee2e2;
 }
 
-.action-btn.copy {
+.admin-action-btn.copy {
     color: #3b82f6;
 }
 
-.action-btn.copy:hover {
+.admin-action-btn.copy:hover {
     background: #dbeafe;
 }
 
-.action-btn.edit {
+.admin-action-btn.edit {
     color: #3b82f6;
 }
 
-.action-btn.edit:hover {
+.admin-action-btn.edit:hover {
     background: #dbeafe;
 }
 
@@ -282,10 +246,6 @@
 
 /* Tablet */
 @media (min-width: 640px) {
-    .admin-card {
-        padding: 1.25rem;
-    }
-
     .add-carousel-form {
         flex-direction: row;
         margin-bottom: 1.5rem;
@@ -314,16 +274,9 @@
 
 /* Desktop */
 @media (min-width: 1024px) {
-    .admin-card {
-        padding: 1.5rem;
-    }
-
-    .admin-card-desc {
-        margin-bottom: 1.5rem;
-    }
 }
 
-.action-btn.delete:hover {
+.admin-action-btn.delete:hover {
     color: #ef4444;
     background: #fee2e2;
 }

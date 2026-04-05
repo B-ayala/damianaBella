@@ -100,10 +100,10 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                                     <span className="product-card-category">{product.category}</span>
                                 </div>
                                 <div className="product-card-actions">
-                                    <button onClick={() => onEdit(product)} className="action-btn edit" title="Editar">
+                                    <button onClick={() => onEdit(product)} className="admin-action-btn edit" title="Editar">
                                         <Edit size={16} />
                                     </button>
-                                    <button onClick={() => setConfirmDeleteId(product.id)} className="action-btn delete" title="Eliminar">
+                                    <button onClick={() => setConfirmDeleteId(product.id)} className="admin-action-btn delete" title="Eliminar">
                                         <Trash2 size={16} />
                                     </button>
                                 </div>
@@ -174,10 +174,10 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
                                 </td>
                                 <td>
                                     <div className="table-actions">
-                                        <button onClick={() => onEdit(product)} className="action-btn edit" title="Editar">
+                                        <button onClick={() => onEdit(product)} className="admin-action-btn edit" title="Editar">
                                             <Edit size={16} />
                                         </button>
-                                        <button onClick={() => setConfirmDeleteId(product.id)} className="action-btn delete" title="Eliminar">
+                                        <button onClick={() => setConfirmDeleteId(product.id)} className="admin-action-btn delete" title="Eliminar">
                                             <Trash2 size={16} />
                                         </button>
                                     </div>

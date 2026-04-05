@@ -5,18 +5,6 @@
     gap: 0.75rem;
 }
 
-.admin-page-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0;
-}
-
-.admin-page-subtitle {
-    color: #64748b;
-    margin: 0;
-    font-size: 0.875rem;
-}
 
 /* Mobile: single column stack */
 .dashboard-grid {
@@ -105,10 +93,6 @@
         gap: 1rem;
     }
 
-    .admin-page-title {
-        font-size: 1.375rem;
-    }
-
     .dashboard-card-content p {
         font-size: 1.5rem;
     }
@@ -137,10 +121,6 @@
     }
 
     .dashboard-card-content p {
-        font-size: 1.75rem;
-    }
-
-    .admin-page-title {
         font-size: 1.75rem;
     }
 

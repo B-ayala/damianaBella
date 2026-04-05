@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '../types/product';
 import { getProductPricing } from '../utils/pricing';
-import { areUnitVariantSelectionsValid } from '../utils/productVariants';
+import { areUnitVariantSelectionsValid, getProductStockLimit } from '../utils/productVariants';
 
 export type UnitVariants = { [key: string]: string };
 export type CheckoutItemSource = 'cart' | 'direct';
@@ -33,14 +33,6 @@ interface CartState {
   totalItems: () => number;
   setItem: (item: CheckoutItem | null) => void;
 }
-
-const getProductStockLimit = (product: Product): number => {
-  if (typeof product.stock !== 'number' || !Number.isFinite(product.stock)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, product.stock);
-};
 
 const clampQuantityToStock = (quantity: number, product: Product): number => {
   const safeQuantity = Math.max(0, quantity);
@@ -159,6 +151,11 @@ export const useCartStore = create<CartState>()(
             return state;
           }
 
+          const existingUnitVariants = existing?.unitVariants ?? [];
+          if (!areUnitVariantSelectionsValid(product, [...existingUnitVariants, ...nextVariants])) {
+            return state;
+          }
+
           const items = existing
             ? state.items.map((i) =>
                 i.product.id === product.id
@@ -208,11 +205,16 @@ export const useCartStore = create<CartState>()(
               if (delta > 0) {
                 const fallbackVariants = i.unitVariants[i.unitVariants.length - 1] ?? {};
                 const extraVariants = Array.from({ length: nextQuantity - i.quantity }, () => ({ ...fallbackVariants }));
+                const nextUnitVariants = [...i.unitVariants, ...extraVariants];
+
+                if (!areUnitVariantSelectionsValid(i.product, nextUnitVariants)) {
+                  return i;
+                }
 
                 return {
                   ...i,
                   quantity: nextQuantity,
-                  unitVariants: [...i.unitVariants, ...extraVariants],
+                  unitVariants: nextUnitVariants,
                 };
               }
 

@@ -290,7 +290,7 @@
 }
 
 /* Delete button */
-.action-btn.delete {
+.admin-action-btn.delete {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -305,12 +305,12 @@
     transition: background 0.15s, color 0.15s;
 }
 
-.action-btn.delete:hover:not(:disabled) {
+.admin-action-btn.delete:hover:not(:disabled) {
     background: #fee2e2;
     color: #dc2626;
 }
 
-.action-btn.delete:disabled {
+.admin-action-btn.delete:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
