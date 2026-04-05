@@ -8,11 +8,18 @@ import './CheckoutResult.css';
 
 type ResultStatus = 'approved' | 'pending' | 'failure' | 'unknown';
 
-interface LastOrder {
+interface LastOrderItem {
     productName: string;
     productImage: string;
     quantity: number;
+    totalPrice: number;
+}
+
+interface LastOrder {
+    items: LastOrderItem[];
+    itemsSubtotal?: number;
     grandTotal: number;
+    source?: 'cart' | 'direct';
 }
 
 const CONTENT: Record<ResultStatus, { icon: React.ReactNode; title: string; desc: string; color: string }> = {
@@ -46,6 +53,7 @@ const CheckoutResult = () => {
     const [params] = useSearchParams();
     const navigate = useNavigate();
     const setItem = useCartStore((s) => s.setItem);
+    const clearCart = useCartStore((s) => s.clearCart);
     const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
     const cancelledRef = useRef(false);
 
@@ -68,19 +76,46 @@ const CheckoutResult = () => {
         }
 
         if (status === 'approved') {
-            setItem(null);
-            sessionStorage.removeItem('mp_order_id');
+            sessionStorage.removeItem('mp_order_ids');
+
+            let source: LastOrder['source'] | undefined;
+            if (raw) {
+                try {
+                    source = (JSON.parse(raw) as LastOrder).source;
+                } catch {
+                    source = undefined;
+                }
+            }
+
+            if (source === 'cart') {
+                clearCart();
+            } else {
+                setItem(null);
+            }
         } else if (status === 'failure') {
-            setItem(null);
-            // Cancelar la orden en el backend para marcarla como 'fallido' y restaurar stock
-            const orderId = externalRef || sessionStorage.getItem('mp_order_id') || '';
-            sessionStorage.removeItem('mp_order_id');
-            if (orderId && !cancelledRef.current) {
+            const storedOrderIds = sessionStorage.getItem('mp_order_ids');
+            sessionStorage.removeItem('mp_order_ids');
+
+            let orderIds = externalRef ? externalRef.split(',').map((id) => id.trim()).filter(Boolean) : [];
+            if (orderIds.length === 0 && storedOrderIds) {
+                try {
+                    const parsedIds = JSON.parse(storedOrderIds);
+                    if (Array.isArray(parsedIds)) {
+                        orderIds = parsedIds.map((id) => String(id));
+                    }
+                } catch {
+                    orderIds = [];
+                }
+            }
+
+            if (orderIds.length > 0 && !cancelledRef.current) {
                 cancelledRef.current = true;
-                cancelMpOrder(orderId);
+                orderIds.forEach((orderId) => {
+                    cancelMpOrder(orderId);
+                });
             }
         }
-    }, [status, setItem, externalRef]);
+    }, [clearCart, externalRef, setItem, status]);
 
     const { icon, title, desc, color } = CONTENT[status];
     const fmt = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 2 });
@@ -92,17 +127,27 @@ const CheckoutResult = () => {
                 <h1 className="checkout-result-title">{title}</h1>
                 <p className="checkout-result-desc">{desc}</p>
 
-                {lastOrder && (status === 'approved' || status === 'pending') && (
-                    <div className="checkout-result-product">
-                        <img
-                            src={lastOrder.productImage}
-                            alt={lastOrder.productName}
-                            className="checkout-result-product-img"
-                        />
-                        <div className="checkout-result-product-info">
-                            <p className="checkout-result-product-name">{lastOrder.productName}</p>
-                            <p className="checkout-result-product-qty">Cantidad: {lastOrder.quantity}</p>
-                            <p className="checkout-result-product-total">Total: ${fmt(lastOrder.grandTotal)}</p>
+                {lastOrder && (status === 'approved' || status === 'pending' || status === 'failure') && (
+                    <div className="checkout-result-products">
+                        {lastOrder.items.map((orderItem, index) => (
+                            <div key={`${orderItem.productName}-${index}`} className="checkout-result-product">
+                                <img
+                                    src={orderItem.productImage}
+                                    alt={orderItem.productName}
+                                    className="checkout-result-product-img"
+                                />
+                                <div className="checkout-result-product-info">
+                                    <p className="checkout-result-product-name">{orderItem.productName}</p>
+                                    <p className="checkout-result-product-qty">Cantidad: {orderItem.quantity}</p>
+                                    <p className="checkout-result-product-total">Subtotal: ${fmt(orderItem.totalPrice)}</p>
+                                </div>
+                            </div>
+                        ))}
+                        <div className="checkout-result-totals">
+                            {typeof lastOrder.itemsSubtotal === 'number' && (
+                                <p className="checkout-result-total-line">Subtotal productos: ${fmt(lastOrder.itemsSubtotal)}</p>
+                            )}
+                            <p className="checkout-result-total-line checkout-result-total-line--grand">Total: ${fmt(lastOrder.grandTotal)}</p>
                         </div>
                     </div>
                 )}

@@ -3,11 +3,12 @@ import Modal from '../../../components/common/Modal/Modal';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
-import type { Variant, Specification, FAQ } from '../../../types/product';
+import type { Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
 import { calculateDiscountPercentage } from '../../../utils/pricing';
 import { apiFetch } from '../../../utils/apiFetch';
 import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
+import { getNormalizedVariantOptions, getProductStockFromVariants, isSizeVariant, normalizeVariantOption, sanitizeProductVariants } from '../../../utils/productVariants';
 import { Folder, FolderOpen, Dot, Plus, X, Images } from 'lucide-react';
 import CloudinaryImagePicker from '../CloudinaryImagePicker/CloudinaryImagePicker';
 import './ProductModal.css';
@@ -97,6 +98,21 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [showOptionalWarning, setShowOptionalWarning] = useState(false);
     const [missingOptionals, setMissingOptionals] = useState<string[]>([]);
+    const managesStockFromVariants = useMemo(
+        () => variants.some((variant) => isSizeVariant(variant.name) && getNormalizedVariantOptions(variant.name, variant.optionsText.split(',')).length > 0),
+        [variants]
+    );
+    const derivedVariantStock = useMemo(() => {
+        const builtVariants = sanitizeProductVariants(
+            variants.map((variant) => ({
+                name: variant.name,
+                options: variant.optionsText.split(','),
+                stockByOption: variant.stockByOption,
+            }))
+        );
+
+        return getProductStockFromVariants(builtVariants) ?? 0;
+    }, [variants]);
 
     // Clear category error as soon as a category is selected
     React.useEffect(() => {
@@ -234,41 +250,14 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
 
     const buildPayload = () => {
         const validImages = images.filter(url => url.trim() !== '');
-
-        // Construir variantes con stockByOption para talles
-        const builtVariants: Variant[] = variants.map(v => {
-            const isTalleVariant = v.name.toLowerCase().startsWith('talle');
-            const options = v.optionsText
-                .split(',')
-                .map(o => {
-                    const trimmed = o.trim();
-                    return isTalleVariant ? trimmed.toUpperCase() : trimmed;
-                })
-                .filter(Boolean)
-                .filter((val, idx, arr) => arr.indexOf(val) === idx);
-
-            const variant: Variant = {
-                name: v.name,
-                options,
-            };
-
-            // Si es variante de talle, agregar stockByOption
-            if (isTalleVariant && v.stockByOption) {
-                variant.stockByOption = {};
-                options.forEach(opt => {
-                    variant.stockByOption![opt] = v.stockByOption?.[opt] ?? 0;
-                });
-            }
-
-            return variant;
-        });
-
-        // Calcular stock total como suma del stock de talles si existe variante "Talle" con stockByOption
-        let totalStock = parseInt(stock) || 0;
-        const talleVariant = builtVariants.find(v => v.name.toLowerCase().startsWith('talle'));
-        if (talleVariant?.stockByOption) {
-            totalStock = Object.values(talleVariant.stockByOption).reduce((a, b) => a + b, 0);
-        }
+        const builtVariants = sanitizeProductVariants(
+            variants.map((variant) => ({
+                name: variant.name,
+                options: variant.optionsText.split(','),
+                stockByOption: variant.stockByOption,
+            }))
+        ) ?? [];
+        const totalStock = getProductStockFromVariants(builtVariants) ?? (parseInt(stock) || 0);
 
         return {
             name,
@@ -359,7 +348,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         if (!name.trim()) errors.name = 'El nombre es requerido';
         if (!price) errors.price = 'El precio es requerido';
         if (!category) errors.category = 'La categoría es requerida';
-        if (!stock) errors.stock = 'El stock es requerido';
+        if (!managesStockFromVariants && !stock) errors.stock = 'El stock es requerido';
 
         if (Object.keys(errors).length > 0) {
             setFieldErrors(errors);
@@ -417,18 +406,8 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         setImages(prev => [...prev, ...newUrls]);
     };
 
-    const normalizeVariantOption = (variantName: string, option: string) => {
-        const trimmed = option.trim();
-        if (!trimmed) return '';
-        return variantName.toLowerCase().startsWith('talle') ? trimmed.toUpperCase() : trimmed;
-    };
-
-    const getNormalizedVariantOptions = (variantName: string, optionsText: string) => (
-        optionsText
-            .split(',')
-            .map(option => normalizeVariantOption(variantName, option))
-            .filter(Boolean)
-            .filter((value, index, list) => list.indexOf(value) === index)
+    const getNormalizedOptionsFromText = (variantName: string, optionsText: string) => (
+        getNormalizedVariantOptions(variantName, optionsText.split(','))
     );
 
     const syncVariantState = (
@@ -436,12 +415,12 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         optionsText: string,
         stockByOption?: Record<string, number>
     ) => {
-        const options = getNormalizedVariantOptions(variantName, optionsText);
-        const isSizeVariant = variantName.toLowerCase().startsWith('talle');
+        const options = getNormalizedOptionsFromText(variantName, optionsText);
+        const isSizeVariantName = isSizeVariant(variantName);
 
         return {
             optionsText: options.join(', '),
-            stockByOption: isSizeVariant
+            stockByOption: isSizeVariantName
                 ? options.reduce<Record<string, number>>((acc, option) => {
                     acc[option] = Math.max(0, stockByOption?.[option] ?? 0);
                     return acc;
@@ -482,7 +461,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             const candidate = normalizeVariantOption(variant.name, rawValue);
             if (!candidate) return variant;
 
-            const currentOptions = getNormalizedVariantOptions(variant.name, variant.optionsText);
+            const currentOptions = getNormalizedOptionsFromText(variant.name, variant.optionsText);
             if (currentOptions.includes(candidate)) return variant;
 
             added = true;
@@ -761,13 +740,20 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                     {fieldErrors.price && <span className="field-error-msg">{fieldErrors.price}</span>}
                                 </div>
                                 <div className={`form-group${fieldErrors.stock ? ' form-group--error' : ''}`}>
-                                    <label>Stock disponible</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={stock}
-                                        onChange={e => { setStock(e.target.value); if (fieldErrors.stock) setFieldErrors(prev => { const n = {...prev}; delete n.stock; return n; }); }}
-                                    />
+                                    <label>{managesStockFromVariants ? 'Stock total' : 'Stock disponible'}</label>
+                                    {managesStockFromVariants ? (
+                                        <div className="stock-derived-card">
+                                            <strong>{derivedVariantStock}</strong>
+                                            <span>Se calcula automáticamente desde los talles configurados en Variantes.</span>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={stock}
+                                            onChange={e => { setStock(e.target.value); if (fieldErrors.stock) setFieldErrors(prev => { const n = {...prev}; delete n.stock; return n; }); }}
+                                        />
+                                    )}
                                     {fieldErrors.stock && <span className="field-error-msg">{fieldErrors.stock}</span>}
                                 </div>
                                 <div className="form-group">
@@ -1058,8 +1044,8 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                     <div className="options-editor">
                                                         <div className="options-list">
                                                             {(() => {
-                                                                const isTalleVariant = v.name.toLowerCase().startsWith('talle');
-                                                                const options = getNormalizedVariantOptions(v.name, v.optionsText);
+                                                                const isTalleVariant = isSizeVariant(v.name);
+                                                                const options = getNormalizedOptionsFromText(v.name, v.optionsText);
                                                                 const shouldCollapseOptions = options.length > DEFAULT_VISIBLE_VARIANT_OPTIONS;
                                                                 const isExpanded = expandedVariantOptions[i] || false;
                                                                 const visibleOptions = shouldCollapseOptions && !isExpanded
@@ -1115,7 +1101,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                             })()}
                                                         </div>
                                                         {(() => {
-                                                            const totalOptions = getNormalizedVariantOptions(v.name, v.optionsText).length;
+                                                            const totalOptions = getNormalizedOptionsFromText(v.name, v.optionsText).length;
                                                             if (totalOptions <= DEFAULT_VISIBLE_VARIANT_OPTIONS) return null;
 
                                                             const isExpanded = expandedVariantOptions[i] || false;

@@ -6,9 +6,7 @@ export const INVALID_PRODUCT_PRICE_MESSAGE = 'Este producto no esta disponible p
 
 const INVALID_PRODUCT_DATA_MESSAGE = 'No se pudo procesar la compra porque los datos del producto son invalidos.';
 
-export interface CreateOrderPayload {
-  buyerName: string;
-  buyerEmail: string;
+export interface OrderLineItemPayload {
   productId: string;
   productName: string;
   productImage: string;
@@ -16,25 +14,53 @@ export interface CreateOrderPayload {
   unitPrice: number;
   totalPrice: number;
   unitsConfig: UnitVariants[];
-  paymentMethod: string;
-  shippingMethod?: string;
 }
 
-const validateOrderPayload = (payload: CreateOrderPayload): string | null => {
-  if (payload.productName.trim() === '') {
+export interface CreateOrderPayload {
+  buyerName: string;
+  buyerEmail: string;
+  items: OrderLineItemPayload[];
+  paymentMethod: string;
+  shippingMethod?: string;
+  shippingCost?: number | null;
+  totalPrice: number;
+}
+
+const validateOrderItemPayload = (item: OrderLineItemPayload): string | null => {
+  if (item.productName.trim() === '') {
     return INVALID_PRODUCT_DATA_MESSAGE;
   }
 
-  if (!Number.isInteger(payload.quantity) || payload.quantity <= 0) {
+  if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
     return 'No se pudo procesar la compra porque la cantidad seleccionada es invalida.';
   }
 
-  if (!Number.isFinite(payload.unitPrice) || payload.unitPrice <= 0) {
+  if (!Number.isFinite(item.unitPrice) || item.unitPrice <= 0) {
     return INVALID_PRODUCT_PRICE_MESSAGE;
   }
 
-  if (!Number.isFinite(payload.totalPrice) || payload.totalPrice <= 0) {
+  if (!Number.isFinite(item.totalPrice) || item.totalPrice <= 0) {
     return 'No se pudo procesar la compra porque el total calculado es invalido.';
+  }
+
+  return null;
+};
+
+const validateOrderPayload = (payload: CreateOrderPayload): string | null => {
+  if (!Array.isArray(payload.items) || payload.items.length === 0) {
+    return 'No hay productos en el carrito para procesar la compra.';
+  }
+
+  for (const item of payload.items) {
+    const itemValidationError = validateOrderItemPayload(item);
+
+    if (itemValidationError) {
+      return itemValidationError;
+    }
+  }
+
+  if (!Number.isFinite(payload.totalPrice) || payload.totalPrice <= 0) {
+    return 'No se pudo procesar la compra porque el total final es invalido.';
   }
 
   return null;
@@ -64,20 +90,24 @@ export const createOrder = async (payload: CreateOrderPayload): Promise<void> =>
   }
 
   try {
-    await supabase.from('ventas').insert({
-      buyer_name: payload.buyerName || null,
-      buyer_email: payload.buyerEmail || null,
-      product_id: payload.productId ? Number(payload.productId) : null,
-      product_name: payload.productName,
-      product_image: payload.productImage,
-      quantity: payload.quantity,
-      unit_price: payload.unitPrice,
-      total_price: payload.totalPrice,
-      units_config: payload.unitsConfig,
-      payment_method: payload.paymentMethod,
-      payment_status: 'pendiente',
-      shipping_method: payload.shippingMethod ?? null,
-    });
+    const shippingSurcharge = Number.isFinite(payload.shippingCost) ? Number(payload.shippingCost) : 0;
+
+    await supabase.from('ventas').insert(
+      payload.items.map((item, index) => ({
+        buyer_name: payload.buyerName || null,
+        buyer_email: payload.buyerEmail || null,
+        product_id: item.productId ? Number(item.productId) : null,
+        product_name: item.productName,
+        product_image: item.productImage,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total_price: item.totalPrice + (index === 0 ? shippingSurcharge : 0),
+        units_config: item.unitsConfig,
+        payment_method: payload.paymentMethod,
+        payment_status: 'pendiente',
+        shipping_method: payload.shippingMethod ?? null,
+      }))
+    );
   } catch {
     // Silent — payment flow continues even if order save fails
   }
@@ -85,7 +115,7 @@ export const createOrder = async (payload: CreateOrderPayload): Promise<void> =>
 
 export interface MpPreferenceResult {
   init_point: string;
-  order_id: string;
+  order_ids: string[];
 }
 
 /** Llama al backend para crear una preferencia de Mercado Pago y registrar la venta. */
@@ -104,14 +134,10 @@ export const createMpPreference = async (
     body: JSON.stringify({
       buyerName: payload.buyerName,
       buyerEmail: payload.buyerEmail,
-      productId: payload.productId,
-      productName: payload.productName,
-      productImage: payload.productImage,
-      quantity: payload.quantity,
-      unitPrice: payload.unitPrice,
-      totalPrice: payload.totalPrice,
-      unitsConfig: payload.unitsConfig,
+      items: payload.items,
       shippingMethod: payload.shippingMethod,
+      shippingCost: payload.shippingCost,
+      totalPrice: payload.totalPrice,
     }),
   });
 
@@ -121,7 +147,7 @@ export const createMpPreference = async (
   }
 
   const data = await res.json();
-  return { init_point: data.init_point, order_id: data.order_id };
+  return { init_point: data.init_point, order_ids: data.order_ids ?? [] };
 };
 
 /** Cancela una orden MP pendiente (usuario volvió sin pagar). Restaura stock en el backend. */

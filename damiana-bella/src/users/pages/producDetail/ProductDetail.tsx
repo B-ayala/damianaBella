@@ -12,6 +12,13 @@ import { useCartStore } from '../../../store/cartStore';
 import type { UnitVariants } from '../../../store/cartStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
+import {
+  areUnitVariantSelectionsValid,
+  getInvalidVariantSelections,
+  getMissingVariantSelections,
+  isVariantOptionAvailable,
+  sanitizeSelectedVariants,
+} from '../../../utils/productVariants';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -58,6 +65,24 @@ const ProductDetail = () => {
     setIsMainImageReady(currentImage === '');
   }, [currentImage, product]);
 
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    setSelectedVariants((prev) => {
+      const sanitized = sanitizeSelectedVariants(product, prev);
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(sanitized);
+
+      if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === sanitized[key])) {
+        return prev;
+      }
+
+      return sanitized;
+    });
+  }, [product]);
+
   if (!product) {
     return <div className="loading">Cargando...</div>;
   }
@@ -88,7 +113,13 @@ const ProductDetail = () => {
   };
 
   const handleVariantChange = (variantName: string, option: string) => {
-    setSelectedVariants(prev => ({ ...prev, [variantName]: option }));
+    const variant = product?.variants?.find((currentVariant) => currentVariant.name === variantName);
+
+    if (!product || !variant || !isVariantOptionAvailable(variant, option)) {
+      return;
+    }
+
+    setSelectedVariants((prev) => sanitizeSelectedVariants(product, { ...prev, [variantName]: option }));
   };
 
   const calculateShipping = async () => {
@@ -126,15 +157,43 @@ const ProductDetail = () => {
   const hasVariants = (product?.variants?.length ?? 0) > 0;
 
   const getMissingVariants = (): string[] => {
-    if (!product?.variants) return [];
-    return product.variants
-      .filter(v => !selectedVariants[v.name])
-      .map(v => v.name);
+    if (!product) return [];
+    return getMissingVariantSelections(product, selectedVariants);
+  };
+
+  const getInvalidVariants = (): string[] => {
+    if (!product) return [];
+    return getInvalidVariantSelections(product, selectedVariants);
+  };
+
+  const validateCurrentSelection = (): string | null => {
+    const invalid = getInvalidVariants();
+
+    if (invalid.length > 0) {
+      setMissingVariants(invalid);
+      return invalid.some((variantName) => variantName.toLowerCase().startsWith('talle'))
+        ? 'El talle seleccionado no tiene stock disponible. Elegí uno con stock.'
+        : `La selección actual de ${invalid.join(', ')} no es válida.`;
+    }
+
+    const missing = getMissingVariants();
+
+    if (missing.length > 0) {
+      setMissingVariants(missing);
+      return `Por favor seleccioná: ${missing.join(', ')}`;
+    }
+
+    return null;
   };
 
   const confirmPurchase = (unitVariants: UnitVariants[]) => {
     if (!hasValidPrice) {
       setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
+    if (!areUnitVariantSelectionsValid(product!, unitVariants)) {
+      setVariantError('No se puede continuar con un talle sin stock. Elegí una opción disponible.');
       return;
     }
 
@@ -169,10 +228,9 @@ const ProductDetail = () => {
       return;
     }
 
-    const missing = getMissingVariants();
-    if (missing.length > 0) {
-      setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
-      setMissingVariants(missing);
+    const selectionError = validateCurrentSelection();
+    if (selectionError) {
+      setVariantError(selectionError);
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -192,10 +250,9 @@ const ProductDetail = () => {
       return;
     }
 
-    const missing = getMissingVariants();
-    if (missing.length > 0) {
-      setVariantError(`Por favor seleccioná: ${missing.join(', ')}`);
-      setMissingVariants(missing);
+    const selectionError = validateCurrentSelection();
+    if (selectionError) {
+      setVariantError(selectionError);
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -308,9 +365,7 @@ const ProductDetail = () => {
                       {variant.options.map((option) => {
                         const isColor = variant.name.toLowerCase() === 'color';
                         const isTalle = variant.name.toLowerCase().startsWith('talle');
-
-                        // Verificar si este talle tiene stock
-                        const isTalleOutOfStock = isTalle && variant.stockByOption && variant.stockByOption[option] === 0;
+                        const isTalleOutOfStock = isTalle && !isVariantOptionAvailable(variant, option);
 
                         const { name: colorName, hex: colorHex } = isColor
                           ? parseColorOption(option)
@@ -323,7 +378,6 @@ const ProductDetail = () => {
                             style={{ backgroundColor: colorHex }}
                             title={colorName}
                             onClick={() => handleVariantChange(variant.name, option)}
-                            disabled={isTalleOutOfStock}
                           />
                         ) : (
                           <div

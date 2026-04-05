@@ -1178,6 +1178,28 @@
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
 
+.stock-derived-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 44px;
+    padding: 0.8rem 0.9rem;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(184, 165, 200, 0.08) 0%, rgba(255, 255, 255, 0.92) 100%);
+    border: 1px solid rgba(184, 165, 200, 0.24);
+}
+
+.stock-derived-card strong {
+    font-size: 1rem;
+    color: var(--text-dark);
+}
+
+.stock-derived-card span {
+    font-size: 0.8rem;
+    color: #6b6474;
+    line-height: 1.4;
+}
+
 .option-tag__remove {
     display: inline-flex;
     align-items: center;

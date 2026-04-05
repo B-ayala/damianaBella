@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import type { Product, Variant } from '../../../types/product';
 import type { UnitVariants } from '../../../store/cartStore';
 import { parseColorOption } from '../../../utils/constants';
+import {
+  areUnitVariantSelectionsValid,
+  getInvalidVariantSelections,
+  getMissingVariantSelections,
+  isVariantOptionAvailable,
+} from '../../../utils/productVariants';
 import './PurchaseVariantModal.css';
 
 interface Props {
@@ -16,11 +22,13 @@ interface Props {
 const PurchaseVariantModal = ({ isOpen, onClose, onConfirm, product, quantity, initialVariants }: Props) => {
   const [mode, setMode] = useState<'ask' | 'custom'>('ask');
   const [perUnitVariants, setPerUnitVariants] = useState<UnitVariants[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setMode('ask');
       setPerUnitVariants(Array.from({ length: quantity }, () => ({ ...initialVariants })));
+      setError('');
     }
   }, [isOpen, quantity, initialVariants]);
 
@@ -29,11 +37,43 @@ const PurchaseVariantModal = ({ isOpen, onClose, onConfirm, product, quantity, i
   const variants = product.variants ?? [];
 
   const handleUnitVariantChange = (unitIndex: number, variantName: string, option: string) => {
+    const variant = variants.find((currentVariant) => currentVariant.name === variantName);
+
+    if (!variant || !isVariantOptionAvailable(variant, option)) {
+      return;
+    }
+
+    setError('');
     setPerUnitVariants(prev => {
       const updated = [...prev];
       updated[unitIndex] = { ...updated[unitIndex], [variantName]: option };
       return updated;
     });
+  };
+
+  const hasInvalidInitialSelection = getInvalidVariantSelections(product, initialVariants).length > 0;
+
+  const validateBeforeConfirm = (nextVariants: UnitVariants[]): boolean => {
+    if (areUnitVariantSelectionsValid(product, nextVariants)) {
+      setError('');
+      return true;
+    }
+
+    const invalidUnitIndex = nextVariants.findIndex((selection) => getInvalidVariantSelections(product, selection).length > 0);
+    if (invalidUnitIndex >= 0) {
+      setError(`La unidad ${invalidUnitIndex + 1} tiene un talle sin stock. Elegí una opción disponible.`);
+      return false;
+    }
+
+    const missingUnitIndex = nextVariants.findIndex((selection) => getMissingVariantSelections(product, selection).length > 0);
+    if (missingUnitIndex >= 0) {
+      const missing = getMissingVariantSelections(product, nextVariants[missingUnitIndex]);
+      setError(`Completá ${missing.join(', ')} en la unidad ${missingUnitIndex + 1}.`);
+      return false;
+    }
+
+    setError('Selección de variantes inválida.');
+    return false;
   };
 
   return (
@@ -75,7 +115,13 @@ const PurchaseVariantModal = ({ isOpen, onClose, onConfirm, product, quantity, i
             <div className="pvm-actions">
               <button
                 className="pvm-btn pvm-btn--primary"
-                onClick={() => onConfirm(Array.from({ length: quantity }, () => ({ ...initialVariants })))}
+                onClick={() => {
+                  const nextVariants = Array.from({ length: quantity }, () => ({ ...initialVariants }));
+                  if (validateBeforeConfirm(nextVariants)) {
+                    onConfirm(nextVariants);
+                  }
+                }}
+                disabled={hasInvalidInitialSelection}
               >
                 Sí, aplicar a todas las unidades
               </button>
@@ -107,11 +153,24 @@ const PurchaseVariantModal = ({ isOpen, onClose, onConfirm, product, quantity, i
               <button className="pvm-btn pvm-btn--secondary" onClick={() => setMode('ask')}>
                 Volver
               </button>
-              <button className="pvm-btn pvm-btn--primary" onClick={() => onConfirm(perUnitVariants)}>
+              <button
+                className="pvm-btn pvm-btn--primary"
+                onClick={() => {
+                  if (validateBeforeConfirm(perUnitVariants)) {
+                    onConfirm(perUnitVariants);
+                  }
+                }}
+              >
                 Confirmar selección
               </button>
             </div>
           </>
+        )}
+
+        {(error || hasInvalidInitialSelection) && (
+          <p className="pvm-error">
+            {error || 'La selección actual incluye un talle sin stock. Elegí uno disponible antes de continuar.'}
+          </p>
         )}
       </div>
     </div>
@@ -133,8 +192,7 @@ const VariantSelector = ({ variant, selected, onChange }: VariantSelectorProps) 
       <label className="pvm-variant-label">{variant.name}:</label>
       <div className="pvm-variant-options">
         {variant.options.map(option => {
-          // Verificar si este talle tiene stock
-          const isTalleOutOfStock = isTalle && variant.stockByOption && variant.stockByOption[option] === 0;
+          const isTalleOutOfStock = isTalle && !isVariantOptionAvailable(variant, option);
 
           const { name: colorName, hex } = isColor
             ? parseColorOption(option)
@@ -146,47 +204,22 @@ const VariantSelector = ({ variant, selected, onChange }: VariantSelectorProps) 
               style={{ backgroundColor: hex }}
               title={colorName}
               onClick={() => onChange(option)}
-              disabled={isTalleOutOfStock}
             />
           ) : (
-            <div
-              key={option}
-              style={{
-                position: 'relative',
-                display: 'inline-flex',
-                ...(isTalleOutOfStock && { opacity: 0.5 })
-              }}
-            >
+            <div key={option} className={`pvm-option-wrap${isTalleOutOfStock ? ' pvm-option-wrap--soldout' : ''}`}>
               <button
-                className={`pvm-option-btn ${selected === option ? 'pvm-option-btn--selected' : ''}`}
+                className={`pvm-option-btn ${selected === option ? 'pvm-option-btn--selected' : ''}${isTalleOutOfStock ? ' pvm-option-btn--soldout' : ''}`}
                 onClick={() => {
                   if (!isTalleOutOfStock) {
                     onChange(option);
                   }
                 }}
                 disabled={isTalleOutOfStock}
-                style={{
-                  cursor: isTalleOutOfStock ? 'not-allowed' : 'pointer',
-                  pointerEvents: isTalleOutOfStock ? 'none' : 'auto',
-                }}
               >
                 {isTalle ? option.toUpperCase() : option}
               </button>
               {isTalleOutOfStock && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: -4,
-                    right: -4,
-                    height: '2px',
-                    backgroundColor: 'currentColor',
-                    transform: 'rotate(-45deg)',
-                    transformOrigin: 'center',
-                    pointerEvents: 'none',
-                    opacity: 0.8,
-                  }}
-                />
+                <span className="pvm-option-strike" aria-hidden="true" />
               )}
             </div>
           );

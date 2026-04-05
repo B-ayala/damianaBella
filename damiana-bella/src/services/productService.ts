@@ -2,12 +2,16 @@ import { supabase } from '../config/supabaseClient';
 import { type AdminProduct } from '../admin/store/adminStore';
 import type { Product } from '../types/product';
 import { apiFetch } from '../utils/apiFetch';
+import { getProductStockFromVariants, sanitizeProductVariants } from '../utils/productVariants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const mapDbRowToProduct = (row: any): Product => {
   const images: string[] = row.images && row.images.length > 0
     ? row.images
     : row.image_url ? [row.image_url] : [];
+  const variants = sanitizeProductVariants(row.variants);
+  const stockFromVariants = getProductStockFromVariants(variants);
+
   return {
     id: row.id,
     name: row.name,
@@ -18,10 +22,10 @@ export const mapDbRowToProduct = (row: any): Product => {
     description: row.description,
     category: row.category,
     discount: row.discount,
-    stock: row.stock,
+    stock: stockFromVariants ?? row.stock,
     condition: row.condition,
     freeShipping: row.free_shipping,
-    variants: row.variants,
+    variants,
     specifications: row.specifications,
     features: row.features,
     faqs: row.faqs,

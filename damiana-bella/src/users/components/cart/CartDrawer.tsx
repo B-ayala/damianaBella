@@ -7,6 +7,7 @@ import { useAdminStore } from '../../../admin/store/adminStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
+import { areUnitVariantSelectionsValid } from '../../../utils/productVariants';
 import AuthModal from '../auth/AuthModal';
 import PurchaseVariantModal from '../PurchaseVariantModal/PurchaseVariantModal';
 import './CartDrawer.css';
@@ -32,28 +33,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const currentUser = useAdminStore((s) => s.currentUser);
   const items = useCartStore((s) => s.items);
-  const setItem = useCartStore((s) => s.setItem);
   const removeItem = useCartStore((s) => s.removeItem);
+  const setUnitVariants = useCartStore((s) => s.setUnitVariants);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
 
   const total = items.reduce((sum, i) => sum + getProductPricing(i.product).finalPrice * i.quantity, 0);
 
-  const continueToCheckout = (unitVariants: UnitVariants[]) => {
+  const continueToCheckout = (unitVariants?: UnitVariants[]) => {
     const cartItem = items[0];
-    if (!cartItem) {
-      return;
+    if (cartItem && unitVariants) {
+      setUnitVariants(cartItem.product.id, unitVariants);
     }
-
-    const pricing = getProductPricing(cartItem.product);
-    setItem({
-      product: cartItem.product,
-      quantity: cartItem.quantity,
-      unitVariants,
-      unitPrice: pricing.finalPrice,
-      totalPrice: pricing.finalPrice * cartItem.quantity,
-      source: 'cart',
-    });
 
     setIsVariantModalOpen(false);
     onClose();
@@ -68,18 +59,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
 
   const handleCheckout = () => {
     const cartItem = items[0];
-    if (!cartItem) {
+    if (items.length === 0 || !cartItem) {
       return;
     }
 
     const hasVariants = (cartItem.product.variants?.length ?? 0) > 0;
+    const hasInvalidVariants = hasVariants && !areUnitVariantSelectionsValid(cartItem.product, cartItem.unitVariants);
 
-    if (cartItem.quantity > 1 && hasVariants) {
+    if (items.length === 1 && hasVariants && (cartItem.quantity > 1 || hasInvalidVariants)) {
       setIsVariantModalOpen(true);
       return;
     }
 
-    continueToCheckout(cartItem.unitVariants);
+    continueToCheckout();
   };
 
   return (

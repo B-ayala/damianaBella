@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '../types/product';
 import { getProductPricing } from '../utils/pricing';
+import { areUnitVariantSelectionsValid } from '../utils/productVariants';
 
 export type UnitVariants = { [key: string]: string };
 export type CheckoutItemSource = 'cart' | 'direct';
@@ -27,6 +28,7 @@ interface CartState {
   addItem: (product: Product, qty?: number, unitVariants?: UnitVariants[]) => void;
   removeItem: (productId: string | number) => void;
   updateQuantity: (productId: string | number, delta: number) => void;
+  setUnitVariants: (productId: string | number, unitVariants: UnitVariants[]) => void;
   clearCart: () => void;
   totalItems: () => number;
   setItem: (item: CheckoutItem | null) => void;
@@ -61,10 +63,16 @@ const sanitizeCartItem = (cartItem: CartItem): CartItem | null => {
     return null;
   }
 
+  const unitVariants = buildUnitVariants(quantity, cartItem.unitVariants);
+
+  if (!areUnitVariantSelectionsValid(cartItem.product, unitVariants)) {
+    return null;
+  }
+
   return {
     ...cartItem,
     quantity,
-    unitVariants: buildUnitVariants(quantity, cartItem.unitVariants),
+    unitVariants,
   };
 };
 
@@ -84,12 +92,18 @@ const sanitizeCheckoutItem = (item: CheckoutItem | null): CheckoutItem | null =>
     return null;
   }
 
+  const unitVariants = buildUnitVariants(quantity, item.unitVariants);
+
+  if (!areUnitVariantSelectionsValid(item.product, unitVariants)) {
+    return null;
+  }
+
   const { finalPrice } = getProductPricing(item.product);
 
   return {
     ...item,
     quantity,
-    unitVariants: buildUnitVariants(quantity, item.unitVariants),
+    unitVariants,
     unitPrice: finalPrice,
     totalPrice: finalPrice * quantity,
   };
@@ -140,6 +154,11 @@ export const useCartStore = create<CartState>()(
           }
 
           const nextVariants = buildUnitVariants(quantityToAdd, unitVariants);
+
+          if (!areUnitVariantSelectionsValid(product, nextVariants)) {
+            return state;
+          }
+
           const items = existing
             ? state.items.map((i) =>
                 i.product.id === product.id
@@ -204,6 +223,31 @@ export const useCartStore = create<CartState>()(
               };
             })
             .filter((i) => i.quantity > 0);
+
+          return {
+            items,
+            item: syncCheckoutItemWithCart(items, state.item),
+          };
+        }),
+
+      setUnitVariants: (productId, unitVariants) =>
+        set((state) => {
+          const items = state.items.map((cartItem) => {
+            if (cartItem.product.id !== productId) {
+              return cartItem;
+            }
+
+            const nextUnitVariants = buildUnitVariants(cartItem.quantity, unitVariants);
+
+            if (!areUnitVariantSelectionsValid(cartItem.product, nextUnitVariants)) {
+              return cartItem;
+            }
+
+            return {
+              ...cartItem,
+              unitVariants: nextUnitVariants,
+            };
+          });
 
           return {
             items,

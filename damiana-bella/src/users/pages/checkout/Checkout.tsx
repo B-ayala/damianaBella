@@ -268,7 +268,21 @@ const Checkout = () => {
   const navigate = useNavigate();
   const cartItems = useCartStore((s) => s.items);
   const item = useCartStore((s) => s.item);
-  const setItem = useCartStore((s) => s.setItem);
+  const directCheckoutItem = item?.source === 'direct' ? item : null;
+  const checkoutItems = directCheckoutItem
+    ? [directCheckoutItem]
+    : cartItems.map((cartItem) => {
+        const unitPrice = getProductPricing(cartItem.product).finalPrice;
+
+        return {
+          product: cartItem.product,
+          quantity: cartItem.quantity,
+          unitVariants: cartItem.unitVariants,
+          unitPrice,
+          totalPrice: unitPrice * cartItem.quantity,
+          source: 'cart' as const,
+        };
+      });
 
   useInitialLoadTask('route', loading);
 
@@ -293,28 +307,6 @@ const Checkout = () => {
   }, [addrCity]);
 
   useEffect(() => {
-    if (item || cartItems.length !== 1) {
-      return;
-    }
-
-    const cartItem = cartItems[0];
-    const unitPrice = getProductPricing(cartItem.product).finalPrice;
-
-    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-      return;
-    }
-
-    setItem({
-      product: cartItem.product,
-      quantity: cartItem.quantity,
-      unitVariants: cartItem.unitVariants,
-      unitPrice,
-      totalPrice: unitPrice * cartItem.quantity,
-      source: 'cart',
-    });
-  }, [cartItems, item, setItem]);
-
-  useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
   }, []);
@@ -327,10 +319,10 @@ const Checkout = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    if (!loading && !item) {
+    if (!loading && checkoutItems.length === 0) {
       navigate('/products');
     }
-  }, [loading, item, navigate]);
+  }, [checkoutItems.length, loading, navigate]);
 
   if (loading) {
     return (
@@ -380,12 +372,32 @@ const Checkout = () => {
     );
   }
 
-  if (!item) return null;
+  if (checkoutItems.length === 0) return null;
 
-  const { product, quantity, unitVariants, unitPrice, totalPrice } = item;
-  const hasValidPrice = Number.isFinite(unitPrice) && unitPrice > 0 && Number.isFinite(totalPrice) && totalPrice > 0;
+  const itemsSubtotal = checkoutItems.reduce(
+    (sum, checkoutItem) => sum + (Number.isFinite(checkoutItem.totalPrice) ? checkoutItem.totalPrice : 0),
+    0
+  );
+  const hasValidPrice =
+    checkoutItems.length > 0 &&
+    checkoutItems.every(
+      (checkoutItem) =>
+        Number.isFinite(checkoutItem.unitPrice) &&
+        checkoutItem.unitPrice > 0 &&
+        Number.isFinite(checkoutItem.totalPrice) &&
+        checkoutItem.totalPrice > 0
+    );
   const shippingCost = SHIPPING_COSTS[selectedShipping];
-  const grandTotal = totalPrice + (shippingCost ?? 0);
+  const grandTotal = itemsSubtotal + (shippingCost ?? 0);
+  const orderItemsPayload = checkoutItems.map((checkoutItem) => ({
+    productId: String(checkoutItem.product.id),
+    productName: checkoutItem.product.name,
+    productImage: checkoutItem.product.image,
+    quantity: checkoutItem.quantity,
+    unitPrice: checkoutItem.unitPrice,
+    totalPrice: checkoutItem.totalPrice,
+    unitsConfig: checkoutItem.unitVariants,
+  }));
   const canProceed =
     hasValidPrice &&
     buyerName.trim() !== '' &&
@@ -534,27 +546,30 @@ const Checkout = () => {
       .join(' | ');
   };
 
-  const allSame =
-    unitVariants.length <= 1 ||
-    unitVariants.every(
-      (uv) => JSON.stringify(uv) === JSON.stringify(unitVariants[0])
-    );
-
   const buildWhatsAppMessage = (): string => {
-    const lines: string[] = [
-      `Hola, este es mi comprobante de transferencia y el resumen de lo que compré:`,
-      ``,
-      `Producto: ${product.name}`,
-      `Cantidad: ${quantity}`,
-    ];
+    const lines: string[] = ['Hola, este es mi comprobante de transferencia y el resumen de lo que compré:', ''];
 
-    if (allSame && Object.keys(unitVariants[0] ?? {}).length > 0) {
-      lines.push(`Variantes: ${buildVariantLine(unitVariants[0])}`);
-    } else if (!allSame) {
-      unitVariants.forEach((uv, i) => {
-        lines.push(`  Unidad ${i + 1}: ${buildVariantLine(uv)}`);
-      });
-    }
+    checkoutItems.forEach((checkoutItem, index) => {
+      const allSame =
+        checkoutItem.unitVariants.length <= 1 ||
+        checkoutItem.unitVariants.every(
+          (uv) => JSON.stringify(uv) === JSON.stringify(checkoutItem.unitVariants[0])
+        );
+
+      lines.push(`Producto ${index + 1}: ${checkoutItem.product.name}`);
+      lines.push(`Cantidad: ${checkoutItem.quantity}`);
+
+      if (allSame && Object.keys(checkoutItem.unitVariants[0] ?? {}).length > 0) {
+        lines.push(`Variantes: ${buildVariantLine(checkoutItem.unitVariants[0])}`);
+      } else if (!allSame) {
+        checkoutItem.unitVariants.forEach((uv, unitIndex) => {
+          lines.push(`  Unidad ${unitIndex + 1}: ${buildVariantLine(uv)}`);
+        });
+      }
+
+      lines.push(`Subtotal producto: $${fmt(checkoutItem.totalPrice)}`);
+      lines.push('');
+    });
 
     const shippingLine =
       shippingCost === 0
@@ -564,8 +579,7 @@ const Checkout = () => {
         : `Envío: $${fmt(shippingCost)} (Correo Argentino)`;
 
     lines.push(
-      ``,
-      `Subtotal: $${fmt(totalPrice)}`,
+      `Subtotal: $${fmt(itemsSubtotal)}`,
       shippingLine,
       `Total: $${fmt(grandTotal)}`,
       ``,
@@ -598,15 +612,11 @@ const Checkout = () => {
         await createOrder({
           buyerName: buyerName.trim(),
           buyerEmail: buyerEmail.trim(),
-          productId: String(product.id),
-          productName: product.name,
-          productImage: product.image,
-          quantity,
-          unitPrice,
-          totalPrice: grandTotal,
-          unitsConfig: unitVariants,
+          items: orderItemsPayload,
           paymentMethod: 'transfer',
           shippingMethod: selectedShipping,
+          shippingCost,
+          totalPrice: grandTotal,
         });
         const phoneNumber = '5491141442409';
         const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
@@ -627,25 +637,26 @@ const Checkout = () => {
     setSubmitting(true);
     setMpReady(false);
     try {
-      const { init_point, order_id } = await createMpPreference({
+      const { init_point, order_ids } = await createMpPreference({
         buyerName: buyerName.trim(),
         buyerEmail: buyerEmail.trim(),
-        productId: String(product.id),
-        productName: product.name,
-        productImage: product.image,
-        quantity,
-        unitPrice,
-        totalPrice: grandTotal,
-        unitsConfig: unitVariants,
+        items: orderItemsPayload,
         shippingMethod: selectedShipping,
+        shippingCost,
+        totalPrice: grandTotal,
       });
       sessionStorage.setItem('mp_last_order', JSON.stringify({
-        productName: product.name,
-        productImage: product.image,
-        quantity,
+        items: checkoutItems.map((checkoutItem) => ({
+          productName: checkoutItem.product.name,
+          productImage: checkoutItem.product.image,
+          quantity: checkoutItem.quantity,
+          totalPrice: checkoutItem.totalPrice,
+        })),
+        itemsSubtotal,
         grandTotal,
+        source: directCheckoutItem ? 'direct' : 'cart',
       }));
-      sessionStorage.setItem('mp_order_id', order_id);
+      sessionStorage.setItem('mp_order_ids', JSON.stringify(order_ids));
       window.location.href = init_point;
     } catch (err) {
       setMpError(err instanceof Error ? err.message : 'No se pudo conectar con el sistema de pagos. Intentá de nuevo o elegí transferencia.');
@@ -663,44 +674,28 @@ const Checkout = () => {
           {/* Resumen del producto */}
           <section className="checkout-section">
             <h2 className="checkout-section-title">Tu pedido</h2>
-            <div className="checkout-product-card">
-              <img
-                src={product.image}
-                alt={product.name}
-                className="checkout-product-image"
-              />
-              <div className="checkout-product-info">
-                <p className="checkout-product-name">{product.name}</p>
-                <p className="checkout-product-qty">Cantidad: {quantity}</p>
+            {checkoutItems.map((checkoutItem) => {
+              const { product, quantity, unitVariants, unitPrice, totalPrice } = checkoutItem;
+              const allSame =
+                unitVariants.length <= 1 ||
+                unitVariants.every(
+                  (uv) => JSON.stringify(uv) === JSON.stringify(unitVariants[0])
+                );
 
-                {allSame && Object.keys(unitVariants[0] ?? {}).length > 0 && (
-                  <div className="checkout-variants-summary">
-                    {Object.entries(unitVariants[0]).map(([name, val]) => {
-                      const isColor = name.toLowerCase() === 'color';
-                      const { name: colorName, hex } = isColor
-                        ? parseColorOption(val)
-                        : { name: val, hex: '' };
-                      return (
-                        <span key={name} className="checkout-variant-tag">
-                          {isColor && (
-                            <span
-                              className="checkout-variant-color-dot"
-                              style={{ backgroundColor: hex }}
-                            />
-                          )}
-                          <strong>{name}:</strong> {isColor ? colorName : val.toUpperCase()}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
+              return (
+                <div key={String(product.id)} className="checkout-product-card">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="checkout-product-image"
+                  />
+                  <div className="checkout-product-info">
+                    <p className="checkout-product-name">{product.name}</p>
+                    <p className="checkout-product-qty">Cantidad: {quantity}</p>
 
-                {!allSame && (
-                  <div className="checkout-per-unit-variants">
-                    {unitVariants.map((uv, i) => (
-                      <div key={i} className="checkout-unit-row">
-                        <span className="checkout-unit-label">Unidad {i + 1}:</span>
-                        {Object.entries(uv).map(([name, val]) => {
+                    {allSame && Object.keys(unitVariants[0] ?? {}).length > 0 && (
+                      <div className="checkout-variants-summary">
+                        {Object.entries(unitVariants[0]).map(([name, val]) => {
                           const isColor = name.toLowerCase() === 'color';
                           const { name: colorName, hex } = isColor
                             ? parseColorOption(val)
@@ -718,13 +713,41 @@ const Checkout = () => {
                           );
                         })}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )}
 
-                <p className="checkout-product-price">${fmt(unitPrice)} c/u</p>
-              </div>
-            </div>
+                    {!allSame && (
+                      <div className="checkout-per-unit-variants">
+                        {unitVariants.map((uv, i) => (
+                          <div key={i} className="checkout-unit-row">
+                            <span className="checkout-unit-label">Unidad {i + 1}:</span>
+                            {Object.entries(uv).map(([name, val]) => {
+                              const isColor = name.toLowerCase() === 'color';
+                              const { name: colorName, hex } = isColor
+                                ? parseColorOption(val)
+                                : { name: val, hex: '' };
+                              return (
+                                <span key={name} className="checkout-variant-tag">
+                                  {isColor && (
+                                    <span
+                                      className="checkout-variant-color-dot"
+                                      style={{ backgroundColor: hex }}
+                                    />
+                                  )}
+                                  <strong>{name}:</strong> {isColor ? colorName : val.toUpperCase()}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="checkout-product-price">${fmt(unitPrice)} c/u</p>
+                    <p className="checkout-product-price">Subtotal: ${fmt(totalPrice)}</p>
+                  </div>
+                </div>
+              );
+            })}
           </section>
 
           {/* Datos del comprador */}
@@ -913,13 +936,15 @@ const Checkout = () => {
             <h3 className="checkout-summary-title">Resumen de compra</h3>
 
             <ul className="checkout-summary-list">
-              <li>
-                <span>
-                  {product.name}
-                  {quantity > 1 && <span className="checkout-summary-qty"> ×{quantity}</span>}
-                </span>
-                <span>${fmt(totalPrice)}</span>
-              </li>
+              {checkoutItems.map((checkoutItem) => (
+                <li key={String(checkoutItem.product.id)}>
+                  <span>
+                    {checkoutItem.product.name}
+                    {checkoutItem.quantity > 1 && <span className="checkout-summary-qty"> ×{checkoutItem.quantity}</span>}
+                  </span>
+                  <span>${fmt(checkoutItem.totalPrice)}</span>
+                </li>
+              ))}
               <li>
                 <span>Envío</span>
                 {shippingCost === 0 ? (
@@ -937,7 +962,7 @@ const Checkout = () => {
             <div className="checkout-summary-total">
               <span>Total</span>
               {shippingCost === null ? (
-                <span>${fmt(totalPrice)} + envío</span>
+                <span>${fmt(itemsSubtotal)} + envío</span>
               ) : (
                 <span>${fmt(grandTotal)}</span>
               )}
