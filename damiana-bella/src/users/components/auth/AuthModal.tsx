@@ -838,7 +838,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
               )}
               {emailErrorType === 'pending' && (
                 <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
-                  <Box>Este correo ya fue registrado pero todavía no fue confirmado. Revisá tu bandeja de entrada (o spam).</Box>
+                    <Box>Ese correo ya se encuentra registrado. Si todavia no confirmaste la cuenta, revisa tu bandeja de entrada (o spam).</Box>
                   <Button
                     type="button"
                     onClick={handleResendEmail}
