@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useCartStore } from '../../../store/cartStore';
 import { cancelMpOrder } from '../../../services/orderService';
+import SEO from '../../../components/common/SEO/SEO';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './CheckoutResult.css';
 
@@ -122,6 +123,7 @@ const CheckoutResult = () => {
 
     return (
         <div className="checkout-result-page">
+            <SEO title="Resultado de Compra" description="Estado de tu compra en LIA." path="/checkout/result" />
             <div className={`checkout-result-card ${color}`}>
                 <div className="checkout-result-icon">{icon}</div>
                 <h1 className="checkout-result-title">{title}</h1>

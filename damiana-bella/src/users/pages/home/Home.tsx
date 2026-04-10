@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Carousel from '../../components/header/Carousel';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
+import SEO from '../../../components/common/SEO/SEO';
 import { fetchFeaturedProducts, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import { useInitialLoadTask, useInitialLoad } from '../../../components/common/InitialLoad/InitialLoadProvider';
@@ -23,6 +24,12 @@ const Home = () => {
 
   return (
     <div className="home" style={{ visibility: isInitialLoading ? 'hidden' : 'visible' }}>
+      <SEO
+        title="Inicio"
+        description="Tienda online de moda femenina LIA by Damiana Bella. Descubrí ropa, accesorios y las últimas tendencias con envío a todo el país."
+        path="/"
+      />
+      <h1 className="sr-only">LIA — Tienda de Moda Femenina</h1>
       <Carousel onReady={() => setIsCarouselReady(true)} />
 
       <section className="home__featured-products">

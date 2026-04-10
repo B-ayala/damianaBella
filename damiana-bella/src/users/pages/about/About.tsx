@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
+import SEO from '../../../components/common/SEO/SEO';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import { getSiteContent } from '../../../services/siteContentService';
@@ -98,6 +99,11 @@ const About = () => {
 
   return (
     <div className="about-page">
+      <SEO
+        title="Nosotros"
+        description="Conocé la historia de LIA by Damiana Bella. Nuestra misión, visión y valores como marca de moda femenina argentina."
+        path="/about"
+      />
       <div
         className="about-hero"
         style={heroBackgroundImage ? {

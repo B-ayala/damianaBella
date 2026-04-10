@@ -6,6 +6,7 @@ import { parseColorOption } from '../../../utils/constants';
 import { getProductPricing } from '../../../utils/pricing';
 import { createOrder, createMpPreference, INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
 import AuthModal from '../../components/auth/AuthModal';
+import SEO from '../../../components/common/SEO/SEO';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import './Checkout.css';
 
@@ -666,7 +667,13 @@ const Checkout = () => {
 
   return (
     <>
+    <SEO
+      title="Checkout"
+      description="Completá tu compra en LIA. Revisá tu pedido, elegí la forma de entrega y pagá de forma segura."
+      path="/checkout"
+    />
     <div className="checkout-container">
+      <h1 className="sr-only">Finalizar Compra</h1>
       <div className="checkout-content">
         {/* COLUMNA IZQUIERDA */}
         <div className="checkout-left-column">

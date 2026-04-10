@@ -3,6 +3,7 @@ import { FiMail, FiMapPin } from 'react-icons/fi';
 import { FaWhatsapp, FaTiktok, FaFacebook } from 'react-icons/fa';
 import { supabase } from '../../../config/supabaseClient';
 import Modal from '../../../components/common/Modal/Modal';
+import SEO from '../../../components/common/SEO/SEO';
 import type { FooterInfo } from '../../../admin/store/adminStore';
 import { getSiteContent } from '../../../services/siteContentService';
 import './Contact.css';
@@ -119,6 +120,11 @@ const Contact = () => {
 
   return (
     <div className="contact-page">
+      <SEO
+        title="Contacto"
+        description="Contactanos por WhatsApp, redes sociales o email. Estamos para ayudarte con tus compras, consultas y envíos a todo el país."
+        path="/contact"
+      />
       <div className="contact-header">
         <h1>Siempre cerca de ti</h1>
         <p>¿Tienes alguna duda, sugerencia o simplemente quieres saludarnos? ¡Nos encantaría escucharte!</p>

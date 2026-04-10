@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import './Products.css';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
+import SEO from '../../../components/common/SEO/SEO';
 import { fetchProducts, mapDbRowToProduct, fetchCategoriesTree, type Category } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
@@ -83,7 +84,13 @@ const Products = () => {
 
   return (
     <div className="products-page">
+      <SEO
+        title="Catálogo de Productos"
+        description="Explorá nuestro catálogo completo de moda femenina. Ropa, accesorios y más con envío a todo el país."
+        path="/products"
+      />
       <div className="products-container">
+        <h1 className="sr-only">Catálogo de Productos</h1>
 
         {/* Breadcrumb */}
         <nav className="products-breadcrumb" aria-label="breadcrumb">

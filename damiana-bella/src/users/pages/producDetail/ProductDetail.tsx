@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fetchProductById, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import Modal from '../../../components/common/Modal/Modal';
+import SEO from '../../../components/common/SEO/SEO';
 import VariantTable from '../../../components/common/VariantTable/VariantTable';
 import PurchaseVariantModal from '../../components/PurchaseVariantModal/PurchaseVariantModal';
 import { parseColorOption } from '../../../utils/constants';
@@ -295,6 +296,13 @@ const ProductDetail = () => {
 
   return (
     <div className="product-detail">
+      <SEO
+        title={product.name}
+        description={product.description?.slice(0, 160) || `Comprá ${product.name} en LIA. Moda femenina con envío a todo el país.`}
+        path={`/product/${product.id}`}
+        ogImage={product.images?.[0] || product.image}
+        ogType="product"
+      />
       <div className="product-detail__container">
         {/* Layout principal */}
         <div className="product-detail__main">
