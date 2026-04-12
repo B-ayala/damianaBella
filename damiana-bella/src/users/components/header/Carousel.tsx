@@ -130,26 +130,7 @@ const Carousel = ({ onReady }: CarouselProps) => {
     return () => clearInterval(timer);
   }, [currentSlide, slides.length]);
 
-  // Inject preload link for the first carousel image for LCP optimization
-  useEffect(() => {
-    if (slides.length === 0) return;
-    const firstImg = slides[0]?.images[0];
-    if (!firstImg) return;
-    const optimizedUrl = buildCloudinaryUrl(firstImg, {
-      width: window.innerWidth <= 768 ? 600 : 1200,
-      quality: 'auto',
-      format: 'auto'
-    });
-    // Avoid duplicate preload links
-    if (document.querySelector(`link[rel="preload"][href="${optimizedUrl}"]`)) return;
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = optimizedUrl;
-    document.head.appendChild(link);
-  }, [slides]);
-
-  if (slides.length === 0) return null;
+  if (slides.length === 0) return <div className="carousel carousel--skeleton" aria-hidden="true" />;
 
   return (
     <div className="carousel">
@@ -188,10 +169,10 @@ const Carousel = ({ onReady }: CarouselProps) => {
         </motion.div>
       </AnimatePresence>
 
-      <button className="carousel-arrow carousel-arrow-left" onClick={prevSlide}>
+      <button className="carousel-arrow carousel-arrow-left" onClick={prevSlide} aria-label="Anterior">
         <FiChevronLeft />
       </button>
-      <button className="carousel-arrow carousel-arrow-right" onClick={nextSlide}>
+      <button className="carousel-arrow carousel-arrow-right" onClick={nextSlide} aria-label="Siguiente">
         <FiChevronRight />
       </button>
 
@@ -201,6 +182,8 @@ const Carousel = ({ onReady }: CarouselProps) => {
             key={index}
             className={`carousel-dot ${index === currentSlide ? 'active' : ''}`}
             onClick={() => goToSlide(index)}
+            aria-label={`Ir al slide ${index + 1}`}
+            aria-current={index === currentSlide ? 'true' : undefined}
           />
         ))}
       </div>

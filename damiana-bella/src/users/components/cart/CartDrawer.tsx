@@ -37,6 +37,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const setUnitVariants = useCartStore((s) => s.setUnitVariants);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
+  const setItem = useCartStore((s) => s.setItem);
 
   const total = items.reduce((sum, i) => sum + getProductPricing(i.product).finalPrice * i.quantity, 0);
 
@@ -45,6 +46,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     if (cartItem && unitVariants) {
       setUnitVariants(cartItem.product.id, unitVariants);
     }
+
+    // Limpiar cualquier item directo persistido para que checkout muestre todos los del carrito
+    setItem(null);
 
     setIsVariantModalOpen(false);
     onClose();
@@ -80,10 +84,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       <div className={`cart-drawer ${isOpen ? 'active' : ''}`}>
         <div className="cart-drawer__header">
           <h2 className="cart-drawer__title">
-            <FiShoppingCart /> Carrito
+            <FiShoppingCart aria-hidden="true" /> Carrito
           </h2>
-          <button className="cart-drawer__close" onClick={onClose}>
-            <FiX />
+          <button className="cart-drawer__close" onClick={onClose} aria-label="Cerrar carrito">
+            <FiX aria-hidden="true" />
           </button>
         </div>
 
@@ -121,16 +125,18 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                           className="cart-drawer__qty-btn"
                           onClick={() => updateQuantity(item.product.id, -1)}
                           disabled={item.quantity <= 1}
+                          aria-label={`Reducir cantidad de ${item.product.name}`}
                         >
-                          −
+                          <span aria-hidden="true">−</span>
                         </button>
-                        <span className="cart-drawer__item-qty">{item.quantity}</span>
+                        <span className="cart-drawer__item-qty" aria-label={`Cantidad: ${item.quantity}`}>{item.quantity}</span>
                         <button
                           className="cart-drawer__qty-btn"
                           onClick={() => updateQuantity(item.product.id, 1)}
                           disabled={reachedStockLimit}
+                          aria-label={`Aumentar cantidad de ${item.product.name}`}
                         >
-                          +
+                          <span aria-hidden="true">+</span>
                         </button>
                       </div>
                       {reachedStockLimit && (
@@ -143,9 +149,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <button
                       className="cart-drawer__remove"
                       onClick={() => removeItem(item.product.id)}
-                      title="Eliminar"
+                      aria-label={`Eliminar ${item.product.name} del carrito`}
                     >
-                      <FiTrash2 />
+                      <FiTrash2 aria-hidden="true" />
                     </button>
                   </li>
                 );

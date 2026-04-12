@@ -269,6 +269,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const cartItems = useCartStore((s) => s.items);
   const item = useCartStore((s) => s.item);
+  const clearCart = useCartStore((s) => s.clearCart);
   const directCheckoutItem = item?.source === 'direct' ? item : null;
   const checkoutItems = directCheckoutItem
     ? [directCheckoutItem]
@@ -548,7 +549,7 @@ const Checkout = () => {
   };
 
   const buildWhatsAppMessage = (): string => {
-    const lines: string[] = ['Hola, este es mi comprobante de transferencia y el resumen de lo que compré:', ''];
+    const lines: string[] = ['Hola, ¿cómo estás? Quiero comprar los siguientes productos:', ''];
 
     checkoutItems.forEach((checkoutItem, index) => {
       const allSame =
@@ -591,6 +592,8 @@ const Checkout = () => {
       lines.push(`Domicilio de entrega: ${motoAddress.trim()}`);
     }
 
+    lines.push('', 'Adjunto comprobante de pago.');
+
     return lines.join('\n');
   };
 
@@ -619,9 +622,10 @@ const Checkout = () => {
           shippingCost,
           totalPrice: grandTotal,
         });
-        const phoneNumber = '5491141442409';
+        const phoneNumber = '5491133631325';
         const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
         window.open(whatsappUrl, '_blank');
+        clearCart();
       } catch (err) {
         setMpError(err instanceof Error ? err.message : 'No se pudo iniciar la compra. Intenta nuevamente.');
       }
@@ -749,8 +753,10 @@ const Checkout = () => {
                       </div>
                     )}
 
-                    <p className="checkout-product-price">${fmt(unitPrice)} c/u</p>
-                    <p className="checkout-product-price">Subtotal: ${fmt(totalPrice)}</p>
+                    <div className="checkout-product-pricing">
+                      <span className="checkout-product-unit-price">{quantity} × ${fmt(unitPrice)}</span>
+                      <span className="checkout-product-subtotal">${fmt(totalPrice)}</span>
+                    </div>
                   </div>
                 </div>
               );

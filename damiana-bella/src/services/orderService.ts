@@ -150,6 +150,31 @@ export const createMpPreference = async (
   return { init_point: data.init_point, order_ids: data.order_ids ?? [] };
 };
 
+export interface Purchase {
+  id: string;
+  product_name: string;
+  product_image: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  units_config: Record<string, string>[] | null;
+  payment_method: string;
+  shipping_method: string | null;
+  created_at: string;
+}
+
+/** Obtiene las compras pagadas del usuario por email. Usa el backend para bypassear RLS de Supabase. */
+export const getUserPurchases = async (email: string): Promise<Purchase[]> => {
+  const apiBase = import.meta.env.VITE_API_URL_LOCAL ?? 'http://localhost:3000/api';
+  const res = await apiFetch(`${apiBase}/orders/user?email=${encodeURIComponent(email)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message ?? 'Error al cargar tus compras.');
+  }
+  const data = await res.json();
+  return (data.orders ?? []) as Purchase[];
+};
+
 /** Cancela una orden MP pendiente (usuario volvió sin pagar). Restaura stock en el backend. */
 export const cancelMpOrder = async (orderId: string): Promise<void> => {
   const apiBase = import.meta.env.VITE_API_URL_LOCAL ?? 'http://localhost:3000/api';

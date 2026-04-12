@@ -80,13 +80,14 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  color: #aaa;
+  color: #595959;
   font-size: 1rem;
 }
 
 .cart-drawer__empty-icon {
   font-size: 3.5rem;
-  opacity: 0.3;
+  opacity: 0.5;
+  color: #595959;
 }
 
 /* Item list */

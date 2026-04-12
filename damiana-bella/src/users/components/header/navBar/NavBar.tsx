@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock } from 'react-icons/fi';
+import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock, FiShoppingBag } from 'react-icons/fi';
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
 // @ts-ignore - vite-imagetools query param
 import logoImg from '../../../../assets/img/logo.jpeg?w=120&format=webp&quality=80';
@@ -13,6 +13,7 @@ import { getProductPricing } from '../../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../../utils/cloudinary';
 import { useCartStore } from '../../../../store/cartStore';
 import CartDrawer from '../../cart/CartDrawer';
+import MyPurchasesModal from './MyPurchasesModal';
 import { useInitialLoadTask } from '../../../../components/common/InitialLoad/InitialLoadProvider';
 import './NavBar.css';
 
@@ -45,6 +46,7 @@ const NavBar = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isMobilePurchasesModalOpen, setIsMobilePurchasesModalOpen] = useState(false);
   const [cartBump, setCartBump] = useState(false);
   const totalItems = useCartStore((s) => s.totalItems());
   const prevTotalRef = React.useRef(totalItems);
@@ -95,6 +97,11 @@ const NavBar = () => {
   const handleMobileChangePassword = () => {
     closeMenu();
     setIsMobilePasswordModalOpen(true);
+  };
+
+  const handleMobilePurchases = () => {
+    closeMenu();
+    setIsMobilePurchasesModalOpen(true);
   };
 
   useEffect(() => {
@@ -162,6 +169,9 @@ const NavBar = () => {
         <button
           className="mobile-menu-toggle"
           onClick={() => setMobileMenuOpen(true)}
+          aria-label="Abrir menú de navegación"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="nav-menu-slider"
         >
           <span></span>
           <span></span>
@@ -170,7 +180,7 @@ const NavBar = () => {
 
         {/* Logo */}
         <Link to="/" className="navbar-logo" onClick={closeMenu}>
-          <img src={logoImg} alt="LIA Logo" className="logo-img" />
+          <img src={logoImg} alt="LIA Logo" className="logo-img" width={120} height={40} />
         </Link>
 
         {/* Desktop Navigation */}
@@ -259,13 +269,13 @@ const NavBar = () => {
         />
 
         {/* Menú Principal Deslizable — 3 paneles */}
-        <div className={`nav-menu-slider ${mobileMenuOpen ? 'active' : ''}`}>
+        <div className={`nav-menu-slider ${mobileMenuOpen ? 'active' : ''}`} id="nav-menu-slider">
 
           {/* Panel 0: Menú Principal */}
           <div className={`nav-menu-level level-main ${mobileInProductsMenu ? 'slide-out' : ''}`}>
             <div className="nav-menu-header">
               <span className="nav-menu-title">Menú</span>
-              <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
+              <button className="nav-menu-close" onClick={closeMenu} aria-label="Cerrar menú"><FiX /></button>
             </div>
 
             {currentUser && (
@@ -278,11 +288,21 @@ const NavBar = () => {
                   <button
                     onClick={handleLogout}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', color: '#c0392b', display: 'flex', alignItems: 'center' }}
-                    title="Cerrar sesión"
+                    aria-label="Cerrar sesión"
                   >
-                    <FiLogOut size={18} />
+                    <FiLogOut size={18} aria-hidden="true" />
                   </button>
                 </div>
+                <button
+                  onClick={handleMobilePurchases}
+                  style={{ width: '100%', padding: '0.9rem 1rem', background: 'none', border: 'none', borderTop: '1px solid rgba(184,165,200,0.15)', cursor: 'pointer', color: 'var(--text-dark)', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'background-color var(--transition-fast)', textAlign: 'left' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  title="Mis compras"
+                >
+                  <FiShoppingBag size={18} />
+                  <span>Mis compras</span>
+                </button>
                 <button
                   onClick={handleMobileChangePassword}
                   style={{ width: '100%', padding: '0.9rem 1rem', background: 'none', border: 'none', borderTop: '1px solid rgba(184,165,200,0.15)', cursor: 'pointer', color: 'var(--text-dark)', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.75rem', transition: 'background-color var(--transition-fast)', textAlign: 'left' }}
@@ -336,11 +356,12 @@ const NavBar = () => {
               <button
                 className="nav-menu-back"
                 onClick={() => setMobileInProductsMenu(false)}
+                aria-label="Volver al menú principal"
               >
                 <FiArrowLeft />
               </button>
               <span className="nav-menu-title">PRODUCTOS</span>
-              <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
+              <button className="nav-menu-close" onClick={closeMenu} aria-label="Cerrar menú"><FiX /></button>
             </div>
             <ul className="nav-menu-list">
               <li className="nav-menu-item">
@@ -385,11 +406,11 @@ const NavBar = () => {
                 : ''
           }`}>
             <div className="nav-menu-header">
-              <button className="nav-menu-back" onClick={() => setMobileL1(null)}>
+              <button className="nav-menu-back" onClick={() => setMobileL1(null)} aria-label="Volver a productos">
                 <FiArrowLeft />
               </button>
               <span className="nav-menu-title">{mobileL1?.name.toUpperCase()}</span>
-              <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
+              <button className="nav-menu-close" onClick={closeMenu} aria-label="Cerrar menú"><FiX /></button>
             </div>
             <ul className="nav-menu-list">
               {mobileL1 && (
@@ -432,9 +453,9 @@ const NavBar = () => {
             mobileInProductsMenu && mobileL2 !== null ? 'slide-in' : ''
           }`}>
             <div className="nav-menu-header">
-              <button className="nav-menu-back" onClick={() => setMobileL2(null)}><FiArrowLeft /></button>
+              <button className="nav-menu-back" onClick={() => setMobileL2(null)} aria-label={`Volver a ${mobileL1?.name ?? 'categorías'}`}><FiArrowLeft /></button>
               <span className="nav-menu-title">{mobileL2?.name.toUpperCase()}</span>
-              <button className="nav-menu-close" onClick={closeMenu}><FiX /></button>
+              <button className="nav-menu-close" onClick={closeMenu} aria-label="Cerrar menú"><FiX /></button>
             </div>
             <ul className="nav-menu-list">
               {mobileL2 && (
@@ -466,8 +487,13 @@ const NavBar = () => {
         {/* Right Side Icons */}
         <div className="navbar-right">
           <div className="search-container" ref={searchRef}>
-            <button className="icon-btn" onClick={handleToggleSearch}>
-              <FiSearch className="icon" />
+            <button
+              className="icon-btn"
+              onClick={handleToggleSearch}
+              aria-label={searchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'}
+              aria-expanded={searchOpen}
+            >
+              <FiSearch className="icon" aria-hidden="true" />
             </button>
             {searchOpen && (
               <input
@@ -525,14 +551,18 @@ const NavBar = () => {
               <button className="login-btn hide-mobile" onClick={() => setIsAuthModalOpen(true)}>
                 Iniciar sesion
               </button>
-              <button className="icon-btn hide-desktop" onClick={() => setIsAuthModalOpen(true)}>
-                <FiUser className="icon" />
+              <button className="icon-btn hide-desktop" onClick={() => setIsAuthModalOpen(true)} aria-label="Iniciar sesión">
+                <FiUser className="icon" aria-hidden="true" />
               </button>
             </>
           )}
-          <button className={`icon-btn cart-badge-wrapper${cartBump ? ' cart-bump' : ''}`} onClick={() => setIsCartOpen(true)}>
-            <FiShoppingCart className="icon" />
-            {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
+          <button
+            className={`icon-btn cart-badge-wrapper${cartBump ? ' cart-bump' : ''}`}
+            onClick={() => setIsCartOpen(true)}
+            aria-label={totalItems > 0 ? `Abrir carrito, ${totalItems} ${totalItems === 1 ? 'producto' : 'productos'}` : 'Abrir carrito'}
+          >
+            <FiShoppingCart className="icon" aria-hidden="true" />
+            {totalItems > 0 && <span className="cart-badge" aria-hidden="true">{totalItems}</span>}
           </button>
         </div>
       </div>
@@ -540,6 +570,13 @@ const NavBar = () => {
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <ChangePasswordModal isOpen={isMobilePasswordModalOpen} onClose={() => setIsMobilePasswordModalOpen(false)} />
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      {currentUser && (
+        <MyPurchasesModal
+          isOpen={isMobilePurchasesModalOpen}
+          onClose={() => setIsMobilePurchasesModalOpen(false)}
+          email={currentUser.email}
+        />
+      )}
     </nav>
   );
 };
