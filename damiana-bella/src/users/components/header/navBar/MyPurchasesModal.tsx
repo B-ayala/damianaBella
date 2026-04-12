@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CircularProgress, Collapse, Divider } from '@mui/material';
 import { FiPackage, FiChevronDown, FiChevronUp, FiShoppingBag } from 'react-icons/fi';
 import Modal from '../../../../components/common/Modal/Modal';
@@ -36,9 +37,16 @@ const formatDate = (iso: string) => {
 const formatPrice = (n: number) =>
   `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
-const PurchaseItem = ({ purchase }: { purchase: Purchase }) => {
+const PurchaseItem = ({ purchase, onOpenProduct }: { purchase: Purchase; onOpenProduct: (productId: string | number) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const hasVariants = purchase.units_config && purchase.units_config.length > 0;
+  const canOpenProduct = purchase.product_id !== null && String(purchase.product_id).trim() !== '';
+  const headerStyles = {
+    display: 'flex',
+    gap: '1rem',
+    padding: '1rem',
+    alignItems: 'flex-start',
+  } as const;
 
   return (
     <div
@@ -50,65 +58,67 @@ const PurchaseItem = ({ purchase }: { purchase: Purchase }) => {
       }}
     >
       {/* Header row */}
-      <div style={{ display: 'flex', gap: '1rem', padding: '1rem', alignItems: 'flex-start' }}>
-        {/* Image */}
-        {purchase.product_image ? (
-          <img
-            src={buildCloudinaryUrl(purchase.product_image, { width: 72, quality: 'auto', format: 'auto' })}
-            alt={purchase.product_name}
-            width={72}
-            height={72}
-            style={{ borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: '8px',
-              background: 'rgba(184,165,200,0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <FiPackage size={28} color="var(--primary-accent)" />
-          </div>
-        )}
-
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              margin: '0 0 0.25rem',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-              color: 'var(--text-dark)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {purchase.product_name}
-          </p>
-          <p style={{ margin: '0 0 0.25rem', fontSize: '0.82rem', color: '#888' }}>
-            {formatDate(purchase.created_at)}
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
-            <span
+      {canOpenProduct ? (
+        <button
+          type="button"
+          onClick={() => onOpenProduct(purchase.product_id!)}
+          style={{
+            ...headerStyles,
+            width: '100%',
+            border: 'none',
+            background: 'none',
+            textAlign: 'left',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+          aria-label={`Ver detalle de ${purchase.product_name}`}
+        >
+          {/* Image */}
+          {purchase.product_image ? (
+            <img
+              src={buildCloudinaryUrl(purchase.product_image, { width: 72, quality: 'auto', format: 'auto' })}
+              alt={purchase.product_name}
+              width={72}
+              height={72}
+              style={{ borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div
               style={{
-                fontSize: '0.78rem',
-                padding: '0.2rem 0.6rem',
-                borderRadius: '20px',
+                width: 72,
+                height: 72,
+                borderRadius: '8px',
                 background: 'rgba(184,165,200,0.15)',
-                color: 'var(--text-dark)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              {purchase.quantity} {purchase.quantity === 1 ? 'unidad' : 'unidades'}
-            </span>
-            {purchase.shipping_method && (
+              <FiPackage size={28} color="var(--primary-accent)" />
+            </div>
+          )}
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                margin: '0 0 0.25rem',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                color: 'var(--text-dark)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {purchase.product_name}
+            </p>
+            <p style={{ margin: '0 0 0.25rem', fontSize: '0.82rem', color: '#888' }}>
+              {formatDate(purchase.created_at)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
               <span
                 style={{
                   fontSize: '0.78rem',
@@ -118,33 +128,142 @@ const PurchaseItem = ({ purchase }: { purchase: Purchase }) => {
                   color: 'var(--text-dark)',
                 }}
               >
-                {SHIPPING_METHOD_LABEL[purchase.shipping_method] ?? purchase.shipping_method}
+                {purchase.quantity} {purchase.quantity === 1 ? 'unidad' : 'unidades'}
               </span>
-            )}
-            <span
+              {purchase.shipping_method && (
+                <span
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '20px',
+                    background: 'rgba(184,165,200,0.15)',
+                    color: 'var(--text-dark)',
+                  }}
+                >
+                  {SHIPPING_METHOD_LABEL[purchase.shipping_method] ?? purchase.shipping_method}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '20px',
+                  background: 'rgba(184,165,200,0.15)',
+                  color: 'var(--text-dark)',
+                }}
+              >
+                {PAYMENT_METHOD_LABEL[purchase.payment_method] ?? purchase.payment_method}
+              </span>
+            </div>
+          </div>
+
+          {/* Prices */}
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ margin: '0 0 0.15rem', fontSize: '0.8rem', color: '#888' }}>
+              {formatPrice(purchase.unit_price)} c/u
+            </p>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--primary-accent)' }}>
+              {formatPrice(purchase.total_price)}
+            </p>
+          </div>
+        </button>
+      ) : (
+        <div style={headerStyles}>
+          {/* Image */}
+          {purchase.product_image ? (
+            <img
+              src={buildCloudinaryUrl(purchase.product_image, { width: 72, quality: 'auto', format: 'auto' })}
+              alt={purchase.product_name}
+              width={72}
+              height={72}
+              style={{ borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div
               style={{
-                fontSize: '0.78rem',
-                padding: '0.2rem 0.6rem',
-                borderRadius: '20px',
+                width: 72,
+                height: 72,
+                borderRadius: '8px',
                 background: 'rgba(184,165,200,0.15)',
-                color: 'var(--text-dark)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              {PAYMENT_METHOD_LABEL[purchase.payment_method] ?? purchase.payment_method}
-            </span>
+              <FiPackage size={28} color="var(--primary-accent)" />
+            </div>
+          )}
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                margin: '0 0 0.25rem',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                color: 'var(--text-dark)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {purchase.product_name}
+            </p>
+            <p style={{ margin: '0 0 0.25rem', fontSize: '0.82rem', color: '#888' }}>
+              {formatDate(purchase.created_at)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '20px',
+                  background: 'rgba(184,165,200,0.15)',
+                  color: 'var(--text-dark)',
+                }}
+              >
+                {purchase.quantity} {purchase.quantity === 1 ? 'unidad' : 'unidades'}
+              </span>
+              {purchase.shipping_method && (
+                <span
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '20px',
+                    background: 'rgba(184,165,200,0.15)',
+                    color: 'var(--text-dark)',
+                  }}
+                >
+                  {SHIPPING_METHOD_LABEL[purchase.shipping_method] ?? purchase.shipping_method}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '20px',
+                  background: 'rgba(184,165,200,0.15)',
+                  color: 'var(--text-dark)',
+                }}
+              >
+                {PAYMENT_METHOD_LABEL[purchase.payment_method] ?? purchase.payment_method}
+              </span>
+            </div>
+          </div>
+
+          {/* Prices */}
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ margin: '0 0 0.15rem', fontSize: '0.8rem', color: '#888' }}>
+              {formatPrice(purchase.unit_price)} c/u
+            </p>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--primary-accent)' }}>
+              {formatPrice(purchase.total_price)}
+            </p>
           </div>
         </div>
-
-        {/* Prices */}
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <p style={{ margin: '0 0 0.15rem', fontSize: '0.8rem', color: '#888' }}>
-            {formatPrice(purchase.unit_price)} c/u
-          </p>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--primary-accent)' }}>
-            {formatPrice(purchase.total_price)}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* Expand button for variants */}
       {hasVariants && (
@@ -204,9 +323,15 @@ const PurchaseItem = ({ purchase }: { purchase: Purchase }) => {
 };
 
 const MyPurchasesModal = ({ isOpen, onClose, email }: MyPurchasesModalProps) => {
+  const navigate = useNavigate();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const openPurchasedProduct = (productId: string | number) => {
+    onClose();
+    navigate(`/product/${String(productId)}`);
+  };
 
   useEffect(() => {
     if (!isOpen || !email) return;
@@ -255,7 +380,7 @@ const MyPurchasesModal = ({ isOpen, onClose, email }: MyPurchasesModalProps) => 
               {purchases.length} {purchases.length === 1 ? 'compra realizada' : 'compras realizadas'}
             </p>
             {purchases.map((p) => (
-              <PurchaseItem key={p.id} purchase={p} />
+              <PurchaseItem key={p.id} purchase={p} onOpenProduct={openPurchasedProduct} />
             ))}
           </div>
         )}

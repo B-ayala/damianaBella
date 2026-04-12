@@ -8,7 +8,7 @@ import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
 import { parseColorOption } from '../../../utils/constants';
-import { areUnitVariantSelectionsValid, canAddAnotherUnitWithSelection } from '../../../utils/productVariants';
+import { areUnitVariantSelectionsValid } from '../../../utils/productVariants';
 import AuthModal from '../auth/AuthModal';
 import PurchaseVariantModal from '../PurchaseVariantModal/PurchaseVariantModal';
 import './CartDrawer.css';
@@ -16,6 +16,13 @@ import './CartDrawer.css';
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface GroupedVariantRow {
+  key: string;
+  count: number;
+  fragments: string[];
+  variants: UnitVariants;
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
@@ -37,12 +44,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const items = useCartStore((s) => s.items);
   const removeItem = useCartStore((s) => s.removeItem);
   const setUnitVariants = useCartStore((s) => s.setUnitVariants);
-  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const replaceItemUnits = useCartStore((s) => s.replaceItemUnits);
   const clearCart = useCartStore((s) => s.clearCart);
   const setItem = useCartStore((s) => s.setItem);
   const selectedCartItem = items.find((item) => item.product.id === selectedProductIdForVariantModal) ?? null;
 
   const total = items.reduce((sum, i) => sum + getProductPricing(i.product).finalPrice * i.quantity, 0);
+
+  const openProductDetail = (productId: string | number) => {
+    setIsVariantModalOpen(false);
+    setSelectedProductIdForVariantModal(null);
+    onClose();
+    navigate(`/product/${productId}`);
+  };
 
   const continueToCheckout = (unitVariants?: UnitVariants[]) => {
     const cartItem = selectedCartItem ?? items[0];
@@ -54,7 +68,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     setItem(null);
 
     setIsVariantModalOpen(false);
-  setSelectedProductIdForVariantModal(null);
+    setSelectedProductIdForVariantModal(null);
     onClose();
 
     if (currentUser) {
@@ -89,8 +103,76 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     Object.entries(variants).map(([name, value]) => {
       const isColor = name.toLowerCase() === 'color';
       const displayValue = isColor ? parseColorOption(value).name : value.toUpperCase();
-      return `${name}: ${displayValue}`;
+      const label = name.charAt(0).toUpperCase() + name.slice(1);
+      return `${label} ${displayValue}`;
     });
+
+  const groupUnitVariants = (unitVariants: UnitVariants[]): GroupedVariantRow[] => {
+    const groupedRows = new Map<string, GroupedVariantRow>();
+
+    unitVariants.forEach((variants) => {
+      const line = buildVariantLine(variants);
+
+      if (line.length === 0) {
+        return;
+      }
+
+      const key = JSON.stringify(
+        Object.entries(variants).sort(([leftName], [rightName]) => leftName.localeCompare(rightName))
+      );
+      const existingGroup = groupedRows.get(key);
+
+      if (existingGroup) {
+        existingGroup.count += 1;
+        return;
+      }
+
+      groupedRows.set(key, {
+        key,
+        count: 1,
+        fragments: line,
+        variants: { ...variants },
+      });
+    });
+
+    return Array.from(groupedRows.values());
+  };
+
+  const updateVariantGroupQuantity = (
+    productId: string | number,
+    unitVariants: UnitVariants[],
+    targetVariants: UnitVariants,
+    delta: number
+  ) => {
+    const targetKey = JSON.stringify(
+      Object.entries(targetVariants).sort(([leftName], [rightName]) => leftName.localeCompare(rightName))
+    );
+
+    if (delta > 0) {
+      replaceItemUnits(productId, [...unitVariants, { ...targetVariants }]);
+      return;
+    }
+
+    let removed = false;
+    const nextUnitVariants = unitVariants.filter((variants) => {
+      if (removed) {
+        return true;
+      }
+
+      const currentKey = JSON.stringify(
+        Object.entries(variants).sort(([leftName], [rightName]) => leftName.localeCompare(rightName))
+      );
+
+      if (currentKey === targetKey) {
+        removed = true;
+        return false;
+      }
+
+      return true;
+    });
+
+    replaceItemUnits(productId, nextUnitVariants);
+  };
 
   return (
     <>
@@ -115,95 +197,95 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             <ul className="cart-drawer__list">
               {items.map((item) => {
                 const pricing = getProductPricing(item.product);
-                const reachedStockLimit = !canAddAnotherUnitWithSelection(item.product, item.unitVariants);
-                const allSameVariants =
-                  item.unitVariants.length <= 1 ||
-                  item.unitVariants.every(
-                    (selection) => JSON.stringify(selection) === JSON.stringify(item.unitVariants[0])
-                  );
-                const sharedVariantLine = item.unitVariants[0] ? buildVariantLine(item.unitVariants[0]) : [];
+                const groupedVariants = groupUnitVariants(item.unitVariants);
+                const productSubtotal = pricing.finalPrice * item.quantity;
 
                 return (
                   <li key={item.product.id} className="cart-drawer__item">
-                    <img
-                      src={buildCloudinaryUrl(item.product.image, {
-                        width: 72,
-                        height: 96,
-                        crop: 'fit',
-                        quality: 'auto',
-                        format: 'auto'
-                      })}
-                      alt={item.product.name}
-                      className="cart-drawer__item-img"
-                      loading="lazy"
-                      decoding="async"
-                      width={72}
-                      height={96}
-                    />
-                    <div className="cart-drawer__item-body">
+                    <div className="cart-drawer__item-link">
+                      <button
+                        type="button"
+                        className="cart-drawer__item-preview"
+                        onClick={() => openProductDetail(item.product.id)}
+                        aria-label={`Ver detalle de ${item.product.name}`}
+                      >
+                        <img
+                          src={buildCloudinaryUrl(item.product.image, {
+                            width: 72,
+                            height: 96,
+                            crop: 'fit',
+                            quality: 'auto',
+                            format: 'auto'
+                          })}
+                          alt={item.product.name}
+                          className="cart-drawer__item-img"
+                          loading="lazy"
+                          decoding="async"
+                          width={72}
+                          height={96}
+                        />
+                      </button>
                       <div className="cart-drawer__item-info">
-                        <span className="cart-drawer__item-name">{item.product.name}</span>
-                        {sharedVariantLine.length > 0 && allSameVariants && (
-                          <div className="cart-drawer__variants">
-                            <span className="cart-drawer__variants-label">Variantes:</span>
-                            <span className="cart-drawer__variants-value">{sharedVariantLine.join(' · ')}</span>
-                          </div>
-                        )}
-                        {!allSameVariants && (
-                          <div className="cart-drawer__variants cart-drawer__variants--stacked">
-                            {item.unitVariants.map((unitSelection, index) => {
-                              const unitVariantLine = buildVariantLine(unitSelection);
-
-                              if (unitVariantLine.length === 0) {
-                                return null;
-                              }
+                        <div className="cart-drawer__item-header-row">
+                          <button
+                            type="button"
+                            className="cart-drawer__item-name-button"
+                            onClick={() => openProductDetail(item.product.id)}
+                          >
+                            <span className="cart-drawer__item-name">{item.product.name}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="cart-drawer__remove cart-drawer__remove--inline"
+                            onClick={() => removeItem(item.product.id)}
+                            aria-label={`Eliminar ${item.product.name} del carrito`}
+                          >
+                            <FiTrash2 aria-hidden="true" />
+                          </button>
+                        </div>
+                        <span className="cart-drawer__item-total-units">
+                          {item.quantity} {item.quantity === 1 ? 'unidad total' : 'unidades totales'}
+                        </span>
+                        {groupedVariants.length > 0 && (
+                          <div className="cart-drawer__variant-list">
+                            {groupedVariants.map((group) => {
+                              const canIncrease = areUnitVariantSelectionsValid(item.product, [...item.unitVariants, { ...group.variants }]);
 
                               return (
-                                <span key={`${String(item.product.id)}-${index}`} className="cart-drawer__variants-value">
-                                  Unidad {index + 1}: {unitVariantLine.join(' · ')}
-                                </span>
+                                <div key={`${String(item.product.id)}-${group.key}`} className="cart-drawer__variant-row">
+                                  <span className="cart-drawer__variants-value">
+                                    {group.fragments.join(' · ')}
+                                  </span>
+                                  <div className="cart-drawer__variant-controls">
+                                    <button
+                                      type="button"
+                                      className="cart-drawer__qty-btn"
+                                      onClick={() => updateVariantGroupQuantity(item.product.id, item.unitVariants, group.variants, -1)}
+                                      aria-label={`Reducir cantidad de ${group.fragments.join(' ')} en ${item.product.name}`}
+                                    >
+                                      <span aria-hidden="true">−</span>
+                                    </button>
+                                    <span className="cart-drawer__item-qty" aria-label={`Cantidad: ${group.count}`}>
+                                      {group.count}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="cart-drawer__qty-btn"
+                                      onClick={() => updateVariantGroupQuantity(item.product.id, item.unitVariants, group.variants, 1)}
+                                      disabled={!canIncrease}
+                                      aria-label={`Aumentar cantidad de ${group.fragments.join(' ')} en ${item.product.name}`}
+                                    >
+                                      <span aria-hidden="true">+</span>
+                                    </button>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
                         )}
-                      </div>
-                      <div className="cart-drawer__item-actions">
-                        <div className="cart-drawer__item-meta">
-                          <div className="cart-drawer__qty-controls">
-                            <button
-                              className="cart-drawer__qty-btn"
-                              onClick={() => updateQuantity(item.product.id, -1)}
-                              disabled={item.quantity <= 1}
-                              aria-label={`Reducir cantidad de ${item.product.name}`}
-                            >
-                              <span aria-hidden="true">−</span>
-                            </button>
-                            <span className="cart-drawer__item-qty" aria-label={`Cantidad: ${item.quantity}`}>{item.quantity}</span>
-                            <button
-                              className="cart-drawer__qty-btn"
-                              onClick={() => updateQuantity(item.product.id, 1)}
-                              disabled={reachedStockLimit}
-                              aria-label={`Aumentar cantidad de ${item.product.name}`}
-                            >
-                              <span aria-hidden="true">+</span>
-                            </button>
-                          </div>
-                          <div className="cart-drawer__item-summary">
-                            {reachedStockLimit && (
-                              <span className="cart-drawer__item-stock-limit">Stock máximo alcanzado</span>
-                            )}
-                            <span className="cart-drawer__item-price">
-                              ${(pricing.finalPrice * item.quantity).toFixed(2)}
-                            </span>
-                          </div>
+                        <div className="cart-drawer__item-summary cart-drawer__item-summary--inline">
+                          <span className="cart-drawer__item-price">${productSubtotal.toFixed(2)}</span>
                         </div>
-                        <button
-                          className="cart-drawer__remove"
-                          onClick={() => removeItem(item.product.id)}
-                          aria-label={`Eliminar ${item.product.name} del carrito`}
-                        >
-                          <FiTrash2 aria-hidden="true" />
-                        </button>
                       </div>
                     </div>
                   </li>

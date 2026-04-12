@@ -152,6 +152,7 @@ export const createMpPreference = async (
 
 export interface Purchase {
   id: string;
+  product_id: string | number | null;
   product_name: string;
   product_image: string | null;
   quantity: number;

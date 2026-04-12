@@ -29,6 +29,7 @@ interface CartState {
   removeItem: (productId: string | number) => void;
   updateQuantity: (productId: string | number, delta: number) => void;
   setUnitVariants: (productId: string | number, unitVariants: UnitVariants[]) => void;
+  replaceItemUnits: (productId: string | number, unitVariants: UnitVariants[]) => void;
   clearCart: () => void;
   totalItems: () => number;
   setItem: (item: CheckoutItem | null) => void;
@@ -250,6 +251,40 @@ export const useCartStore = create<CartState>()(
               unitVariants: nextUnitVariants,
             };
           });
+
+          return {
+            items,
+            item: syncCheckoutItemWithCart(items, state.item),
+          };
+        }),
+
+      replaceItemUnits: (productId, unitVariants) =>
+        set((state) => {
+          const items = state.items
+            .map((cartItem) => {
+              if (cartItem.product.id !== productId) {
+                return cartItem;
+              }
+
+              const nextQuantity = clampQuantityToStock(unitVariants.length, cartItem.product);
+
+              if (nextQuantity <= 0) {
+                return null;
+              }
+
+              const nextUnitVariants = buildUnitVariants(nextQuantity, unitVariants);
+
+              if (!areUnitVariantSelectionsValid(cartItem.product, nextUnitVariants)) {
+                return cartItem;
+              }
+
+              return {
+                ...cartItem,
+                quantity: nextQuantity,
+                unitVariants: nextUnitVariants,
+              };
+            })
+            .filter((item): item is CartItem => item !== null);
 
           return {
             items,
