@@ -15,7 +15,6 @@ import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 import {
   areUnitVariantSelectionsValid,
-  countReservedQuantityForSelection,
   getAvailableQuantityForSelection,
   getInvalidVariantSelections,
   getMissingVariantSelections,
@@ -103,9 +102,6 @@ const ProductDetail = () => {
     ? cartItems.find((item) => item.product.id === product.id)
     : undefined;
   const selectionStockLimit = product ? getSelectionStockLimit(product, selectedVariants) : 0;
-  const currentSelectionCartQuantity = product
-    ? countReservedQuantityForSelection(product, currentCartItem?.unitVariants ?? [], selectedVariants)
-    : 0;
   const remainingCartCapacity = product
     ? getAvailableQuantityForSelection(product, selectedVariants, currentCartItem?.unitVariants ?? [])
     : 0;
@@ -312,13 +308,15 @@ const ProductDetail = () => {
               <button className="gallery__arrow gallery__arrow--left" onClick={handlePreviousImage}>
                 ‹
               </button>
-              <img 
-                src={currentImage} 
+              <img
+                src={currentImage}
                 alt={product.name}
                 className="gallery__image"
                 onClick={() => setIsImageModalOpen(true)}
                 onLoad={() => setIsMainImageReady(true)}
                 onError={() => setIsMainImageReady(true)}
+                width={600}
+                height={800}
               />
               <button className="gallery__arrow gallery__arrow--right" onClick={handleNextImage}>
                 ›
@@ -340,6 +338,10 @@ const ProductDetail = () => {
                   alt={`${product.name} ${index + 1}`}
                   className={`thumbnail ${index === currentImageIndex ? 'thumbnail--active' : ''}`}
                   onClick={() => setCurrentImageIndex(index)}
+                  width={80}
+                  height={107}
+                  loading="lazy"
+                  decoding="async"
                 />
               ))}
             </div>
@@ -474,15 +476,11 @@ const ProductDetail = () => {
                   +
                 </button>
               </div>
-              <span className={`quantity__available${quantityStockLimit === 0 ? ' quantity__available--out' : ''}`}>
-                {quantityStockLimit === 0
-                  ? 'Sin stock'
-                  : currentSelectionCartQuantity > 0
-                    ? remainingCartCapacity > 0
-                      ? `(${quantityStockLimit} disponibles${selectionStockLimit !== stock ? ' para este talle' : ''}, ${remainingCartCapacity} para agregar)`
-                      : '(Ya agregaste el stock disponible al carrito)'
-                    : `(${quantityStockLimit} disponibles${selectionStockLimit !== stock ? ' para este talle' : ''})`}
-              </span>
+              {quantityStockLimit === 0 && (
+                <span className="quantity__available quantity__available--out">
+                  Sin stock
+                </span>
+              )}
             </div>
 
             {/* Calcular envío */}

@@ -543,13 +543,14 @@ const Checkout = () => {
       .map(([name, val]) => {
         const isColor = name.toLowerCase() === 'color';
         const display = isColor ? parseColorOption(val).name : val.toUpperCase();
-        return `${name}: ${display}`;
+        const label = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+        return `${label} ${display}`;
       })
       .join(' | ');
   };
 
   const buildWhatsAppMessage = (): string => {
-    const lines: string[] = ['Hola, ¿cómo estás? Quiero comprar los siguientes productos:', ''];
+    const lines: string[] = ['Hola, ¿cómo estás?', 'Quiero comprar los siguientes productos:', ''];
 
     checkoutItems.forEach((checkoutItem, index) => {
       const allSame =
@@ -558,34 +559,38 @@ const Checkout = () => {
           (uv) => JSON.stringify(uv) === JSON.stringify(checkoutItem.unitVariants[0])
         );
 
-      lines.push(`Producto ${index + 1}: ${checkoutItem.product.name}`);
-      lines.push(`Cantidad: ${checkoutItem.quantity}`);
+      lines.push(`*Producto ${index + 1}:* ${checkoutItem.product.name}`);
+      lines.push(`*Cantidad:* ${checkoutItem.quantity}`);
+      lines.push('');
 
       if (allSame && Object.keys(checkoutItem.unitVariants[0] ?? {}).length > 0) {
-        lines.push(`Variantes: ${buildVariantLine(checkoutItem.unitVariants[0])}`);
+        lines.push(`*Variantes:* ${buildVariantLine(checkoutItem.unitVariants[0])}`);
       } else if (!allSame) {
         checkoutItem.unitVariants.forEach((uv, unitIndex) => {
-          lines.push(`  Unidad ${unitIndex + 1}: ${buildVariantLine(uv)}`);
+          lines.push(`* Unidad ${unitIndex + 1}: ${buildVariantLine(uv)}`);
         });
       }
 
-      lines.push(`Subtotal producto: $${fmt(checkoutItem.totalPrice)}`);
+      lines.push('');
+      lines.push(`*Subtotal producto:* $${fmt(checkoutItem.totalPrice)}`);
       lines.push('');
     });
 
     const shippingLine =
       shippingCost === 0
-        ? `Envío: Gratis (Retiro en local)`
+        ? `* Envío: Gratis (Retiro en local)`
         : shippingCost === null
-        ? `Envío: Por moto - a coordinar por WhatsApp`
-        : `Envío: $${fmt(shippingCost)} (Correo Argentino)`;
+        ? `* Envío: Por moto - a coordinar por WhatsApp`
+        : `* Envío: $${fmt(shippingCost)} (Correo Argentino)`;
 
     lines.push(
-      `Subtotal: $${fmt(itemsSubtotal)}`,
+      `*Resumen:*`,
+      '',
+      `* Subtotal: $${fmt(itemsSubtotal)}`,
       shippingLine,
-      `Total: $${fmt(grandTotal)}`,
-      ``,
-      `Método de entrega: ${SHIPPING_LABEL[selectedShipping]}`,
+      `* Total: $${fmt(grandTotal)}`,
+      '',
+      `*Método de entrega:* ${SHIPPING_LABEL[selectedShipping]}`,
     );
 
     if (selectedShipping === 'moto' && motoAddress.trim()) {
@@ -932,7 +937,7 @@ const Checkout = () => {
                     Realizá una transferencia bancaria por alias y coordiná el pago con el vendedor.
                   </p>
                   <div className="checkout-alias-box">
-                    Alias: <strong>lia.zapatos.mp</strong>
+                    Alias: <strong>brianayala.mp</strong>
                   </div>
                   <p className="checkout-payment-small-text">
                     Una vez realizada la transferencia deberás enviar el comprobante.

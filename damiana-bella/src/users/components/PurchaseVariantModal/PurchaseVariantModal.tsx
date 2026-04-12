@@ -17,20 +17,49 @@ interface Props {
   product: Product;
   quantity: number;
   initialVariants: UnitVariants;
+  initialUnitVariants?: UnitVariants[];
 }
 
-const PurchaseVariantModal = ({ isOpen, onClose, onConfirm, product, quantity, initialVariants }: Props) => {
+const PurchaseVariantModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  product,
+  quantity,
+  initialVariants,
+  initialUnitVariants,
+}: Props) => {
   const [mode, setMode] = useState<'ask' | 'custom'>('ask');
   const [perUnitVariants, setPerUnitVariants] = useState<UnitVariants[]>([]);
   const [error, setError] = useState('');
 
+  const buildResolvedInitialUnitVariants = (): UnitVariants[] => {
+    if (initialUnitVariants && initialUnitVariants.length > 0) {
+      return Array.from({ length: quantity }, (_, index) => ({
+        ...(initialUnitVariants[index] ?? initialUnitVariants[initialUnitVariants.length - 1] ?? initialVariants),
+      }));
+    }
+
+    return Array.from({ length: quantity }, () => ({ ...initialVariants }));
+  };
+
+  const resolvedInitialUnitVariants = buildResolvedInitialUnitVariants();
+  const initialUnitVariantsSignature = JSON.stringify(initialUnitVariants ?? []);
+  const initialVariantsSignature = JSON.stringify(initialVariants);
+
+  const allUnitsShareSameVariants =
+    resolvedInitialUnitVariants.length <= 1 ||
+    resolvedInitialUnitVariants.every(
+      (selection) => JSON.stringify(selection) === JSON.stringify(resolvedInitialUnitVariants[0])
+    );
+
   useEffect(() => {
     if (isOpen) {
-      setMode('ask');
-      setPerUnitVariants(Array.from({ length: quantity }, () => ({ ...initialVariants })));
+      setMode(allUnitsShareSameVariants ? 'ask' : 'custom');
+      setPerUnitVariants(buildResolvedInitialUnitVariants());
       setError('');
     }
-  }, [isOpen, quantity, initialVariants]);
+  }, [allUnitsShareSameVariants, initialUnitVariantsSignature, initialVariantsSignature, isOpen, quantity]);
 
   if (!isOpen) return null;
 

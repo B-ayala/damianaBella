@@ -53,6 +53,8 @@ const CONTENT: Record<ResultStatus, { icon: React.ReactNode; title: string; desc
 const CheckoutResult = () => {
     const [params] = useSearchParams();
     const navigate = useNavigate();
+    const cartItems = useCartStore((s) => s.items);
+    const checkoutItem = useCartStore((s) => s.item);
     const setItem = useCartStore((s) => s.setItem);
     const clearCart = useCartStore((s) => s.clearCart);
     const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
@@ -88,7 +90,9 @@ const CheckoutResult = () => {
                 }
             }
 
-            if (source === 'cart') {
+            const resolvedSource = source ?? checkoutItem?.source ?? (cartItems.length > 0 ? 'cart' : undefined);
+
+            if (resolvedSource === 'cart') {
                 clearCart();
             } else {
                 setItem(null);
@@ -116,7 +120,7 @@ const CheckoutResult = () => {
                 });
             }
         }
-    }, [clearCart, externalRef, setItem, status]);
+    }, [cartItems.length, checkoutItem?.source, clearCart, externalRef, setItem, status]);
 
     const { icon, title, desc, color } = CONTENT[status];
     const fmt = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 2 });

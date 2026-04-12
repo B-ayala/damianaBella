@@ -11,6 +11,7 @@ Al inicio de cada conversacion, leer los siguientes archivos para tener contexto
 - `damiana-bella/.ai/personality.md` — rol, principios y forma de trabajar
 - `damiana-bella/.ai/memory/architecture.md` — arquitectura detallada del frontend
 - `damiana-bella/.ai/skills/react.md` — convenciones, patrones y estructura del frontend
+- `damiana-bella/.ai/rules-no-hacer.md` — reglas obligatorias de accesibilidad, performance (CLS/LCP), animaciones y bundles
 
 ### Backend (back/lia-ecommerce/.ai/)
 - `back/lia-ecommerce/.ai/config.json` — stack backend, puertos, rutas, env vars
