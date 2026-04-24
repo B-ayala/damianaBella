@@ -2,25 +2,30 @@ import { supabase } from '../config/supabaseClient';
 import { type AdminProduct } from '../admin/store/adminStore';
 import type { Product } from '../types/product';
 import { apiFetch } from '../utils/apiFetch';
+import { getProductStockFromVariants, sanitizeProductVariants } from '../utils/productVariants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const mapDbRowToProduct = (row: any): Product => {
   const images: string[] = row.images && row.images.length > 0
     ? row.images
     : row.image_url ? [row.image_url] : [];
+  const variants = sanitizeProductVariants(row.variants);
+  const stockFromVariants = getProductStockFromVariants(variants);
+
   return {
     id: row.id,
     name: row.name,
     price: row.price,
+    originalPrice: row.original_price,
     image: images[0] || '',
     images,
     description: row.description,
     category: row.category,
     discount: row.discount,
-    stock: row.stock,
+    stock: stockFromVariants ?? row.stock,
     condition: row.condition,
     freeShipping: row.free_shipping,
-    variants: row.variants,
+    variants,
     specifications: row.specifications,
     features: row.features,
     faqs: row.faqs,
@@ -33,7 +38,7 @@ const API_URL = import.meta.env.VITE_API_URL_LOCAL;
 
 // Get Cloudinary signature for signed uploads
 export const getCloudinarySignature = async () => {
-  const response = await fetch(`${API_URL}/cloudinary/sign`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/sign`, {
     method: 'POST',
   });
 
@@ -59,7 +64,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
   const url = path
     ? `${API_URL}/cloudinary/folders?path=${encodeURIComponent(path)}`
     : `${API_URL}/cloudinary/folders`;
-  const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
   if (!response.ok) throw new Error('Failed to fetch folders');
   const data = await response.json();
   return (data.data?.folders ?? []) as CloudinaryFolder[];
@@ -67,7 +72,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
 
 // Create a new folder
 export const createCloudinaryFolder = async (token: string, path: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ path }),
@@ -77,7 +82,7 @@ export const createCloudinaryFolder = async (token: string, path: string): Promi
 
 // Delete a folder (must be empty)
 export const deleteCloudinaryFolder = async (token: string, path: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/cloudinary/folders`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ path }),
@@ -87,7 +92,7 @@ export const deleteCloudinaryFolder = async (token: string, path: string): Promi
 
 // Fetch Cloudinary public config (cloudName, apiKey)
 export const fetchCloudinaryConfig = async (): Promise<{ cloudName: string; apiKey: string }> => {
-  const response = await fetch(`${API_URL}/cloudinary/config`);
+  const response = await apiFetch(`${API_URL}/cloudinary/config`);
   if (!response.ok) throw new Error('Failed to fetch Cloudinary config');
   const data = await response.json();
   return data.data;
@@ -101,7 +106,7 @@ export const fetchCloudinaryImages = async (token: string, folder?: string, next
   if (nextCursor) params.set('next_cursor', nextCursor);
   if (params.toString()) url += `?${params.toString()}`;
 
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
 
@@ -122,7 +127,7 @@ export interface CloudinaryResource {
 
 // Delete image from Cloudinary
 export const deleteCloudinaryImage = async (publicId: string, token: string) => {
-  const response = await fetch(`${API_URL}/cloudinary/delete`, {
+  const response = await apiFetch(`${API_URL}/cloudinary/delete`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -138,8 +143,101 @@ export const deleteCloudinaryImage = async (publicId: string, token: string) => 
   return response.json();
 };
 
-// Fetch unique active categories from Supabase
+export interface CloudinaryUsage {
+  bytes: number;
+  max_bytes: number;
+  uploads: number;
+  resources: number;
+  derived_resources: number;
+  media_limit: number;
+  media_count: number;
+  transformations: number;
+  requests: number;
+  requests_limit: number;
+}
+
+// Fetch storage usage from Cloudinary
+export const fetchCloudinaryUsage = async (token: string): Promise<CloudinaryUsage> => {
+  const response = await apiFetch(`${API_URL}/cloudinary/usage`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch Cloudinary usage');
+  const data = await response.json();
+  return data.data as CloudinaryUsage;
+};
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  level: number;
+}
+
+// Fetch full category tree from the categories table
+export const fetchCategoriesTree = async (): Promise<Category[]> => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name, slug, parent_id, level')
+    .order('level', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (error) {
+    // Table may not exist yet — return empty silently
+    console.warn('fetchCategoriesTree:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as Category[];
+};
+
+// Create a new category (or subcategory if parentId is provided)
+export const createCategory = async (
+  name: string,
+  parentId: string | null,
+  level: number
+): Promise<Category> => {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name, slug, parent_id: parentId, level })
+    .select('id, name, slug, parent_id, level')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as Category;
+};
+
+// Delete a category (cascades to subcategories via ON DELETE CASCADE)
+export const deleteCategory = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+};
+
+// Fetch level-1 category names (used by NavBar dropdown)
+// Falls back to reading from productos if categories table is not set up yet
 export const fetchCategories = async (): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('level', 1)
+      .order('name', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      return data.map((c) => c.name) as string[];
+    }
+  } catch {
+    // fall through to fallback
+  }
+
+  // Fallback: derive unique categories from productos table
   const { data, error } = await supabase
     .from('productos')
     .select('category')
@@ -184,8 +282,8 @@ export const toggleProductFeatured = async (id: string, featured: boolean) => {
   }
 };
 
-// Fetch all products from Supabase
-export const fetchProducts = async () => {
+// Fetch all products from Supabase (admin — includes inactive)
+export const fetchAllProducts = async () => {
   const { data, error } = await supabase
     .from('productos')
     .select('*')
@@ -197,6 +295,90 @@ export const fetchProducts = async () => {
   }
 
   return data || [];
+};
+
+// Fetch all products from Supabase (only active)
+export const fetchProducts = async () => {
+  const { data, error } = await supabase
+    .from('productos')
+    .select('*')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Fetch products error:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+// Search products by name, category or description
+export interface ProductSearchResult {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  image: string;
+  category: string;
+}
+
+interface ProductSearchRow {
+  id: string;
+  name: string;
+  price: number;
+  original_price?: number | null;
+  discount?: number | null;
+  image_url?: string | null;
+  images?: string[] | null;
+  category: string;
+}
+
+export const searchProducts = async (query: string): Promise<ProductSearchResult[]> => {
+  if (!query.trim()) return [];
+
+  const q = query.trim();
+  let data;
+  let error;
+
+  ({ data, error } = await supabase
+    .from('productos')
+    .select('id, name, price, original_price, discount, image_url, images, category')
+    .eq('status', 'active')
+    .or(`name.ilike.%${q}%,category.ilike.%${q}%,description.ilike.%${q}%`)
+    .limit(8)
+    .order('name', { ascending: true }));
+
+  if (error && error.message?.includes('original_price')) {
+    ({ data, error } = await supabase
+      .from('productos')
+      .select('id, name, price, discount, image_url, images, category')
+      .eq('status', 'active')
+      .or(`name.ilike.%${q}%,category.ilike.%${q}%,description.ilike.%${q}%`)
+      .limit(8)
+      .order('name', { ascending: true }));
+  }
+
+  if (error) {
+    console.error('Search products error:', error);
+    return [];
+  }
+
+  const rows = (data || []) as ProductSearchRow[];
+
+  return rows.map((row) => {
+    const imgs: string[] = row.images && row.images.length > 0 ? row.images : [];
+    return {
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      originalPrice: row.original_price || undefined,
+      discount: row.discount || undefined,
+      image: imgs[0] || row.image_url || '',
+      category: row.category,
+    };
+  });
 };
 
 // Fetch single product
@@ -250,8 +432,35 @@ export const createProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products`, {
     method: 'POST',
+<<<<<<< HEAD
     headers: productAuthHeaders(token),
     body: JSON.stringify(buildProductBody(product)),
+=======
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      name: product.name,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      stock: product.stock,
+      category: product.category,
+      imageUrl: product.imageUrl,
+      publicId: product.imageUrl ? product.imageUrl.split('/').pop() : '',
+      description: product.description,
+      discount: product.discount,
+      condition: product.condition,
+      freeShipping: product.freeShipping,
+      variants: product.variants,
+      specifications: product.specifications,
+      features: product.features,
+      faqs: product.faqs,
+      warranty: product.warranty,
+      returnPolicy: product.returnPolicy,
+      status: product.status,
+    }),
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   });
 
   if (!response.ok) {
@@ -270,8 +479,35 @@ export const updateProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'PUT',
+<<<<<<< HEAD
     headers: productAuthHeaders(token),
     body: JSON.stringify(buildProductBody(product)),
+=======
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      name: product.name,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      stock: product.stock,
+      category: product.category,
+      imageUrl: product.imageUrl,
+      publicId: product.imageUrl ? product.imageUrl.split('/').pop() : '',
+      description: product.description,
+      discount: product.discount,
+      condition: product.condition,
+      freeShipping: product.freeShipping,
+      variants: product.variants,
+      specifications: product.specifications,
+      features: product.features,
+      faqs: product.faqs,
+      warranty: product.warranty,
+      returnPolicy: product.returnPolicy,
+      status: product.status,
+    }),
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   });
 
   if (!response.ok) {
@@ -306,6 +542,7 @@ export interface CarouselImageRow {
   url: string;
   order: number;
   isActive: boolean;
+  deviceType: 'desktop' | 'mobile';
 }
 
 const mapCarouselRow = (row: Record<string, unknown>): CarouselImageRow => ({
@@ -313,20 +550,22 @@ const mapCarouselRow = (row: Record<string, unknown>): CarouselImageRow => ({
   url: row.url as string,
   order: row.order as number,
   isActive: row.is_active as boolean,
+  deviceType: (row.device_type as 'desktop' | 'mobile') ?? 'desktop',
 });
 
-// Fetch active images (user-facing)
-export const fetchCarouselImages = async (): Promise<CarouselImageRow[]> => {
+// Fetch active images (user-facing) — filterable by deviceType
+export const fetchCarouselImages = async (deviceType: 'desktop' | 'mobile' = 'desktop'): Promise<CarouselImageRow[]> => {
   const { data, error } = await supabase
     .from('carousel_images')
     .select('*')
     .eq('is_active', true)
+    .eq('device_type', deviceType)
     .order('order', { ascending: true });
   if (error) throw error;
   return (data || []).map(mapCarouselRow);
 };
 
-// Fetch all images (admin)
+// Fetch all images (admin) — includes all device types
 export const fetchAllCarouselImages = async (): Promise<CarouselImageRow[]> => {
   const { data, error } = await supabase
     .from('carousel_images')
@@ -336,10 +575,14 @@ export const fetchAllCarouselImages = async (): Promise<CarouselImageRow[]> => {
   return (data || []).map(mapCarouselRow);
 };
 
-export const insertCarouselImage = async (url: string, order: number): Promise<CarouselImageRow> => {
+export const insertCarouselImage = async (
+  url: string,
+  order: number,
+  deviceType: 'desktop' | 'mobile' = 'desktop'
+): Promise<CarouselImageRow> => {
   const { data, error } = await supabase
     .from('carousel_images')
-    .insert([{ url, order, is_active: true }])
+    .insert([{ url, order, is_active: true, device_type: deviceType }])
     .select()
     .single();
   if (error) throw error;
@@ -373,3 +616,94 @@ export const reorderCarouselImages = async (images: { id: string; order: number 
   );
 };
 
+<<<<<<< HEAD
+=======
+// Direct Supabase methods (for client-side operations if needed)
+export const supabaseProducts = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async getById(id: string) {
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async insert(product: Omit<AdminProduct, 'id'>) {
+    const { data, error } = await supabase
+      .from('productos')
+      .insert([
+        {
+          name: product.name,
+          price: product.price,
+          original_price: product.originalPrice,
+          stock: product.stock,
+          category: product.category,
+          image_url: product.imageUrl,
+          public_id: product.imageUrl ? product.imageUrl.split('/').pop() : '',
+          description: product.description,
+          discount: product.discount,
+          condition: product.condition,
+          free_shipping: product.freeShipping,
+          variants: product.variants,
+          specifications: product.specifications,
+          features: product.features,
+          faqs: product.faqs,
+          warranty: product.warranty,
+          return_policy: product.returnPolicy,
+          status: product.status,
+        },
+      ])
+      .select();
+    if (error) throw error;
+    return data?.[0];
+  },
+
+  async update(id: string, product: Partial<AdminProduct>) {
+    const updateData: Record<string, unknown> = {};
+    if (product.name) updateData.name = product.name;
+    if (product.price !== undefined) updateData.price = product.price;
+    if (product.originalPrice !== undefined) updateData.original_price = product.originalPrice;
+    if (product.stock !== undefined) updateData.stock = product.stock;
+    if (product.category) updateData.category = product.category;
+    if (product.imageUrl) updateData.image_url = product.imageUrl;
+    if (product.description !== undefined) updateData.description = product.description;
+    if (product.discount !== undefined) updateData.discount = product.discount;
+    if (product.condition) updateData.condition = product.condition;
+    if (product.freeShipping !== undefined) updateData.free_shipping = product.freeShipping;
+    if (product.variants !== undefined) updateData.variants = product.variants;
+    if (product.specifications !== undefined) updateData.specifications = product.specifications;
+    if (product.features !== undefined) updateData.features = product.features;
+    if (product.faqs !== undefined) updateData.faqs = product.faqs;
+    if (product.warranty !== undefined) updateData.warranty = product.warranty;
+    if (product.returnPolicy !== undefined) updateData.return_policy = product.returnPolicy;
+    if (product.status) updateData.status = product.status;
+
+    const { data, error } = await supabase
+      .from('productos')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+    if (error) throw error;
+    return data?.[0];
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('productos')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+};
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591

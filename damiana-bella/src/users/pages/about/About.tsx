@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
-import { supabase } from '../../../config/supabaseClient';
+import SEO from '../../../components/common/SEO/SEO';
+import { buildCloudinaryUrl } from '../../../utils/cloudinary';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
+import { getSiteContent } from '../../../services/siteContentService';
 import './About.css';
-import modelo2 from '../../../assets/modelos/modelo2.png';
 
 interface AboutInfo {
   title: string;
@@ -13,43 +15,111 @@ interface AboutInfo {
   values?: { title: string; description: string }[];
 }
 
+interface HeroImageData {
+  imageUrl: string;
+  altText: string;
+  title: string;
+  backgroundPosition?: string;
+}
+
 const About = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [aboutInfo, setAboutInfo] = useState<AboutInfo | null>(null);
+  const [heroImage, setHeroImage] = useState<HeroImageData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isImageReady, setIsImageReady] = useState(false);
+  const [isHeroImageReady, setIsHeroImageReady] = useState(false);
+
+  const image = aboutInfo?.imageUrl;
+
+  useInitialLoadTask('route', isLoading || (!!image && !isImageReady) || (!!heroImage?.imageUrl && !isHeroImageReady));
 
   useEffect(() => {
     const loadAbout = async () => {
-      const { data } = await supabase
-        .from('site_content')
-        .select('value')
-        .eq('key', 'about')
-        .single();
+      try {
+        const data = await getSiteContent<AboutInfo>('about');
 
-      if (data) {
-        setAboutInfo(data.value as AboutInfo);
+        if (data) {
+          setAboutInfo(data);
+        }
+
+        const heroData = await getSiteContent<HeroImageData>('hero_image');
+
+        if (heroData) {
+          setHeroImage(heroData);
+        }
+      } catch (error) {
+        console.error('Error loading about content:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadAbout();
   }, []);
 
-  const title = aboutInfo?.title || 'Nuestra Historia';
-  const description = aboutInfo?.description || 'En LIA, creemos que la moda es mucho más que ropa; es una forma de expresión, una herramienta para destacar tu confianza y una fiel compañera en tu día a día.';
-  const image = aboutInfo?.imageUrl || modelo2;
+  useEffect(() => {
+    setIsImageReady(!image);
+  }, [image]);
+
+  useEffect(() => {
+    if (!heroImage?.imageUrl) {
+      setIsHeroImageReady(true);
+      return;
+    }
+
+    const img = new Image();
+    img.src = buildCloudinaryUrl(heroImage.imageUrl, {
+      width: window.innerWidth <= 768 ? 600 : 1200,
+      quality: 'auto',
+      format: 'auto'
+    });
+
+    if (img.complete) {
+      setIsHeroImageReady(true);
+      return;
+    }
+
+    img.onload = () => setIsHeroImageReady(true);
+    img.onerror = () => setIsHeroImageReady(true);
+  }, [heroImage]);
+
+  const title = aboutInfo?.title;
+  const description = aboutInfo?.description;
+
+  const heroBackgroundImage = heroImage?.imageUrl
+    ? buildCloudinaryUrl(heroImage.imageUrl, {
+        width: window.innerWidth <= 768 ? 600 : 1200,
+        quality: 'auto',
+        format: 'auto'
+      })
+    : undefined;
+
+  const heroBackgroundPosition = heroImage?.backgroundPosition || '50% 50%';
 
   return (
     <div className="about-page">
-      <div className="about-hero">
+      <SEO
+        title="Nosotros"
+        description="Conocé la historia de LIA by Damiana Bella. Nuestra misión, visión y valores como marca de moda femenina argentina."
+        path="/about"
+      />
+      <div
+        className="about-hero"
+        style={heroBackgroundImage ? {
+          backgroundImage: `url('${heroBackgroundImage}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: heroBackgroundPosition
+        } : undefined}
+      >
         <div className="about-hero-content">
-          <h1 className="about-title">{title}</h1>
-          <p className="about-subtitle">Creando momentos únicos, pensando en ti.</p>
+          <h1 className="about-title">{heroImage?.title || title}</h1>
         </div>
       </div>
 
       <div className="about-container">
         <div className="about-main-content">
           <div className="about-text-section">
-            <h2 className="section-heading">Bienvenidos a LIA</h2>
             <p>{description}</p>
 
             <button
@@ -61,7 +131,21 @@ const About = () => {
           </div>
 
           <div className="about-image-section">
-            <img src={image} alt="Esencia de LIA" className="about-image" />
+            <img
+              src={buildCloudinaryUrl(image ?? '', {
+                width: 450,
+                quality: 'auto',
+                format: 'auto'
+              })}
+              alt="Esencia de LIA"
+              className="about-image"
+              loading="lazy"
+              decoding="async"
+              width={450}
+              height={600}
+              onLoad={() => setIsImageReady(true)}
+              onError={() => setIsImageReady(true)}
+            />
           </div>
         </div>
       </div>
@@ -74,21 +158,18 @@ const About = () => {
         <div className="about-modal-content">
           {aboutInfo?.mission && (
             <div className="modal-section">
-              <h4>Nuestra Misión</h4>
               <p>{aboutInfo.mission}</p>
             </div>
           )}
 
           {aboutInfo?.vision && (
             <div className="modal-section">
-              <h4>Nuestra Visión</h4>
               <p>{aboutInfo.vision}</p>
             </div>
           )}
 
           {aboutInfo?.values && aboutInfo.values.length > 0 && (
             <div className="modal-section">
-              <h4>Nuestros Valores</h4>
               <ul className="values-list">
                 {aboutInfo.values.map((value, index) => (
                   <li key={index}><strong>{value.title}:</strong> {value.description}</li>

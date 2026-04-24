@@ -3,8 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fetchProductById, mapDbRowToProduct } from '../../../services/productService';
 import type { Product } from '../../../types/product';
 import Modal from '../../../components/common/Modal/Modal';
+import SEO from '../../../components/common/SEO/SEO';
 import VariantTable from '../../../components/common/VariantTable/VariantTable';
+import PurchaseVariantModal from '../../components/PurchaseVariantModal/PurchaseVariantModal';
 import { parseColorOption } from '../../../utils/constants';
+import { getProductPricing } from '../../../utils/pricing';
+import { INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
+import { useCartStore } from '../../../store/cartStore';
+import type { UnitVariants } from '../../../store/cartStore';
+import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
+import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
+import {
+  areUnitVariantSelectionsValid,
+  getAvailableQuantityForSelection,
+  getInvalidVariantSelections,
+  getMissingVariantSelections,
+  isVariantOptionAvailable,
+  sanitizeSelectedVariants,
+  getSelectionStockLimit,
+} from '../../../utils/productVariants';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -20,6 +37,22 @@ const ProductDetail = () => {
   const [shippingCost, setShippingCost] = useState<number | null>(null);
   const [shippingDays, setShippingDays] = useState<string>('');
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [variantError, setVariantError] = useState('');
+  const [missingVariants, setMissingVariants] = useState<string[]>([]);
+  const [isShaking, setIsShaking] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const [isMainImageReady, setIsMainImageReady] = useState(false);
+  const cartItems = useCartStore((s) => s.items);
+  const addItem = useCartStore((s) => s.addItem);
+  const setItem = useCartStore((s) => s.setItem);
+
+  useBodyScrollLock(isImageModalOpen);
+
+  const images = product?.images || (product?.image ? [product.image] : []);
+  const currentImage = images[currentImageIndex] || '';
+
+  useInitialLoadTask('route', !product || (!!currentImage && !isMainImageReady));
 
   useEffect(() => {
     fetchProductById(id!)
@@ -27,15 +60,34 @@ const ProductDetail = () => {
       .catch(() => navigate('/products'));
   }, [id, navigate]);
 
-  if (!product) {
-    return <div className="loading">Cargando...</div>;
-  }
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
 
-  const images = product.images || [product.image];
-  const currentImage = images[currentImageIndex];
-  const discountedPrice = product.discount 
-    ? product.price * (1 - product.discount / 100)
-    : product.price;
+    setIsMainImageReady(currentImage === '');
+  }, [currentImage, product]);
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    setSelectedVariants((prev) => {
+      const sanitized = sanitizeSelectedVariants(product, prev);
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(sanitized);
+
+      if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === sanitized[key])) {
+        return prev;
+      }
+
+      return sanitized;
+    });
+  }, [product]);
+
+  const discountedPrice = product ? getProductPricing(product).finalPrice : 0;
+  const hasValidPrice = Number.isFinite(discountedPrice) && discountedPrice > 0;
 
   const handlePreviousImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
@@ -45,39 +97,208 @@ const ProductDetail = () => {
     setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  const stock = product.stock ?? 0;
+  const stock = product?.stock ?? 0;
+  const currentCartItem = product
+    ? cartItems.find((item) => item.product.id === product.id)
+    : undefined;
+  const selectionStockLimit = product ? getSelectionStockLimit(product, selectedVariants) : 0;
+  const remainingCartCapacity = product
+    ? getAvailableQuantityForSelection(product, selectedVariants, currentCartItem?.unitVariants ?? [])
+    : 0;
+  const quantityStockLimit = Number.isFinite(selectionStockLimit) ? selectionStockLimit : stock;
+  const canAddSelectedQuantityToCart = remainingCartCapacity > 0 && quantity <= remainingCartCapacity;
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+
+    if (quantityStockLimit <= 0) {
+      setQuantity(1);
+      return;
+    }
+
+    setQuantity((prev) => Math.min(prev, quantityStockLimit));
+  }, [quantityStockLimit]);
+
+  if (!product) {
+    return <div className="loading">Cargando...</div>;
+  }
+
+  const pricing = getProductPricing(product);
 
   const handleQuantityChange = (delta: number) => {
     const newQuantity = quantity + delta;
-    if (newQuantity >= 1 && newQuantity <= stock) {
+    if (newQuantity >= 1 && newQuantity <= quantityStockLimit) {
+      setVariantError('');
       setQuantity(newQuantity);
     }
   };
 
   const handleVariantChange = (variantName: string, option: string) => {
-    setSelectedVariants(prev => ({ ...prev, [variantName]: option }));
+    const variant = product?.variants?.find((currentVariant) => currentVariant.name === variantName);
+
+    if (!product || !variant || !isVariantOptionAvailable(variant, option)) {
+      return;
+    }
+
+    setSelectedVariants((prev) => sanitizeSelectedVariants(product, { ...prev, [variantName]: option }));
   };
 
-  const calculateShipping = () => {
+  const calculateShipping = async () => {
     if (postalCode.length < 4) {
       alert('Por favor ingresa un código postal válido');
       return;
     }
-    
-    // Simulación de cálculo de envío
-    if (product.freeShipping) {
-      setShippingCost(0);
-      setShippingDays('3-5 días hábiles');
-    } else {
-      // Simulación: costo aleatorio entre 500 y 1500
-      const cost = Math.floor(Math.random() * 1000) + 500;
-      setShippingCost(cost);
-      setShippingDays('5-7 días hábiles');
+
+    try {
+      // Si tiene envío gratis, no llama al backend
+      if (product.freeShipping) {
+        setShippingCost(0);
+        setShippingDays('3-5 días hábiles');
+        return;
+      }
+
+      // Llamar al endpoint real de shipping
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL_LOCAL}/shipping?postalCode=${encodeURIComponent(postalCode)}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al calcular envío');
+      }
+
+      const data = await response.json();
+      setShippingCost(data.cost ?? 0);
+      setShippingDays(data.days ?? '5-7 días hábiles');
+    } catch (error) {
+      console.error('Error calculating shipping:', error);
+      alert('Error al calcular el costo de envío. Por favor intenta nuevamente.');
     }
+  };
+
+  const hasVariants = (product?.variants?.length ?? 0) > 0;
+
+  const getMissingVariants = (): string[] => {
+    if (!product) return [];
+    return getMissingVariantSelections(product, selectedVariants);
+  };
+
+  const getInvalidVariants = (): string[] => {
+    if (!product) return [];
+    return getInvalidVariantSelections(product, selectedVariants);
+  };
+
+  const validateCurrentSelection = (): string | null => {
+    const invalid = getInvalidVariants();
+
+    if (invalid.length > 0) {
+      setMissingVariants(invalid);
+      return invalid.some((variantName) => variantName.toLowerCase().startsWith('talle'))
+        ? 'El talle seleccionado no tiene stock disponible. Elegí uno con stock.'
+        : `La selección actual de ${invalid.join(', ')} no es válida.`;
+    }
+
+    const missing = getMissingVariants();
+
+    if (missing.length > 0) {
+      setMissingVariants(missing);
+      return `Por favor seleccioná: ${missing.join(', ')}`;
+    }
+
+    return null;
+  };
+
+  const confirmPurchase = (unitVariants: UnitVariants[]) => {
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
+    if (!areUnitVariantSelectionsValid(product!, unitVariants)) {
+      setVariantError('No se puede continuar con un talle sin stock. Elegí una opción disponible.');
+      return;
+    }
+
+    setIsVariantModalOpen(false);
+    setItem({
+      product: product!,
+      quantity,
+      unitVariants,
+      unitPrice: discountedPrice,
+      totalPrice: discountedPrice * quantity,
+      source: 'direct',
+    });
+    navigate('/checkout');
+  };
+
+  const handleAddToCart = () => {
+    setVariantError('');
+    setMissingVariants([]);
+
+    if (remainingCartCapacity <= 0) {
+      setVariantError('Ya agregaste al carrito todas las unidades disponibles de este producto.');
+      return;
+    }
+
+    if (quantity > remainingCartCapacity) {
+      setVariantError(`Solo podés agregar ${remainingCartCapacity} ${remainingCartCapacity === 1 ? 'unidad' : 'unidades'} más de este producto.`);
+      return;
+    }
+
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
+    const selectionError = validateCurrentSelection();
+    if (selectionError) {
+      setVariantError(selectionError);
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    const cartUnitVariants: UnitVariants[] = Array.from({ length: quantity }, () => ({ ...selectedVariants }));
+    addItem(product!, quantity, cartUnitVariants);
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
+  };
+
+  const handleBuy = () => {
+    setVariantError('');
+    setMissingVariants([]);
+    if (!hasValidPrice) {
+      setVariantError(INVALID_PRODUCT_PRICE_MESSAGE);
+      return;
+    }
+
+    const selectionError = validateCurrentSelection();
+    if (selectionError) {
+      setVariantError(selectionError);
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      document.querySelector('.info__variants')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (quantity > 1 && hasVariants) {
+      setIsVariantModalOpen(true);
+      return;
+    }
+    // qty === 1 or no variants — go directly
+    const sameVariants: UnitVariants[] = Array.from({ length: quantity }, () => ({ ...selectedVariants }));
+    confirmPurchase(sameVariants);
   };
 
   return (
     <div className="product-detail">
+      <SEO
+        title={product.name}
+        description={product.description?.slice(0, 160) || `Comprá ${product.name} en LIA. Moda femenina con envío a todo el país.`}
+        path={`/product/${product.id}`}
+        ogImage={product.images?.[0] || product.image}
+        ogType="product"
+      />
       <div className="product-detail__container">
         {/* Layout principal */}
         <div className="product-detail__main">
@@ -87,19 +308,23 @@ const ProductDetail = () => {
               <button className="gallery__arrow gallery__arrow--left" onClick={handlePreviousImage}>
                 ‹
               </button>
-              <img 
-                src={currentImage} 
+              <img
+                src={currentImage}
                 alt={product.name}
                 className="gallery__image"
                 onClick={() => setIsImageModalOpen(true)}
+                onLoad={() => setIsMainImageReady(true)}
+                onError={() => setIsMainImageReady(true)}
+                width={600}
+                height={800}
               />
               <button className="gallery__arrow gallery__arrow--right" onClick={handleNextImage}>
                 ›
               </button>
               
-              {product.discount && (
+              {pricing.hasPromotion && pricing.discountPercentage && (
                 <div className="gallery__discount-badge">
-                  -{product.discount}%
+                  -{pricing.discountPercentage}%
                 </div>
               )}
             </div>
@@ -113,6 +338,10 @@ const ProductDetail = () => {
                   alt={`${product.name} ${index + 1}`}
                   className={`thumbnail ${index === currentImageIndex ? 'thumbnail--active' : ''}`}
                   onClick={() => setCurrentImageIndex(index)}
+                  width={80}
+                  height={107}
+                  loading="lazy"
+                  decoding="async"
                 />
               ))}
             </div>
@@ -141,15 +370,20 @@ const ProductDetail = () => {
 
             {/* Precio */}
             <div className="info__pricing">
-              {product.discount && (
+              {pricing.hasPromotion && pricing.originalPrice && pricing.discountPercentage && (
                 <div className="pricing__original">
-                  <span className="original-price">${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                  <span className="discount-badge">{product.discount}% OFF</span>
+                  <span className="original-price">${pricing.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                  <span className="discount-badge">{pricing.discountPercentage}% OFF</span>
                 </div>
               )}
               <div className="pricing__final">
                 ${discountedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </div>
+              {!hasValidPrice && (
+                <p className="pricing__warning">
+                  Este producto no esta disponible para compra porque todavia no tiene un precio asignado.
+                </p>
+              )}
               {product.freeShipping && (
                 <div className="pricing__shipping">
                   <span className="shipping-badge">Envío gratis</span>
@@ -161,14 +395,18 @@ const ProductDetail = () => {
             {product.variants && product.variants.length > 0 && (
               <div className="info__variants">
                 {product.variants.map((variant) => (
-                  <div key={variant.name} className="variant">
+                  <div key={variant.name} className={`variant${missingVariants.includes(variant.name) ? ` variant--error${isShaking ? ' variant--shake' : ''}` : ''}`}>
                     <label className="variant__label">{variant.name}:</label>
                     <div className="variant__options">
                       {variant.options.map((option) => {
                         const isColor = variant.name.toLowerCase() === 'color';
+                        const isTalle = variant.name.toLowerCase().startsWith('talle');
+                        const isTalleOutOfStock = isTalle && !isVariantOptionAvailable(variant, option);
+
                         const { name: colorName, hex: colorHex } = isColor
                           ? parseColorOption(option)
                           : { name: option, hex: '' };
+
                         return isColor ? (
                           <button
                             key={option}
@@ -178,13 +416,27 @@ const ProductDetail = () => {
                             onClick={() => handleVariantChange(variant.name, option)}
                           />
                         ) : (
-                          <button
+                          <div
                             key={option}
-                            className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''}`}
-                            onClick={() => handleVariantChange(variant.name, option)}
+                            className={`variant__option-wrap ${isTalleOutOfStock ? 'variant__option-wrap--soldout' : ''}`}
                           >
-                            {variant.name.toLowerCase().startsWith('talle') ? option.toUpperCase() : option}
-                          </button>
+                            <button
+                              className={`variant__option ${selectedVariants[variant.name] === option ? 'variant__option--selected' : ''} ${isTalleOutOfStock ? 'variant__option--soldout' : ''}`}
+                              onClick={() => {
+                                if (!isTalleOutOfStock) {
+                                  handleVariantChange(variant.name, option);
+                                }
+                              }}
+                              disabled={isTalleOutOfStock}
+                            >
+                              <span className="variant__option-text">
+                                {isTalle ? option.toUpperCase() : option}
+                              </span>
+                            </button>
+                            {isTalleOutOfStock && (
+                              <span className="variant__option-strike" aria-hidden="true" />
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -206,27 +458,29 @@ const ProductDetail = () => {
                 <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(-1)}
-                  disabled={quantity <= 1 || stock === 0}
+                  disabled={quantity <= 1 || quantityStockLimit === 0}
                 >
                   -
                 </button>
                 <input
                   type="text"
                   className="quantity__input"
-                  value={stock === 0 ? 0 : quantity}
+                  value={quantityStockLimit === 0 ? 0 : quantity}
                   readOnly
                 />
                 <button
                   className="quantity__btn"
                   onClick={() => handleQuantityChange(1)}
-                  disabled={stock === 0 || quantity >= stock}
+                  disabled={quantityStockLimit === 0 || quantity >= quantityStockLimit}
                 >
                   +
                 </button>
               </div>
-              <span className={`quantity__available${stock === 0 ? ' quantity__available--out' : ''}`}>
-                {stock === 0 ? 'Sin stock' : `(${stock} disponibles)`}
-              </span>
+              {quantityStockLimit === 0 && (
+                <span className="quantity__available quantity__available--out">
+                  Sin stock
+                </span>
+              )}
             </div>
 
             {/* Calcular envío */}
@@ -263,53 +517,30 @@ const ProductDetail = () => {
             </div>
 
             {/* Botones de acción */}
+            {variantError && (
+              <div className="variant-error-banner">
+                <span className="variant-error-banner__icon">!</span>
+                <span>{variantError}</span>
+              </div>
+            )}
             <div className="info__actions">
               <button
-                onClick={() => navigate('/checkout')}
-                disabled={stock === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  padding: '14px 24px',
-                  background: stock === 0 ? '#a0bcf8' : '#3483fa',
-                  color: '#ffffff',
-                  border: '2px solid #3483fa',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.2s',
-                  opacity: stock === 0 ? 0.6 : 1,
-                }}
+                className="action-btn action-btn--primary"
+                onClick={handleBuy}
+                disabled={quantityStockLimit === 0 || !hasValidPrice}
               >
                 Comprar ahora
               </button>
               <button
-                disabled={stock === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '100%',
-                  padding: '14px 24px',
-                  background: '#ffffff',
-                  color: '#3483fa',
-                  border: '2px solid #3483fa',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: stock === 0 ? 'not-allowed' : 'pointer',
-                  boxSizing: 'border-box',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.2s',
-                  opacity: stock === 0 ? 0.6 : 1,
-                }}
+                className={`action-btn action-btn--secondary${addedToCart ? ' action-btn--secondary-added' : ''}`}
+                onClick={handleAddToCart}
+                disabled={quantityStockLimit === 0 || !hasValidPrice || !canAddSelectedQuantityToCart}
               >
-                Agregar al carrito
+                {remainingCartCapacity <= 0
+                  ? 'Stock máximo en carrito'
+                  : addedToCart
+                    ? '¡Agregado al carrito!'
+                    : 'Agregar al carrito'}
               </button>
             </div>
 
@@ -446,6 +677,18 @@ const ProductDetail = () => {
       >
         <VariantTable />
       </Modal>
+
+      {/* Modal de selección de variantes por unidad */}
+      {isVariantModalOpen && product && (
+        <PurchaseVariantModal
+          isOpen={isVariantModalOpen}
+          onClose={() => setIsVariantModalOpen(false)}
+          onConfirm={confirmPurchase}
+          product={product}
+          quantity={quantity}
+          initialVariants={selectedVariants}
+        />
+      )}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { apiFetch } from '../utils/apiFetch';
 interface CreateUserPayload {
   name: string;
   email: string;
+  phone?: string;
   password: string;
 }
 
@@ -35,6 +36,7 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
       options: {
         data: {
           name: payload.name,
+          ...(payload.phone ? { phone: payload.phone } : {}),
         },
         emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
       },
@@ -66,7 +68,10 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
     // Intento best-effort de actualizar, pero no falla si RLS lo bloquea (email no confirmado)
     await supabase
       .from('profiles')
-      .update({ name: payload.name })
+      .update({
+        name: payload.name,
+        ...(payload.phone ? { phone: payload.phone } : {}),
+      })
       .eq('id', authData.user.id);
 
     return {
@@ -185,6 +190,11 @@ export const resendConfirmationEmail = async (email: string): Promise<{ success:
       if (error.message?.toLowerCase().includes('rate limit') || error.message?.toLowerCase().includes('over_email_send_rate_limit')) {
         throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a solicitar el email.');
       }
+      if (error.message?.toLowerCase().includes('you can only request this after')) {
+        const match = error.message.match(/after (\d+) second/);
+        const seconds = match ? match[1] : '60';
+        throw new Error(`RESEND_COOLDOWN:${seconds}`);
+      }
       throw new Error(error.message);
     }
 
@@ -260,6 +270,30 @@ const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> =
 };
 
 /**
+ * Solicitar recuperación de contraseña por email
+ * Supabase envía un link mágico al correo con type=recovery
+ */
+export const requestPasswordReset = async (email: string): Promise<void> => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
+  });
+  if (error) {
+    throw new Error(error.message || 'Error al enviar el email de recuperación');
+  }
+};
+
+/**
+ * Establecer nueva contraseña (se llama desde la página de reset, tras el link mágico)
+ * Requiere que Supabase ya haya establecido la sesión de recovery en el cliente
+ */
+export const resetPassword = async (newPassword: string): Promise<void> => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    throw new Error(error.message || 'Error al actualizar la contraseña');
+  }
+};
+
+/**
  * Cambiar la contraseña del usuario actual
  * Verifica la contraseña actual reautenticando, luego actualiza a la nueva
  */
@@ -297,6 +331,7 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 export interface AdminUserData {
   id: string;
   name: string;
+  phone?: string;
   email: string;
   role: string;
   created_at: string;

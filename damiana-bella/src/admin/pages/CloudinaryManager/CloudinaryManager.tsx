@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   Trash2, Upload, Search, RefreshCw, X, Image,
@@ -5,6 +7,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '../../../config/supabaseClient';
+import { apiFetch } from '../../../utils/apiFetch';
 import { useAdminStore } from '../../store/adminStore';
 import {
   fetchCloudinaryImages,
@@ -16,6 +19,7 @@ import {
   type CloudinaryResource,
   type CloudinaryFolder,
 } from '../../../services/productService';
+import CloudinaryStorageUsage from '../../components/CloudinaryStorageUsage/CloudinaryStorageUsage';
 import './CloudinaryManager.css';
 
 interface ImageUsage {
@@ -78,6 +82,7 @@ const CloudinaryManager = () => {
   const [checkingUsage, setCheckingUsage] = useState(false);
   const [preview, setPreview] = useState<CloudinaryResource | null>(null);
   const [mobileFolderOpen, setMobileFolderOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const getToken = async () => {
     const { data } = await supabase.auth.getSession();
@@ -170,6 +175,7 @@ const CloudinaryManager = () => {
 
   // Upload images
   const handleUpload = async () => {
+    setUploading(true);
     try {
       const config = await fetchCloudinaryConfig();
       const token = await getToken();
@@ -181,10 +187,10 @@ const CloudinaryManager = () => {
           apiKey: config.apiKey,
           uploadSignature: async (callback: (sig: string, ts: number) => void, paramsToSign: Record<string, unknown>) => {
             const ts = Math.round(Date.now() / 1000);
-            const res = await fetch(`${import.meta.env.VITE_API_URL_LOCAL}/cloudinary/sign`, {
+            const res = await apiFetch(`${import.meta.env.VITE_API_URL_LOCAL}/cloudinary/sign`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body: JSON.stringify({ ...paramsToSign, timestamp: ts }),
+              body: JSON.stringify({ source: 'uw', ...paramsToSign, timestamp: ts }),
             });
             const data = await res.json();
             callback(data.data.signature, ts);
@@ -203,6 +209,8 @@ const CloudinaryManager = () => {
       );
     } catch {
       setError('No se pudo abrir el widget de carga.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -303,9 +311,11 @@ const CloudinaryManager = () => {
             <RefreshCw size={15} className={imagesLoading ? 'spinning' : ''} />
             Actualizar
           </button>
-          <button className="admin-btn-primary admin-flex-center gap-2" onClick={handleUpload}>
-            <Upload size={15} />
-            Subir imagen
+          <button className="admin-btn-primary admin-flex-center gap-2" onClick={handleUpload} disabled={uploading}>
+            {uploading
+              ? <RefreshCw size={15} className="spinning" />
+              : <Upload size={15} />}
+            {uploading ? 'Abriendo...' : 'Subir imagen'}
           </button>
         </div>
       </div>
@@ -317,6 +327,9 @@ const CloudinaryManager = () => {
           <button onClick={() => setError('')}><X size={14} /></button>
         </div>
       )}
+
+      {/* Storage usage bar */}
+      <CloudinaryStorageUsage onRefresh={() => loadImages(currentFolder)} />
 
       <div className="cloudinary-layout">
         {/* ── Folder sidebar ── */}

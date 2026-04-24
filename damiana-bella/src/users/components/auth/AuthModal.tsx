@@ -2,21 +2,23 @@ import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog, DialogContent, Grow, Box, Typography, Stack, Button,
-  useMediaQuery, Tabs, Tab, TextField, Alert, Link,
+  useMediaQuery, Tabs, Tab, TextField, Alert, Link, InputAdornment, IconButton,
 } from '@mui/material';
 import { FcGoogle } from 'react-icons/fc';
 import {
   FiLogIn, FiUserPlus, FiAlertCircle, FiCheckCircle, FiMail, FiArrowRight, FiMessageSquare,
+  FiEye, FiEyeOff, FiPhone,
 } from 'react-icons/fi';
 import { useAuthStore } from '../../../store/authStore';
 import { isValidEmail } from '../../../utils/validation';
-import { createUser, resendConfirmationEmail } from '../../../services/userService';
+import { createUser, resendConfirmationEmail, requestPasswordReset } from '../../../services/userService';
 import Modal from '../../../components/common/Modal/Modal';
-import { EMAIL_CONFIRMED_CHANNEL } from '../../pages/auth/EmailConfirmation';
+import { EMAIL_CONFIRMED_CHANNEL, EMAIL_CONFIRMED_STORAGE_KEY } from '../../pages/auth/EmailConfirmation';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const labelSx = {
@@ -194,7 +196,7 @@ const fieldError = (msg?: string) =>
     </Box>
   ) : undefined;
 
-const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
+const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const navigate = useNavigate();
   const login = useAuthStore(state => state.login);
   const isMobile = useMediaQuery('(max-width:639px)');
@@ -207,8 +209,14 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   // Register form state
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
+
+  // Password visibility
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -220,72 +228,74 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [emailErrorType, setEmailErrorType] = useState<'confirmed' | 'pending' | null>(null);
 
+  // Forgot password state
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+
   // Email confirmation modal state
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState('');
   const [confirmationError, setConfirmationError] = useState('');
+  const [emailActuallySent, setEmailActuallySent] = useState(false);
   const [emailConfirmedByLink, setEmailConfirmedByLink] = useState(false);
-
-  // Cooldown para reenvío de email
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Cooldown y contador para rate limit de registro
-  const [rateLimitCooldown, setRateLimitCooldown] = useState(0);
-  const [rateLimitCount, setRateLimitCount] = useState(0);
-  const rateLimitRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startCooldown = (seconds = 60) => {
-    setResendCooldown(seconds);
-    if (cooldownRef.current) clearInterval(cooldownRef.current);
-    cooldownRef.current = setInterval(() => {
-      setResendCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(cooldownRef.current!);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const startRateLimitCooldown = (seconds = 60) => {
-    setRateLimitCooldown(seconds);
-    if (rateLimitRef.current) clearInterval(rateLimitRef.current);
-    rateLimitRef.current = setInterval(() => {
-      setRateLimitCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(rateLimitRef.current!);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-      if (rateLimitRef.current) clearInterval(rateLimitRef.current);
-    };
-  }, []);
-
   // Escuchar confirmación de email desde la otra pestaña
   useEffect(() => {
-    if (!showConfirmationModal) return;
+    if (!isOpen) return;
+
+    const applyEmailConfirmed = () => {
+      setShowConfirmationModal(false);
+      setConfirmationError('');
+      setEmailActuallySent(false);
+      setEmailConfirmedByLink(true);
+      setView('login');
+    };
+
+    const consumeStoredConfirmation = () => {
+      try {
+        const rawValue = window.localStorage.getItem(EMAIL_CONFIRMED_STORAGE_KEY);
+        if (!rawValue) return false;
+
+        const parsed = JSON.parse(rawValue) as { type?: string };
+        if (parsed?.type !== 'EMAIL_CONFIRMED') return false;
+
+        window.localStorage.removeItem(EMAIL_CONFIRMED_STORAGE_KEY);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (consumeStoredConfirmation()) {
+      applyEmailConfirmed();
+    }
+
     let channel: BroadcastChannel | null = null;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== EMAIL_CONFIRMED_STORAGE_KEY || !event.newValue) return;
+      if (consumeStoredConfirmation()) {
+        applyEmailConfirmed();
+      }
+    };
+
     try {
       channel = new BroadcastChannel(EMAIL_CONFIRMED_CHANNEL);
       channel.onmessage = (e) => {
         if (e.data?.type === 'EMAIL_CONFIRMED') {
-          setShowConfirmationModal(false);
-          setEmailConfirmedByLink(true);
-          setView('login');
+          applyEmailConfirmed();
         }
       };
     } catch { /* BroadcastChannel not supported */ }
-    return () => { channel?.close(); };
-  }, [showConfirmationModal]);
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [isOpen]);
 
   // Reset state when closing
   const handleClose = () => {
@@ -293,6 +303,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setLoginPassword('');
     setRegisterName('');
     setRegisterEmail('');
+    setRegisterPhone('');
     setRegisterPassword('');
     setRegisterConfirmPassword('');
     setErrors({});
@@ -300,13 +311,13 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setSuccessMessage('');
     setEmailErrorType(null);
     setView('login');
+    setForgotEmail('');
+    setForgotSent(false);
+    setShowForgotModal(false);
     setShowConfirmationModal(false);
     setConfirmedEmail('');
     setConfirmationError('');
     setEmailConfirmedByLink(false);
-    setRateLimitCooldown(0);
-    setRateLimitCount(0);
-    if (rateLimitRef.current) clearInterval(rateLimitRef.current);
     // Ensure small timeout to not show reset during fade out animation
     setTimeout(() => {
         onClose();
@@ -330,6 +341,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
 
     if (!registerEmail.trim()) newErrors.registerEmail = 'El correo electrónico es requerido';
     else if (!isValidEmail(registerEmail)) newErrors.registerEmail = 'Ingresa un correo válido';
+
+    if (!registerPhone.trim()) newErrors.registerPhone = 'El número de celular es requerido';
+    else if (!/^\+?[\d\s\-()]{7,20}$/.test(registerPhone.trim())) newErrors.registerPhone = 'Ingresa un número de celular válido';
 
     if (!registerPassword.trim()) newErrors.registerPassword = 'La contraseña es requerida';
     else if (registerPassword.length < 6) newErrors.registerPassword = 'La contraseña debe tener al menos 6 caracteres';
@@ -356,6 +370,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         return;
       }
       // Login exitoso pero no es admin — cerrar modal normalmente
+      onSuccess?.();
       handleClose();
     } catch (err) {
       console.error('[AuthModal] login error:', err);
@@ -363,6 +378,40 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!forgotEmail.trim() || !isValidEmail(forgotEmail)) {
+      setErrors({ forgotEmail: 'Ingresá un correo electrónico válido' });
+      return;
+    }
+    setErrors({});
+    setServerError('');
+    setIsLoading(true);
+    try {
+      await requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Error al enviar el email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startResendCooldown = (seconds: number) => {
+    setResendCooldown(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleRegisterSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -378,13 +427,16 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       await createUser({
         name: registerName.trim(),
         email: registerEmail.trim(),
+        phone: registerPhone.trim(),
         password: registerPassword,
       });
 
       // Mostrar modal de confirmación en lugar de redirigir automáticamente
       setConfirmedEmail(registerEmail.trim());
+      setEmailActuallySent(true);
       setShowConfirmationModal(true);
       setConfirmationError('');
+      startResendCooldown(60);
 
       // Limpiar formulario
       setRegisterName('');
@@ -400,13 +452,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         setEmailErrorType('pending');
         setServerError('pending');
       } else if (message.startsWith('SIGNUP_RATE_LIMIT:')) {
-        const [, secs, cnt] = message.split(':');
-        const remainingSeconds = parseInt(secs) || 60;
-        const count = parseInt(cnt) || 1;
-        setEmailErrorType(null);
-        setRateLimitCount(count);
-        if (remainingSeconds > 0) startRateLimitCooldown(remainingSeconds);
-        setServerError('__rate_limit__');
+        setConfirmedEmail(registerEmail.trim());
+        setEmailActuallySent(false);
+        setShowConfirmationModal(true);
+        setConfirmationError('');
       } else {
         setEmailErrorType(null);
         setServerError(message);
@@ -427,7 +476,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     try {
       const result = await resendConfirmationEmail(registerEmail.trim());
       setSuccessMessage(result.message);
-      startCooldown(60);
       setTimeout(() => {
         setSuccessMessage('');
         setView('login');
@@ -436,9 +484,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al reenviar el email';
       setServerError(message);
-      if (message.toLowerCase().includes('demasiados intentos') || message.toLowerCase().includes('rate limit')) {
-        startCooldown(60);
-      }
     } finally {
       setIsResendingEmail(false);
     }
@@ -454,13 +499,15 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setConfirmationError('');
     try {
       await resendConfirmationEmail(confirmedEmail);
-      startCooldown(60);
       setConfirmationError('');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al reenviar el email';
-      setConfirmationError(message);
-      if (message.toLowerCase().includes('demasiados intentos') || message.toLowerCase().includes('rate limit')) {
-        startCooldown(60);
+      if (message.startsWith('RESEND_COOLDOWN:')) {
+        const seconds = parseInt(message.split(':')[1], 10) || 60;
+        startResendCooldown(seconds);
+        setConfirmationError('');
+      } else {
+        setConfirmationError(message);
       }
     } finally {
       setIsResendingEmail(false);
@@ -471,6 +518,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setShowConfirmationModal(false);
     setConfirmedEmail('');
     setConfirmationError('');
+    setEmailActuallySent(false);
+    setResendCooldown(0);
+    if (cooldownRef.current) { clearInterval(cooldownRef.current); cooldownRef.current = null; }
     setView('login');
   };
 
@@ -487,6 +537,8 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
             setSuccessMessage('');
             setEmailErrorType(null);
             setEmailConfirmedByLink(false);
+            setForgotEmail('');
+            setForgotSent(false);
             setView(v as 'login' | 'register');
           }}
           variant="fullWidth"
@@ -558,7 +610,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 </Typography>
                 <TextField
                   id="loginPassword"
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
@@ -567,19 +619,40 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowLoginPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showLoginPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: '-0.25rem' }}>
                 <Link
-                  href="#"
+                  component="button"
+                  type="button"
                   underline="none"
+                  onClick={() => { setErrors({}); setServerError(''); setForgotEmail(''); setForgotSent(false); setShowForgotModal(true); }}
                   sx={{
                     fontSize: '0.875rem',
                     color: 'var(--primary-dark)',
                     fontWeight: 500,
                     position: 'relative',
                     transition: 'color 0.2s ease',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
                     '&:hover': { color: 'var(--primary-color)' },
                     '&::after': {
                       content: '""',
@@ -656,12 +729,39 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               </Stack>
 
               <Stack spacing={0.5}>
+                <Typography component="label" htmlFor="registerPhone" sx={labelSx}>
+                  Número de Celular
+                </Typography>
+                <TextField
+                  id="registerPhone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={registerPhone}
+                  onChange={(e) => setRegisterPhone(e.target.value)}
+                  error={!!errors.registerPhone}
+                  helperText={fieldError(errors.registerPhone)}
+                  variant="outlined"
+                  fullWidth
+                  sx={inputSx}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <FiPhone size={16} color="var(--primary-color)" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Stack>
+
+              <Stack spacing={0.5}>
                 <Typography component="label" htmlFor="registerPassword" sx={labelSx}>
                   Contraseña
                 </Typography>
                 <TextField
                   id="registerPassword"
-                  type="password"
+                  type={showRegisterPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={registerPassword}
                   onChange={(e) => setRegisterPassword(e.target.value)}
@@ -670,6 +770,22 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowRegisterPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showRegisterPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 
@@ -679,7 +795,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 </Typography>
                 <TextField
                   id="registerConfirmPassword"
-                  type="password"
+                  type={showRegisterConfirmPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={registerConfirmPassword}
                   onChange={(e) => setRegisterConfirmPassword(e.target.value)}
@@ -688,6 +804,22 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   variant="outlined"
                   fullWidth
                   sx={inputSx}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowRegisterConfirmPassword(p => !p)}
+                            edge="end"
+                            size="small"
+                            tabIndex={-1}
+                          >
+                            {showRegisterConfirmPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Stack>
 
@@ -706,28 +838,19 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               )}
               {emailErrorType === 'pending' && (
                 <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
-                  <Box>Este correo ya fue registrado pero todavía no fue confirmado. Revisá tu bandeja de entrada (o spam).</Box>
+                    <Box>Ese correo ya se encuentra registrado. Si todavia no confirmaste la cuenta, revisa tu bandeja de entrada (o spam).</Box>
                   <Button
                     type="button"
                     onClick={handleResendEmail}
-                    disabled={isResendingEmail || resendCooldown > 0}
+                    disabled={isResendingEmail}
                     startIcon={<FiMail size={15} />}
                     sx={resendBtnSx}
                   >
-                    {isResendingEmail ? 'Reenviando...' : resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : 'Reenviar email de confirmación'}
+                    {isResendingEmail ? 'Reenviando...' : 'Reenviar email de confirmación'}
                   </Button>
                 </Alert>
               )}
-              {!emailErrorType && serverError === '__rate_limit__' && rateLimitCount >= 2 && rateLimitCooldown === 0 && (
-                <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
-                  <Box>
-                    Te {Math.max(0, 6 - rateLimitCount) === 1 ? 'queda' : 'quedan'}{' '}
-                    <strong>{Math.max(0, 6 - rateLimitCount)}</strong>{' '}
-                    intento{Math.max(0, 6 - rateLimitCount) === 1 ? '' : 's'} más.
-                  </Box>
-                </Alert>
-              )}
-              {!emailErrorType && serverError && serverError !== '__rate_limit__' && (
+              {!emailErrorType && serverError && (
                 <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
                   {serverError}
                 </Alert>
@@ -739,20 +862,16 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 </Alert>
               )}
 
-              <Button type="submit" disabled={isLoading || rateLimitCooldown > 0} variant="contained" fullWidth sx={submitBtnSx}
+              <Button type="submit" disabled={isLoading} variant="contained" fullWidth sx={submitBtnSx}
                 startIcon={!isLoading ? <FiUserPlus size={18} /> : undefined}
               >
                 {isLoading ? 'Registrando...' : 'Registrarse'}
               </Button>
-              {rateLimitCooldown > 0 && (
-                <Box sx={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', mt: '-0.5rem' }}>
-                  Podés volver a intentar en <strong style={{ color: '#c0392b' }}>{rateLimitCooldown}s</strong>
-                </Box>
-              )}
             </Box>
           )}
 
-          {/* Separator */}
+          {/* Separator + Google */}
+          <Box>
           <Box
             sx={{
               display: 'flex',
@@ -799,8 +918,144 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           >
             Continuar con Google
           </Button>
+          </Box>
         </Box>
       </Box>
+
+      {/* Modal de recuperación de contraseña */}
+      <Dialog
+        open={showForgotModal}
+        onClose={() => { setShowForgotModal(false); setForgotEmail(''); setForgotSent(false); setErrors({}); setServerError(''); }}
+        fullScreen={isMobile}
+        fullWidth
+        maxWidth={false}
+        slots={{ transition: Grow }}
+        slotProps={{ transition: { timeout: 200 } }}
+        sx={{
+          zIndex: 2100,
+          '& .MuiBackdrop-root': {
+            background: 'linear-gradient(135deg, rgba(184,165,200,0.35) 0%, rgba(0,0,0,0.45) 100%)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          },
+          '& .MuiDialog-paper': {
+            background: 'linear-gradient(145deg, #ffffff 0%, #fafafa 100%)',
+            borderRadius: isMobile ? 0 : '20px',
+            boxShadow: '0 25px 80px -20px rgba(184,165,200,0.4), 0 15px 40px -10px rgba(0,0,0,0.2)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            overflow: 'hidden',
+            position: 'relative',
+            maxWidth: '480px',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, var(--primary-color) 0%, var(--primary-light) 50%, var(--primary-color) 100%)',
+              zIndex: 1,
+            },
+          },
+        }}
+      >
+        <DialogContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: { xs: '1rem', sm: '1.25rem' },
+            p: { xs: '1.75rem 1.25rem', sm: '2rem 1.75rem' },
+          }}
+        >
+          {forgotSent ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', py: 1, textAlign: 'center' }}>
+              <Box
+                sx={{
+                  width: { xs: 56, sm: 64 },
+                  height: { xs: 56, sm: 64 },
+                  borderRadius: '50%',
+                  background: 'rgba(46,204,113,0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <FiCheckCircle size={30} color="#27ae60" />
+              </Box>
+
+              <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 700, color: 'var(--text-dark)' }}>
+                ¡Email enviado!
+              </Typography>
+
+              <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' }, color: '#666', lineHeight: 1.5, maxWidth: 340 }}>
+                Revisá tu bandeja de entrada (y carpeta de spam). Si el correo existe en nuestra base, recibirás el link en breve.
+              </Typography>
+
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => { setShowForgotModal(false); setForgotEmail(''); setForgotSent(false); }}
+                startIcon={<FiLogIn size={16} />}
+                sx={{
+                  mt: 1,
+                  color: 'var(--primary-dark)',
+                  borderColor: 'var(--primary-color)',
+                  borderWidth: 2,
+                  borderRadius: '10px',
+                  py: '0.75rem',
+                  fontWeight: 600,
+                  textTransform: 'none' as const,
+                  fontFamily: "'Poppins', sans-serif",
+                  '&:hover': { background: 'rgba(184,165,200,0.08)', borderColor: 'var(--primary-color)', borderWidth: 2 },
+                }}
+              >
+                Volver a Iniciar Sesión
+              </Button>
+            </Box>
+          ) : (
+            <Box component="form" onSubmit={handleForgotSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <Box>
+                <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 700, color: 'var(--text-dark)', mb: 0.5 }}>
+                  Recuperar contraseña
+                </Typography>
+                <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' }, color: '#888' }}>
+                  Ingresá tu correo y te enviaremos un link para restablecer tu contraseña.
+                </Typography>
+              </Box>
+
+              <Stack spacing={0.5}>
+                <Typography component="label" htmlFor="forgotEmailModal" sx={labelSx}>
+                  Correo Electrónico
+                </Typography>
+                <TextField
+                  id="forgotEmailModal"
+                  type="email"
+                  autoComplete="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  error={!!errors.forgotEmail}
+                  helperText={fieldError(errors.forgotEmail)}
+                  variant="outlined"
+                  fullWidth
+                  sx={inputSx}
+                />
+              </Stack>
+
+              {serverError && (
+                <Alert severity="error" icon={<FiAlertCircle size={18} />} sx={alertErrorSx}>
+                  {serverError}
+                </Alert>
+              )}
+
+              <Button type="submit" disabled={isLoading} variant="contained" fullWidth sx={submitBtnSx}
+                startIcon={!isLoading ? <FiMail size={18} /> : undefined}
+              >
+                {isLoading ? 'Enviando...' : 'Enviar link de recuperación'}
+              </Button>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de confirmación de email */}
       <Dialog
@@ -883,14 +1138,16 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </Typography>
 
           <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.9rem' }, color: '#666', fontWeight: 500 }}>
-            Hemos enviado un enlace de confirmación a:
+            {emailActuallySent
+              ? 'Hemos enviado un enlace de confirmación a:'
+              : 'Tu cuenta fue creada, pero no pudimos enviar el email de confirmación a:'}
           </Typography>
 
           <Box
             sx={{
               fontSize: { xs: '0.75rem', sm: '0.85rem' },
               color: 'var(--primary-color)',
-              fontWeight: 600,
+            fontWeight: 600,
               background: 'rgba(102,126,234,0.08)',
               p: { xs: '0.5rem 0.75rem', sm: '0.6rem 1rem' },
               borderRadius: '6px',
@@ -904,7 +1161,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </Box>
 
           <Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.85rem' }, color: '#999', lineHeight: 1.4, mt: 0.5 }}>
-            Haz clic en el enlace dentro del email para confirmar tu cuenta y activarla.
+            {emailActuallySent
+              ? 'Haz clic en el enlace dentro del email para confirmar tu cuenta y activarla.'
+              : 'Se alcanzó el límite de envíos. Usá el botón de abajo para reenviar el email cuando estés listo.'}
           </Typography>
 
           {confirmationError && (
@@ -950,7 +1209,11 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 '&.Mui-disabled': { opacity: 0.65, color: 'white', background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)' },
               }}
             >
-              {isResendingEmail ? 'Reenviando...' : resendCooldown > 0 ? `Reenviar en ${resendCooldown}s` : '¿No te llegó el correo? Reenviar'}
+              {isResendingEmail
+                ? 'Reenviando...'
+                : resendCooldown > 0
+                  ? `Podés reenviar en ${resendCooldown}s`
+                  : '¿No te llegó el correo? Reenviar'}
             </Button>
 
             <Button

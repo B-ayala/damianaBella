@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+<<<<<<< HEAD
+=======
+import { getCurrentUser, loginUser, logoutUser } from '../../services/userService';
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 import type { Variant, Specification, FAQ } from '../../types/product';
 
 // Auth (login/logout/currentUser/isAuthenticated) vive en `src/store/authStore.ts`
@@ -8,6 +12,7 @@ export interface AdminProduct {
   id: string;
   name: string;
   price: number;
+  originalPrice?: number;
   stock: number;
   category: string;
   imageUrl: string;
@@ -40,6 +45,7 @@ export interface CarouselImage {
   url: string;
   order: number;
   isActive: boolean;
+  deviceType: 'desktop' | 'mobile';
 }
 
 export interface AboutInfo {
@@ -66,11 +72,23 @@ export interface FooterInfo {
 }
 
 interface AdminState {
+<<<<<<< HEAD
   products: AdminProduct[];
   users: AdminUser[];
   carouselImages: CarouselImage[];
+=======
+  isAuthenticated: boolean;
+  authInitialized: boolean;
+  currentUser: { id: string; name: string; email: string; role: string } | null;
+  products: AdminProduct[];
+  users: AdminUser[];
+  carouselImages: CarouselImage[];
+  initializeAuth: () => Promise<void>;
+  login: (email: string, pass: string) => Promise<boolean>;
+  logout: () => void;
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   setCarouselImages: (images: CarouselImage[]) => void;
-  addCarouselImage: (url: string) => void;
+  addCarouselImage: (url: string, deviceType?: 'desktop' | 'mobile') => void;
   updateCarouselImage: (id: string, data: Partial<CarouselImage>) => void;
   deleteCarouselImage: (id: string) => void;
   setProducts: (products: AdminProduct[]) => void;
@@ -85,6 +103,12 @@ interface AdminState {
 }
 
 export const useAdminStore = create<AdminState>((set) => ({
+<<<<<<< HEAD
+=======
+  isAuthenticated: false,
+  authInitialized: false,
+  currentUser: null,
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   products: [],
   users: [],
   carouselImages: [],
@@ -102,9 +126,57 @@ export const useAdminStore = create<AdminState>((set) => ({
     mapQuery: '',
     copyright: '',
   },
+<<<<<<< HEAD
+=======
+  initializeAuth: async () => {
+    const user = await getCurrentUser();
+
+    set({
+      currentUser: user
+        ? {
+            id: user.id || '',
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          }
+        : null,
+      isAuthenticated: user?.role === 'admin',
+      authInitialized: true,
+    });
+  },
+  login: async (email, pass) => {
+    const response = await loginUser({ email, password: pass });
+    console.log('[adminStore] loginUser response:', JSON.stringify(response));
+    if (response.success && response.data) {
+      const userData = {
+        id: response.data.id || '',
+        name: response.data.name,
+        email: response.data.email,
+        role: response.data.role,
+      };
+
+      if (response.data.role === 'admin') {
+        set({
+          isAuthenticated: true,
+          authInitialized: true,
+          currentUser: userData
+        });
+        return true;
+      } else {
+        set({ currentUser: userData, isAuthenticated: false, authInitialized: true });
+        return false;
+      }
+    }
+    return false;
+  },
+  logout: async () => {
+    await logoutUser();
+    set({ isAuthenticated: false, currentUser: null, authInitialized: true });
+  },
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   setCarouselImages: (images) => set({ carouselImages: images }),
-  addCarouselImage: (url) => set((state) => ({
-    carouselImages: [...state.carouselImages, { id: Date.now().toString(), url, order: state.carouselImages.length + 1, isActive: true }]
+  addCarouselImage: (url, deviceType = 'desktop') => set((state) => ({
+    carouselImages: [...state.carouselImages, { id: Date.now().toString(), url, order: state.carouselImages.length + 1, isActive: true, deviceType }]
   })),
   updateCarouselImage: (id, data) => set((state) => ({
     carouselImages: state.carouselImages.map(img => img.id === id ? { ...img, ...data } : img)

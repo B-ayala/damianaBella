@@ -1,0 +1,32 @@
+{
+  "project": "damianaBella",
+  "type": "ecommerce",
+  "stack": ["react", "vite", "typescript", "material-ui", "zustand", "react-query", "node", "express", "postgresql (supabase)"],
+  "architecture": "fullstack-monorepo",
+  "methodology": "sdd",
+  "subprojects": {
+    "frontend": "damiana-bella",
+    "backend": "lia-ecommerce"
+  },
+  "auth": "supabase",
+  "stateManagement": "zustand",
+  "styling": "material-ui + emotion",
+  "deployment": {
+    "frontend": "vercel",
+    "basePath": "/"
+  },
+  "ports": {
+    "frontend": 5173,
+    "backend": 3000
+  },
+  "database": {
+    "provider": "supabase",
+    "tables": [
+      "public.profiles",
+      "public.productos",
+      "public.ventas",
+      "public.carousel_images",
+      "public.categories"
+    ]
+  }
+}

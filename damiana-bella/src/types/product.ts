@@ -1,6 +1,7 @@
 export interface Variant {
   name: string;
   options: string[];
+  stockByOption?: Record<string, number>; // Stock por opción de variante (ej: para talles)
 }
 
 export interface Specification {
@@ -25,6 +26,7 @@ export interface Product {
   id: string | number;
   name: string;
   price: number;
+  originalPrice?: number;
   image: string;
   images?: string[];
   description?: string;

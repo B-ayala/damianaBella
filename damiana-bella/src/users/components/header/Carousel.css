@@ -6,6 +6,25 @@
   background: #b0adad;
 }
 
+.carousel--skeleton {
+  background: #c4c0c0;
+}
+
+/* Shimmer via transform (compositor-only, no repaint) */
+.carousel--skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 25%, #d1cece 50%, transparent 75%);
+  animation: carousel-shimmer 1.5s infinite;
+  will-change: transform;
+}
+
+@keyframes carousel-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 .carousel-slide {
   position: absolute;
   width: 100%;
@@ -26,9 +45,11 @@
 .carousel-image {
   flex: 1;
   height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  width: auto;
+  min-width: 0;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .carousel-overlay {

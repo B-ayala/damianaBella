@@ -1,3 +1,5 @@
+import { createTheme } from '@mui/material/styles';
+
 // ─── Paleta de marca (LIA - Zapatos) ──────────────────────────────────────────
 // Colores primarios (lila/malva — identidad de LIA)
 export const BRAND_COLORS = {
@@ -59,25 +61,57 @@ export const SEMANTIC_COLORS = {
   infoSecondary: '#009ee3',
 } as const;
 
-// ─── Tema legacy (mantiene compatibilidad con importaciones existentes) ───────
-export const theme = {
-  colors: {
-    primary: BRAND_COLORS.primary,
-    primaryLight: BRAND_COLORS.primaryLight,
-    primaryDark: BRAND_COLORS.primaryDark,
-    textDark: NEUTRAL_COLORS.textDark,
-    textLight: NEUTRAL_COLORS.gray600,
-    bgLight: BRAND_COLORS.primaryBg,
-    white: NEUTRAL_COLORS.white,
-    black: NEUTRAL_COLORS.black,
+export const theme = createTheme({
+  palette: {
+    primary: {
+      main: BRAND_COLORS.primary,
+      light: BRAND_COLORS.primaryLight,
+      dark: BRAND_COLORS.primaryDark,
+    },
+    secondary: {
+      main: BRAND_COLORS.accent,
+    },
+    text: {
+      primary: NEUTRAL_COLORS.textDark,
+      secondary: NEUTRAL_COLORS.gray600,
+    },
+    background: {
+      default: NEUTRAL_COLORS.white,
+      paper: NEUTRAL_COLORS.white,
+    },
+    error: {
+      main: SEMANTIC_COLORS.error,
+    },
+    success: {
+      main: SEMANTIC_COLORS.success,
+    },
+    info: {
+      main: SEMANTIC_COLORS.info,
+    },
   },
-  fonts: {
-    main: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  typography: {
+    fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  shape: {
+    borderRadius: 8,
   },
   breakpoints: {
-    mobile: '480px',
-    tablet: '768px',
-    desktop: '1024px',
-    wide: '1400px',
+    values: {
+      xs: 0,
+      sm: 480,
+      md: 768,
+      lg: 1024,
+      xl: 1400,
+    },
   },
-};
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          color: NEUTRAL_COLORS.textDark,
+          backgroundColor: NEUTRAL_COLORS.white,
+        },
+      },
+    },
+  },
+});

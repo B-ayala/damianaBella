@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { FiUser, FiLock, FiLogOut, FiChevronDown } from 'react-icons/fi';
+import { FiUser, FiLock, FiLogOut, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 import { Divider } from '@mui/material';
 import ChangePasswordModal from './ChangePasswordModal';
+import MyPurchasesModal from './MyPurchasesModal';
 import './UserProfileDropdown.css';
 
 interface UserProfileDropdownProps {
@@ -12,6 +13,7 @@ interface UserProfileDropdownProps {
 const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isPurchasesModalOpen, setIsPurchasesModalOpen] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +34,11 @@ const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
   const handleChangePasswordClick = () => {
     setIsDropdownOpen(false);
     setIsPasswordModalOpen(true);
+  };
+
+  const handlePurchasesClick = () => {
+    setIsDropdownOpen(false);
+    setIsPurchasesModalOpen(true);
   };
 
   const handleLogoutClick = async () => {
@@ -61,6 +68,15 @@ const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
 
         {isDropdownOpen && (
           <div className="profile-dropdown-menu">
+            {/* Mis compras */}
+            <button
+              className="profile-dropdown-item"
+              onClick={handlePurchasesClick}
+            >
+              <FiShoppingBag size={18} />
+              <span>Mis compras</span>
+            </button>
+
             {/* Cambiar contraseña */}
             <button
               className="profile-dropdown-item"
@@ -90,10 +106,14 @@ const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
         )}
       </div>
 
-      {/* Modal de cambio de contraseña */}
       <ChangePasswordModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
+      />
+      <MyPurchasesModal
+        isOpen={isPurchasesModalOpen}
+        onClose={() => setIsPurchasesModalOpen(false)}
+        email={user.email}
       />
     </>
   );

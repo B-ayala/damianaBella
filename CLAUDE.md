@@ -2,6 +2,36 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## AI Context (.ai/)
+
+Al inicio de cada conversacion, leer los siguientes archivos para tener contexto completo del proyecto:
+
+### Frontend (damiana-bella/.ai/)
+- `damiana-bella/.ai/config.json` — stack, arquitectura, puertos, tablas de BD
+- `damiana-bella/.ai/personality.md` — rol, principios y forma de trabajar
+- `damiana-bella/.ai/memory/architecture.md` — arquitectura detallada del frontend
+- `damiana-bella/.ai/skills/react.md` — convenciones, patrones y estructura del frontend
+- `damiana-bella/.ai/rules-no-hacer.md` — reglas obligatorias de accesibilidad, performance (CLS/LCP), animaciones y bundles
+
+### Backend (back/lia-ecommerce/.ai/)
+- `back/lia-ecommerce/.ai/config.json` — stack backend, puertos, rutas, env vars
+- `back/lia-ecommerce/.ai/personality.md` — rol senior backend, principios MVC
+- `back/lia-ecommerce/.ai/memory/architecture.md` — arquitectura MVC backend, middleware, pool DB
+- `back/lia-ecommerce/.ai/skills/express.md` — patrones Express, controllers, routes, middleware
+- `back/lia-ecommerce/.ai/skills/database.md` — PostgreSQL/Supabase pool, queries, transacciones
+
+### Specs (por dominio)
+Si el prompt involucra autenticación o JWT:
+- `back/lia-ecommerce/.ai/specs/auth.md` — JWT Supabase, authMiddleware, adminMiddleware
+
+Si el prompt involucra ventas, despachos o el flujo de compra:
+- `damiana-bella/.ai/specs/ventas.md` — spec frontend del modulo de ventas
+- `back/lia-ecommerce/.ai/specs/ventas.md` — spec backend, MP webhook, stock, órdenes
+- `damiana-bella/.ai/tasks/ventas-tasks.md` — tareas frontend completadas y pendientes
+- `back/lia-ecommerce/.ai/tasks/ventas-tasks.md` — tareas backend completadas y pendientes
+
+---
+
 ## Project Overview
 
 Full-stack e-commerce application for a fashion brand. Two sub-projects:
@@ -82,3 +112,9 @@ Single table: `public.profiles` (Supabase PostgreSQL)
 - Auto-updated `updated_at` trigger
 
 Backend REST API: `GET|POST|PUT|DELETE /api/users`, plus `GET /api/users/auth/:userId` to look up by Supabase auth UID.
+
+# Claude Orchestrator
+
+skills:
+  - C:\Users\Brian\.claude\skills\sdd-propose
+  - C:\Users\Brian\.claude\skills\sdd-verify

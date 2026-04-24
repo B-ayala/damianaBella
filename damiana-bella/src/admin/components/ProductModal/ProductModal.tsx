@@ -1,10 +1,21 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
+import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
+<<<<<<< HEAD
 import { createProduct, updateProduct as updateProductApi } from '../../../services/productService';
 import type { Variant, Specification, FAQ } from '../../../types/product';
+=======
+import type { Specification, FAQ } from '../../../types/product';
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 import { COLOR_MAP } from '../../../utils/constants';
+import { calculateDiscountPercentage } from '../../../utils/pricing';
+import { apiFetch } from '../../../utils/apiFetch';
+import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
+import { getNormalizedVariantOptions, getProductStockFromVariants, isSizeVariant, normalizeVariantOption, sanitizeProductVariants } from '../../../utils/productVariants';
+import { Folder, FolderOpen, Dot, Plus, X, Images } from 'lucide-react';
+import CloudinaryImagePicker from '../CloudinaryImagePicker/CloudinaryImagePicker';
 import './ProductModal.css';
 import './ProductModalStylesExtension.css';
 
@@ -12,30 +23,44 @@ interface ProductModalProps {
     isOpen: boolean;
     onClose: () => void;
     product: AdminProduct | null;
+    onSaved?: () => void;
 }
 
 
 const tabs = ['Datos Básicos', 'Variantes', 'Promociones', 'Descripción', 'Especificaciones', 'FAQ'];
+const DEFAULT_VISIBLE_VARIANT_OPTIONS = 6;
 
-const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
-    const { addProduct, updateProduct, products } = useAdminStore();
+const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) => {
+    const { addProduct, updateProduct } = useAdminStore();
 
-    const existingCategories = Array.from(
-        new Set(products.map(p => p.category).filter(Boolean))
-    ).sort();
     const [activeTab, setActiveTab] = useState(tabs[0]);
+    const [dbCategories, setDbCategories] = useState<Category[]>([]);
 
     // Datos Básicos
     const [name, setName] = useState('');
     const [category, setCategory] = useState('');
-    const [isNewCategory, setIsNewCategory] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [newCatName, setNewCatName] = useState('');
+    const [savingCategory, setSavingCategory] = useState(false);
+    const [categoryError, setCategoryError] = useState('');
+    const [newCatParentId, setNewCatParentId] = useState<string | null>(null);
+    const [showManageCatModal, setShowManageCatModal] = useState(false);
+    const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
+    const [manageCatError, setManageCatError] = useState('');
+    const [deleteCatConfirm, setDeleteCatConfirm] = useState<{ id: string; name: string } | null>(null);
+    const [catDropOpen, setCatDropOpen] = useState(false);
+    const [expandedCatIds, setExpandedCatIds] = useState<Set<string>>(new Set());
     const [price, setPrice] = useState('');
     const [stock, setStock] = useState('');
     const [condition, setCondition] = useState<'new' | 'used'>('new');
+    const [status, setStatus] = useState<'active' | 'inactive'>('active');
     const [images, setImages] = useState<string[]>([]);
+    const [pickerOpen, setPickerOpen] = useState(false);
 
     // Promociones
+    const [originalPrice, setOriginalPrice] = useState('');
     const [discount, setDiscount] = useState('');
+    const [discountTouched, setDiscountTouched] = useState(false);
     const [freeShipping, setFreeShipping] = useState(false);
 
     // Descripción
@@ -45,7 +70,8 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
     const [returnPolicy, setReturnPolicy] = useState('');
 
     // Variantes
-    const [variants, setVariants] = useState<{ name: string; optionsText: string }[]>([]);
+    const [variants, setVariants] = useState<{ name: string; optionsText: string; stockByOption?: Record<string, number> }[]>([]);
+    const [expandedVariantOptions, setExpandedVariantOptions] = useState<Record<number, boolean>>({});
     const [customColorName, setCustomColorName] = useState('');
     const [customColorHex, setCustomColorHex] = useState('#000000');
     const [customPaletteColors, setCustomPaletteColors] = useState<Record<string, string>>(() => {
@@ -74,23 +100,111 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [showOptionalWarning, setShowOptionalWarning] = useState(false);
+    const [missingOptionals, setMissingOptionals] = useState<string[]>([]);
+    const managesStockFromVariants = useMemo(
+        () => variants.some((variant) => isSizeVariant(variant.name) && getNormalizedVariantOptions(variant.name, variant.optionsText.split(',')).length > 0),
+        [variants]
+    );
+    const derivedVariantStock = useMemo(() => {
+        const builtVariants = sanitizeProductVariants(
+            variants.map((variant) => ({
+                name: variant.name,
+                options: variant.optionsText.split(','),
+                stockByOption: variant.stockByOption,
+            }))
+        );
+
+        return getProductStockFromVariants(builtVariants) ?? 0;
+    }, [variants]);
+
+    // Clear category error as soon as a category is selected
+    React.useEffect(() => {
+        if (category && fieldErrors.category) {
+            setFieldErrors(prev => { const n = {...prev}; delete n.category; return n; });
+        }
+    }, [category]);
+
+    const toggleCatExpand = (id: string) => {
+        setExpandedCatIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    // Pre-compute tree once per dbCategories change — avoids O(n³) filters on every render
+    const categoryTree = useMemo(() => (
+        dbCategories
+            .filter(c => c.level === 1)
+            .map(cat => ({
+                ...cat,
+                children: dbCategories
+                    .filter(c => c.parent_id === cat.id)
+                    .map(sub => ({
+                        ...sub,
+                        children: dbCategories.filter(c => c.parent_id === sub.id),
+                    })),
+            }))
+    ), [dbCategories]);
+
+    const promotionReferencePrice = useMemo(() => {
+        if (product?.originalPrice && product.originalPrice > 0) return product.originalPrice;
+        if (product?.price && product.price > 0) return product.price;
+        return undefined;
+    }, [product]);
+
+    const syncPromotionFromPrice = (nextPriceValue: string, ignoreDiscountTouched = false) => {
+        if (!product || (discountTouched && !ignoreDiscountTouched)) return;
+
+        const nextPrice = parseFloat(nextPriceValue);
+        if (!promotionReferencePrice || !Number.isFinite(nextPrice) || nextPrice <= 0) return;
+
+        if (nextPrice < promotionReferencePrice) {
+            const nextDiscount = calculateDiscountPercentage(promotionReferencePrice, nextPrice);
+            setOriginalPrice(promotionReferencePrice.toString());
+            setDiscount(nextDiscount ? nextDiscount.toString() : '');
+            return;
+        }
+
+        if (product.originalPrice && nextPrice >= product.originalPrice) {
+            setOriginalPrice('');
+            setDiscount('');
+            return;
+        }
+
+        setOriginalPrice(product.originalPrice?.toString() || '');
+        setDiscount(product.discount?.toString() || '');
+    };
 
     useEffect(() => {
         if (isOpen) {
+            const savedCategory = product?.category || '';
+            setExpandedVariantOptions({});
+            fetchCategoriesTree().then(cats => {
+                setDbCategories(cats);
+                // Normaliza: busca la categoría de forma case-insensitive y usa el
+                // nombre exacto de la DB para que coincida con el option del árbol.
+                const matched = cats.find(c => c.name.toLowerCase() === savedCategory.toLowerCase());
+                setCategory(matched ? matched.name : savedCategory);
+            });
             setActiveTab(tabs[0]);
             if (product) {
                 setName(product.name || '');
-                setCategory(product.category || '');
-                setIsNewCategory(false);
+                setCategory(savedCategory);
                 setPrice(product.price?.toString() || '');
                 setStock(product.stock?.toString() || '');
                 setCondition(product.condition || 'new');
+                setStatus(product.status || 'active');
                 setImages(
                     product.images && product.images.length > 0
                         ? [...product.images]
                         : product.imageUrl ? [product.imageUrl] : []
                 );
+                setOriginalPrice(product.originalPrice?.toString() || '');
                 setDiscount(product.discount?.toString() || '');
+                setDiscountTouched(false);
                 setFreeShipping(product.freeShipping || false);
                 setDescription(product.description || '');
                 setFeaturesText((product.features || []).join('\n'));
@@ -100,6 +214,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                     (product.variants || []).map(v => ({
                         name: v.name,
                         optionsText: v.options.join(', '),
+                        stockByOption: v.stockByOption,
                     }))
                 );
                 setSpecifications(product.specifications ? [...product.specifications] : []);
@@ -114,63 +229,64 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
     const resetForm = () => {
         setName('');
         setCategory('');
-        setIsNewCategory(false);
         setPrice('');
         setStock('');
         setCondition('new');
+        setStatus('active');
         setImages([]);
+        setOriginalPrice('');
         setDiscount('');
+        setDiscountTouched(false);
         setFreeShipping(false);
         setDescription('');
         setFeaturesText('');
         setWarranty('');
         setReturnPolicy('');
         setVariants([]);
+        setExpandedVariantOptions({});
         setSpecifications([]);
         setFaqs([]);
         setCustomColorName('');
         setCustomColorHex('#000000');
+        setFieldErrors({});
+        setShowOptionalWarning(false);
+        setMissingOptionals([]);
     };
 
     const buildPayload = () => {
         const validImages = images.filter(url => url.trim() !== '');
+        const builtVariants = sanitizeProductVariants(
+            variants.map((variant) => ({
+                name: variant.name,
+                options: variant.optionsText.split(','),
+                stockByOption: variant.stockByOption,
+            }))
+        ) ?? [];
+        const totalStock = getProductStockFromVariants(builtVariants) ?? (parseInt(stock) || 0);
+
         return {
             name,
             category: category.trim().replace(/\b\w/g, c => c.toUpperCase()),
             price: parseFloat(price),
-            stock: parseInt(stock) || 0,
+            originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
+            stock: totalStock,
             imageUrl: validImages[0] || '',
             images: validImages,
             condition,
             description,
-            discount: discount ? parseFloat(discount) : null,
+            discount: discount ? parseFloat(discount) : undefined,
             freeShipping,
-            variants: variants.map(v => ({
-                name: v.name,
-                options: v.optionsText
-                    .split(',')
-                    .map(o => {
-                        const trimmed = o.trim();
-                        return v.name.toLowerCase().startsWith('talle') ? trimmed.toUpperCase() : trimmed;
-                    })
-                    .filter(Boolean)
-                    .filter((val, idx, arr) => arr.indexOf(val) === idx),
-            })) as Variant[],
+            variants: builtVariants,
             specifications,
             features: featuresText.split('\n').map(f => f.trim()).filter(Boolean),
             faqs,
             warranty,
             returnPolicy,
-            status: 'active' as const,
+            status,
         };
     };
 
-    const handleSave = async () => {
-        if (!name || !price) {
-            setError('El nombre y el precio son requeridos');
-            return;
-        }
-
+    const executeSave = async () => {
         setSaving(true);
         setError('');
 
@@ -182,6 +298,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
             const payload = buildPayload();
 
             if (product?.id) {
+<<<<<<< HEAD
                 // Editar: pasa por el service (centraliza body + headers + error handling)
                 await updateProductApi(product.id, payload, token);
                 updateProduct(product.id, payload);
@@ -189,6 +306,40 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                 // Crear: idem. Si el backend no devuelve id (caso raro), caemos a
                 // timestamp como sentinel — patrón histórico del componente.
                 const savedData = await createProduct(payload, token);
+=======
+                // Editar: llamar API y actualizar store
+                const response = await apiFetch(
+                    `${import.meta.env.VITE_API_URL_LOCAL}/products/${product.id}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        },
+                        body: JSON.stringify(payload),
+                    }
+                );
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'No se pudo actualizar el producto');
+                }
+                updateProduct(product.id, payload);
+            } else {
+                // Crear: llamar API y agregar al store
+                const response = await apiFetch(`${import.meta.env.VITE_API_URL_LOCAL}/products`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'No se pudo crear el producto');
+                }
+                const savedData = await response.json();
+>>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
                 const newProduct: AdminProduct = {
                     id: savedData?.data?.id || Date.now().toString(),
                     ...payload,
@@ -198,11 +349,45 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
 
             resetForm();
             onClose();
+            onSaved?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudo guardar el producto');
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSave = async () => {
+        // Nivel 1: campos obligatorios
+        const errors: Record<string, string> = {};
+        if (!name.trim()) errors.name = 'El nombre es requerido';
+        if (!price) errors.price = 'El precio es requerido';
+        if (!category) errors.category = 'La categoría es requerida';
+        if (!managesStockFromVariants && !stock) errors.stock = 'El stock es requerido';
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            setActiveTab('Datos Básicos');
+            return;
+        }
+
+        setFieldErrors({});
+
+        // Nivel 2: campos opcionales recomendados
+        const hasValidVariants = variants.some(v => v.name.trim() && v.optionsText.trim());
+        const missing: string[] = [];
+        if (!hasValidVariants) missing.push('Variantes (colores, talles)');
+        if (!description.trim()) missing.push('Descripción');
+        if (specifications.length === 0) missing.push('Especificaciones técnicas');
+        if (faqs.length === 0) missing.push('Preguntas frecuentes (FAQ)');
+
+        if (missing.length > 0) {
+            setMissingOptionals(missing);
+            setShowOptionalWarning(true);
+            return;
+        }
+
+        await executeSave();
     };
 
     const addImage = () => setImages(prev => [...prev, '']);
@@ -231,12 +416,113 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         });
     };
 
-    const addVariant = () => setVariants([...variants, { name: '', optionsText: '' }]);
-    const removeVariant = (i: number) => setVariants(variants.filter((_, j) => j !== i));
+    const handlePickerSelect = (selectedUrls: string[]) => {
+        const newUrls = selectedUrls.filter(url => !images.includes(url));
+        setImages(prev => [...prev, ...newUrls]);
+    };
+
+    const getNormalizedOptionsFromText = (variantName: string, optionsText: string) => (
+        getNormalizedVariantOptions(variantName, optionsText.split(','))
+    );
+
+    const syncVariantState = (
+        variantName: string,
+        optionsText: string,
+        stockByOption?: Record<string, number>
+    ) => {
+        const options = getNormalizedOptionsFromText(variantName, optionsText);
+        const isSizeVariantName = isSizeVariant(variantName);
+
+        return {
+            optionsText: options.join(', '),
+            stockByOption: isSizeVariantName
+                ? options.reduce<Record<string, number>>((acc, option) => {
+                    acc[option] = Math.max(0, stockByOption?.[option] ?? 0);
+                    return acc;
+                }, {})
+                : undefined,
+        };
+    };
+
+    const toggleVariantOptions = (variantIndex: number) => {
+        setExpandedVariantOptions(prev => ({
+            ...prev,
+            [variantIndex]: !prev[variantIndex],
+        }));
+    };
+
+    const updateVariantOptionStock = (variantIndex: number, option: string, rawValue: string) => {
+        const nextStock = Math.max(0, Number.parseInt(rawValue.replace(/\D/g, ''), 10) || 0);
+
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== variantIndex) return variant;
+
+            return {
+                ...variant,
+                stockByOption: {
+                    ...(variant.stockByOption || {}),
+                    [option]: nextStock,
+                },
+            };
+        }));
+    };
+
+    const addVariantOption = (variantIndex: number, rawValue: string) => {
+        let added = false;
+
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== variantIndex) return variant;
+
+            const candidate = normalizeVariantOption(variant.name, rawValue);
+            if (!candidate) return variant;
+
+            const currentOptions = getNormalizedOptionsFromText(variant.name, variant.optionsText);
+            if (currentOptions.includes(candidate)) return variant;
+
+            added = true;
+            const syncedState = syncVariantState(
+                variant.name,
+                [...currentOptions, candidate].join(', '),
+                variant.stockByOption
+            );
+
+            return {
+                ...variant,
+                ...syncedState,
+            };
+        }));
+
+        return added;
+    };
+
+    const addVariant = () => setVariants(prev => [...prev, { name: '', optionsText: '' }]);
+    const removeVariant = (i: number) => {
+        setVariants(variants.filter((_, j) => j !== i));
+        setExpandedVariantOptions(prev => {
+            const next: Record<number, boolean> = {};
+            Object.entries(prev).forEach(([key, value]) => {
+                const numericKey = Number(key);
+                if (numericKey < i) next[numericKey] = value;
+                if (numericKey > i) next[numericKey - 1] = value;
+            });
+            return next;
+        });
+    };
     const updateVariant = (i: number, field: 'name' | 'optionsText', value: string) => {
-        const updated = [...variants];
-        updated[i] = { ...updated[i], [field]: value };
-        setVariants(updated);
+        setVariants(prev => prev.map((variant, index) => {
+            if (index !== i) return variant;
+
+            const nextName = field === 'name' ? value : variant.name;
+            const nextOptionsText = field === 'optionsText' ? value : variant.optionsText;
+            const syncedState = syncVariantState(nextName, nextOptionsText, variant.stockByOption);
+
+            return {
+                ...variant,
+                [field]: value,
+                ...syncedState,
+                name: nextName,
+            };
+        }));
     };
 
     const addSpec = () => setSpecifications([...specifications, { label: '', value: '' }]);
@@ -245,6 +531,48 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         const updated = [...specifications];
         updated[i] = { ...updated[i], [field]: value };
         setSpecifications(updated);
+    };
+
+    const handleCreateCategory = async () => {
+        if (!newCatName.trim()) return;
+        setSavingCategory(true);
+        setCategoryError('');
+        try {
+            const parentCat = newCatParentId ? dbCategories.find(c => c.id === newCatParentId) : null;
+            const level = parentCat ? parentCat.level + 1 : 1;
+            const created = await createCategory(newCatName.trim(), newCatParentId, level);
+            const updated = await fetchCategoriesTree();
+            setDbCategories(updated);
+            setCategory(created.name);
+            setShowCategoryModal(false);
+            setNewCatName('');
+            setNewCatParentId(null);
+        } catch (err) {
+            setCategoryError(err instanceof Error ? err.message : 'No se pudo crear la categoría');
+        } finally {
+            setSavingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (id: string, name: string) => {
+        setDeleteCatConfirm({ id, name });
+    };
+
+    const confirmDeleteCategory = async () => {
+        if (!deleteCatConfirm) return;
+        const { id, name } = deleteCatConfirm;
+        setDeletingCatId(id);
+        setManageCatError('');
+        try {
+            await deleteCategory(id);
+            const updated = await fetchCategoriesTree();
+            setDbCategories(updated);
+            if (category === name) setCategory('');
+        } catch (err) {
+            setManageCatError(err instanceof Error ? err.message : 'No se pudo eliminar la categoría');
+        } finally {
+            setDeletingCatId(null);
+        }
     };
 
     const addFaq = () => setFaqs([...faqs, { question: '', answer: '' }]);
@@ -256,6 +584,7 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
     };
 
     return (
+        <>
         <Modal
             isOpen={isOpen}
             onClose={onClose}
@@ -263,15 +592,19 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
         >
             <div className="product-modal-container">
                 <div className="product-modal-sidebar">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab}
-                            className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            {tab}
-                        </button>
-                    ))}
+                    {tabs.map(tab => {
+                        const hasError = tab === 'Datos Básicos' && Object.keys(fieldErrors).length > 0;
+                        return (
+                            <button
+                                key={tab}
+                                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tab)}
+                            >
+                                {tab}
+                                {hasError && <span className="tab-btn__error-dot" />}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="product-modal-content">
@@ -286,73 +619,157 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                         <div className="tab-pane">
                             <h3>Datos Básicos</h3>
                             <div className="admin-form-grid">
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.name ? ' form-group--error' : ''}`}>
                                     <label>Nombre del producto</label>
                                     <input
                                         type="text"
                                         placeholder="Ej: Remera Básica"
                                         value={name}
-                                        onChange={e => setName(e.target.value)}
+                                        onChange={e => { setName(e.target.value); if (fieldErrors.name) setFieldErrors(prev => { const n = {...prev}; delete n.name; return n; }); }}
                                     />
+                                    {fieldErrors.name && <span className="field-error-msg">{fieldErrors.name}</span>}
                                 </div>
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.category ? ' form-group--error' : ''}`}>
                                     <label>Categoría</label>
-                                    {!isNewCategory ? (
-                                        <select
-                                            className="category-select"
-                                            value={category}
-                                            onChange={e => {
-                                                if (e.target.value === '__new__') {
-                                                    setCategory('');
-                                                    setIsNewCategory(true);
-                                                } else {
-                                                    setCategory(e.target.value);
-                                                }
-                                            }}
-                                        >
-                                            <option value="">-- Seleccionar categoría --</option>
-                                            {existingCategories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                            <option value="__new__">+ Agregar nueva categoría...</option>
-                                        </select>
-                                    ) : (
-                                        <div className="category-new-input-wrapper">
-                                            <input
-                                                type="text"
-                                                className="category-new-input"
-                                                placeholder="Nombre de la nueva categoría"
-                                                value={category}
-                                                onChange={e => setCategory(e.target.value)}
-                                                autoFocus
+                                    <div className="cat-drop-wrapper">
+                                        {catDropOpen && (
+                                            <div
+                                                className="cat-drop-backdrop"
+                                                onClick={() => setCatDropOpen(false)}
                                             />
-                                            <button
-                                                type="button"
-                                                className="category-cancel-btn"
-                                                onClick={() => { setIsNewCategory(false); setCategory(''); }}
-                                            >
-                                                Cancelar
-                                            </button>
-                                        </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className={`cat-drop-trigger${catDropOpen ? ' cat-drop-trigger--open' : ''}`}
+                                            onClick={() => setCatDropOpen(o => !o)}
+                                        >
+                                            <span className={category ? '' : 'cat-drop-placeholder'}>
+                                                {category || '-- Seleccionar categoría --'}
+                                            </span>
+                                            <svg className="cat-drop-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="6 9 12 15 18 9" />
+                                            </svg>
+                                        </button>
+                                        {catDropOpen && (
+                                            <div className="cat-drop-panel">
+                                                <div
+                                                    className="cat-drop-item"
+                                                    onClick={() => { setCategory(''); setCatDropOpen(false); }}
+                                                >
+                                                    <span className="cat-drop-placeholder">-- Seleccionar categoría --</span>
+                                                </div>
+                                                {/* Fallback: categoría actual no encontrada en el árbol */}
+                                                {category && !dbCategories.some(c => c.name.toLowerCase() === category.toLowerCase()) && (
+                                                    <div
+                                                        className="cat-drop-item cat-drop-item--active"
+                                                        onClick={() => setCatDropOpen(false)}
+                                                    >
+                                                        {category}
+                                                    </div>
+                                                )}
+                                                {dbCategories.filter(c => c.level === 1).map(root => {
+                                                    const children = dbCategories.filter(c => c.parent_id === root.id);
+                                                    const rootExpanded = expandedCatIds.has(root.id);
+                                                    return (
+                                                        <div key={root.id} className="cat-drop-group">
+                                                            <div className="cat-drop-group-row">
+                                                                <div
+                                                                    className={`cat-drop-item cat-drop-item--root${category === root.name ? ' cat-drop-item--active' : ''}`}
+                                                                    onClick={() => { setCategory(root.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                >
+                                                                    {root.name}
+                                                                </div>
+                                                                {children.length > 0 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-drop-expand"
+                                                                        onClick={() => toggleCatExpand(root.id)}
+                                                                    >
+                                                                        {rootExpanded ? '▲ ocultar' : 'ver más'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {rootExpanded && children.map(child => {
+                                                                const grandchildren = dbCategories.filter(c => c.parent_id === child.id);
+                                                                const childExpanded = expandedCatIds.has(child.id);
+                                                                return (
+                                                                    <div key={child.id} className="cat-drop-subgroup">
+                                                                        <div className="cat-drop-group-row">
+                                                                            <div
+                                                                                className={`cat-drop-item cat-drop-item--sub${category === child.name ? ' cat-drop-item--active' : ''}`}
+                                                                                onClick={() => { setCategory(child.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                            >
+                                                                                {child.name}
+                                                                            </div>
+                                                                            {grandchildren.length > 0 && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="cat-drop-expand cat-drop-expand--sm"
+                                                                                    onClick={() => toggleCatExpand(child.id)}
+                                                                                >
+                                                                                    {childExpanded ? '▲ ocultar' : 'ver más'}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                        {childExpanded && grandchildren.map(gc => (
+                                                                            <div
+                                                                                key={gc.id}
+                                                                                className={`cat-drop-item cat-drop-item--subsub${category === gc.name ? ' cat-drop-item--active' : ''}`}
+                                                                                onClick={() => { setCategory(gc.name); setCatDropOpen(false); setExpandedCatIds(new Set()); }}
+                                                                            >
+                                                                                {gc.name}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {dbCategories.length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="cat-manage-link"
+                                            onClick={() => { setShowManageCatModal(true); setManageCatError(''); }}
+                                        >
+                                            Gestionar categorías
+                                        </button>
                                     )}
+                                    {fieldErrors.category && <span className="field-error-msg">{fieldErrors.category}</span>}
                                 </div>
-                                <div className="form-group">
+                                <div className={`form-group${fieldErrors.price ? ' form-group--error' : ''}`}>
                                     <label>Precio ($)</label>
                                     <input
                                         type="number"
                                         placeholder="0.00"
                                         value={price}
-                                        onChange={e => setPrice(e.target.value)}
+                                        onChange={e => {
+                                            setPrice(e.target.value);
+                                            syncPromotionFromPrice(e.target.value);
+                                            if (fieldErrors.price) setFieldErrors(prev => { const n = {...prev}; delete n.price; return n; });
+                                        }}
                                     />
+                                    {fieldErrors.price && <span className="field-error-msg">{fieldErrors.price}</span>}
                                 </div>
-                                <div className="form-group">
-                                    <label>Stock disponible</label>
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={stock}
-                                        onChange={e => setStock(e.target.value)}
-                                    />
+                                <div className={`form-group${fieldErrors.stock ? ' form-group--error' : ''}`}>
+                                    <label>{managesStockFromVariants ? 'Stock total' : 'Stock disponible'}</label>
+                                    {managesStockFromVariants ? (
+                                        <div className="stock-derived-card">
+                                            <strong>{derivedVariantStock}</strong>
+                                            <span>Se calcula automáticamente desde los talles configurados en Variantes.</span>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={stock}
+                                            onChange={e => { setStock(e.target.value); if (fieldErrors.stock) setFieldErrors(prev => { const n = {...prev}; delete n.stock; return n; }); }}
+                                        />
+                                    )}
+                                    {fieldErrors.stock && <span className="field-error-msg">{fieldErrors.stock}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label>Condición</label>
@@ -362,6 +779,16 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                     >
                                         <option value="new">Nuevo</option>
                                         <option value="used">Usado</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Estado</label>
+                                    <select
+                                        value={status}
+                                        onChange={e => setStatus(e.target.value as 'active' | 'inactive')}
+                                    >
+                                        <option value="active">Activo</option>
+                                        <option value="inactive">Inactivo</option>
                                     </select>
                                 </div>
                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -427,13 +854,22 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                             </div>
                                         ))}
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="admin-btn-secondary mt-2"
-                                        onClick={addImage}
-                                    >
-                                        + Agregar imagen
-                                    </button>
+                                    <div className="img-manager__actions">
+                                        <button
+                                            type="button"
+                                            className="admin-btn-secondary"
+                                            onClick={addImage}
+                                        >
+                                            + Agregar imagen
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="admin-btn-secondary"
+                                            onClick={() => setPickerOpen(true)}
+                                        >
+                                            <Images size={14} /> Seleccionar de Cloudinary
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -446,20 +882,13 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                             <p style={{ color: '#666', fontSize: '0.88rem', marginBottom: '1rem' }}>
                                 Ej: nombre "Color" con opciones desde la paleta — nombre "Talle" con opciones "S, M, L, XL"
                             </p>
+                            <div className="variants-container">
                             {variants.map((v, i) => {
                                 const isColorVariant = v.name.toLowerCase() === 'color';
                                 const selectedColors = v.optionsText
                                     .split(',').map(s => s.trim()).filter(Boolean);
                                 return (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: '0.5rem',
-                                            padding: '1rem',
-                                            marginBottom: '0.75rem',
-                                        }}
-                                    >
+                                    <div key={i} className="variant-card">
                                         <div className="admin-form-grid">
                                             <div className="form-group">
                                                 <label>Nombre de variante</label>
@@ -626,13 +1055,115 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                                 </div>
                                             ) : (
                                                 <div className="form-group">
-                                                    <label>Opciones (separadas por coma)</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="S, M, L, XL"
-                                                        value={v.optionsText}
-                                                        onChange={e => updateVariant(i, 'optionsText', e.target.value)}
-                                                    />
+                                                    <label>Opciones disponibles</label>
+                                                    <div className="options-editor">
+                                                        <div className="options-list">
+                                                            {(() => {
+                                                                const isTalleVariant = isSizeVariant(v.name);
+                                                                const options = getNormalizedOptionsFromText(v.name, v.optionsText);
+                                                                const shouldCollapseOptions = options.length > DEFAULT_VISIBLE_VARIANT_OPTIONS;
+                                                                const isExpanded = expandedVariantOptions[i] || false;
+                                                                const visibleOptions = shouldCollapseOptions && !isExpanded
+                                                                    ? options.slice(0, DEFAULT_VISIBLE_VARIANT_OPTIONS)
+                                                                    : options;
+
+                                                                return visibleOptions.map((option) => {
+                                                                    const normalizedOption = normalizeVariantOption(v.name, option);
+                                                                    const currentStock = v.stockByOption?.[normalizedOption] ?? 0;
+
+                                                                    return (
+                                                                        <div key={normalizedOption} className={`option-tag${isTalleVariant ? ' option-tag--size' : ''}`}>
+                                                                            <div className="option-tag__content">
+                                                                                <span className="option-tag__label">{option}</span>
+                                                                                {isTalleVariant && (
+                                                                                    <label className="option-tag__stock-field">
+                                                                                        <span className="option-tag__stock-label">Stock</span>
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            inputMode="numeric"
+                                                                                            pattern="[0-9]*"
+                                                                                            placeholder="0"
+                                                                                            value={currentStock}
+                                                                                            onChange={(e) => {
+                                                                                                updateVariantOptionStock(i, normalizedOption, e.target.value);
+                                                                                            }}
+                                                                                            className="option-tag__stock-input"
+                                                                                            aria-label={`Stock para talle ${option}`}
+                                                                                        />
+                                                                                    </label>
+                                                                                )}
+                                                                            </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="option-tag__remove"
+                                                                                aria-label={`Eliminar opción ${option}`}
+                                                                                onClick={() => {
+                                                                                    const remaining = options.filter(currentOption => currentOption !== normalizedOption);
+                                                                                    updateVariant(i, 'optionsText', remaining.join(', '));
+                                                                                    // Al eliminar opción, eliminar su stock
+                                                                                    if (isTalleVariant && v.stockByOption) {
+                                                                                        const updated = [...variants];
+                                                                                        delete updated[i].stockByOption![normalizedOption];
+                                                                                        setVariants(updated);
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <X size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                        {(() => {
+                                                            const totalOptions = getNormalizedOptionsFromText(v.name, v.optionsText).length;
+                                                            if (totalOptions <= DEFAULT_VISIBLE_VARIANT_OPTIONS) return null;
+
+                                                            const isExpanded = expandedVariantOptions[i] || false;
+                                                            const hiddenCount = totalOptions - DEFAULT_VISIBLE_VARIANT_OPTIONS;
+
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    className="options-toggle-btn"
+                                                                    onClick={() => toggleVariantOptions(i)}
+                                                                >
+                                                                    {isExpanded ? 'Ver menos' : `Ver más (${hiddenCount})`}
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                        <div className="option-input-group">
+                                                            <input
+                                                                type="text"
+                                                                placeholder={`Ej: ${v.name === 'Talle' ? 'XL' : v.name === 'Material' ? 'Algodón' : 'Nueva opción'}`}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        const added = addVariantOption(i, e.currentTarget.value);
+                                                                        if (added) {
+                                                                            e.currentTarget.value = '';
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="option-add-btn"
+                                                                onClick={(e) => {
+                                                                    const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
+                                                                    if (input) {
+                                                                        const added = addVariantOption(i, input.value);
+                                                                        if (added) {
+                                                                            input.value = '';
+                                                                            input.focus();
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Plus size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -646,9 +1177,12 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                     </div>
                                 );
                             })}
-                            <button className="admin-btn-secondary mt-2" onClick={addVariant}>
-                                + Agregar variante
-                            </button>
+                            </div>
+                            <div className="add-variant-btn-wrapper">
+                                <button className="admin-btn-secondary" style={{ width: '100%' }} onClick={addVariant}>
+                                    + Agregar variante
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -665,8 +1199,20 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                                         value={discount}
                                         min="0"
                                         max="100"
-                                        onChange={e => setDiscount(e.target.value)}
+                                        onChange={e => {
+                                            setDiscountTouched(Boolean(e.target.value));
+                                            setDiscount(e.target.value);
+                                            if (!e.target.value) {
+                                                setOriginalPrice('');
+                                                syncPromotionFromPrice(price, true);
+                                            }
+                                        }}
                                     />
+                                    {originalPrice && price && (
+                                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                                            Precio original detectado: ${Number(originalPrice).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. El precio actual se guarda como precio final.
+                                        </p>
+                                    )}
                                     {discount && (
                                         <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
                                             Se mostrará como "{discount}% OFF" en la vista del producto
@@ -822,6 +1368,271 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                 </div>
             </div>
 
+            {showCategoryModal && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => { setShowCategoryModal(false); setNewCatName(''); setCategoryError(''); setNewCatParentId(null); }}
+                >
+                    <div className="cat-modal cat-modal--create" onClick={e => e.stopPropagation()}>
+                        <h4 className="cat-modal__title">Nueva Categoría</h4>
+                        <div className="form-group">
+                            <label>Nombre</label>
+                            <input
+                                type="text"
+                                placeholder="Ej: Vestidos"
+                                value={newCatName}
+                                onChange={e => setNewCatName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && newCatName.trim()) handleCreateCategory(); }}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>¿Dónde agregarla?</label>
+                            <select
+                                className="cat-parent-select"
+                                value={newCatParentId ?? '__root__'}
+                                onChange={e => setNewCatParentId(e.target.value === '__root__' ? null : e.target.value)}
+                            >
+                                <option value="__root__">— Categoría principal (nivel 1)</option>
+                                {(() => {
+                                    const opts: React.ReactElement[] = [];
+                                    const addOpt = (cat: Category, depth: number) => {
+                                        const prefix = '\u00a0\u00a0\u00a0'.repeat(depth) + (depth > 0 ? '↳ ' : '');
+                                        opts.push(
+                                            <option key={cat.id} value={cat.id}>
+                                                {prefix}{cat.name}
+                                            </option>
+                                        );
+                                        if (cat.level < 2) {
+                                            dbCategories
+                                                .filter(c => c.parent_id === cat.id)
+                                                .forEach(child => addOpt(child, depth + 1));
+                                        }
+                                    };
+                                    dbCategories.filter(c => c.level === 1).forEach(root => addOpt(root, 0));
+                                    return opts;
+                                })()}
+                            </select>
+                            <p className="cat-location-hint">
+                                {newCatParentId ? (() => {
+                                    const parent = dbCategories.find(c => c.id === newCatParentId);
+                                    if (!parent) return null;
+                                    if (parent.level === 1) {
+                                        return <>Subcategoría de <strong>{parent.name}</strong></>;
+                                    }
+                                    const grandparent = dbCategories.find(c => c.id === parent.parent_id);
+                                    return <>Subcategoría de <strong>{parent.name}</strong>{grandparent ? <> (dentro de {grandparent.name})</> : null}</>;
+                                })() : 'Se creará como categoría principal'}
+                            </p>
+                        </div>
+                        {categoryError && (
+                            <p className="cat-modal__error">{categoryError}</p>
+                        )}
+                        <div className="cat-modal__actions">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => { setShowCategoryModal(false); setNewCatName(''); setCategoryError(''); setNewCatParentId(null); }}
+                                disabled={savingCategory}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={handleCreateCategory}
+                                disabled={!newCatName.trim() || savingCategory}
+                            >
+                                {savingCategory ? 'Guardando...' : 'Crear categoría'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showManageCatModal && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                >
+                    <div className="cat-modal cat-modal--manage" onClick={e => e.stopPropagation()}>
+
+                        {/* ── Header ── */}
+                        <div className="cat-manage-header">
+                            <div className="cat-manage-header-info">
+                                <h4 className="cat-manage-title">Gestionar Categorías</h4>
+                                <p className="cat-manage-subtitle">
+                                    {categoryTree.length} principal{categoryTree.length !== 1 ? 'es' : ''} · {dbCategories.length} en total
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="cat-manage-close-btn"
+                                onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                                title="Cerrar"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* ── Hint ── */}
+                        <div className="cat-manage-hint">
+                            <p>Eliminar una categoría también elimina sus subcategorías. Pasá el cursor (o tocá) para ver las acciones.</p>
+                        </div>
+
+                        {/* ── Error ── */}
+                        {manageCatError && <p className="cat-modal__error" style={{ margin: '0.6rem 1.25rem 0' }}>{manageCatError}</p>}
+
+                        {/* ── Tree body ── */}
+                        <div className="cat-manage-body">
+                            {categoryTree.length === 0 ? (
+                                <div className="cat-list__empty">
+                                    <FolderOpen size={36} strokeWidth={1.5} className="cat-list__empty-icon" />
+                                    <p>No hay categorías creadas aún.</p>
+                                    <p className="cat-list__empty-sub">Usá el botón de abajo para crear la primera.</p>
+                                </div>
+                            ) : (
+                                <div className="cat-tree">
+                                    {categoryTree.map(cat => (
+                                        <div key={cat.id} className="cat-tree-node">
+                                            {/* Nivel 1 */}
+                                            <div className="cat-tree-row cat-tree-row--1">
+                                                <span className="cat-tree-icon">
+                                                    <Folder size={16} strokeWidth={1.8} />
+                                                </span>
+                                                <span className="cat-tree-name">{cat.name}</span>
+                                                {cat.children.length > 0 && (
+                                                    <span className="cat-tree-badge">{cat.children.length}</span>
+                                                )}
+                                                <div className="cat-tree-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="cat-tree-add-btn"
+                                                        title={`Agregar subcategoría en "${cat.name}"`}
+                                                        onClick={() => {
+                                                            setNewCatParentId(cat.id);
+                                                            setShowManageCatModal(false);
+                                                            setNewCatName('');
+                                                            setCategoryError('');
+                                                            setShowCategoryModal(true);
+                                                        }}
+                                                    >
+                                                        <Plus size={11} strokeWidth={2.5} /> Sub
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="cat-tree-del-btn"
+                                                        disabled={deletingCatId === cat.id}
+                                                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                                                        title="Eliminar categoría"
+                                                    >
+                                                        {deletingCatId === cat.id ? '…' : <X size={13} strokeWidth={2.5} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Nivel 2 */}
+                                            {cat.children.length > 0 && (
+                                                <div className="cat-tree-children">
+                                                    {cat.children.map(sub => (
+                                                        <div key={sub.id} className="cat-tree-node">
+                                                            <div className="cat-tree-row cat-tree-row--2">
+                                                                <span className="cat-tree-icon cat-tree-icon--sub">
+                                                                    <FolderOpen size={14} strokeWidth={1.8} />
+                                                                </span>
+                                                                <span className="cat-tree-name cat-tree-name--sub">{sub.name}</span>
+                                                                {sub.children.length > 0 && (
+                                                                    <span className="cat-tree-badge">{sub.children.length}</span>
+                                                                )}
+                                                                <div className="cat-tree-actions">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-tree-add-btn cat-tree-add-btn--sm"
+                                                                        title={`Agregar subcategoría en "${sub.name}"`}
+                                                                        onClick={() => {
+                                                                            setNewCatParentId(sub.id);
+                                                                            setShowManageCatModal(false);
+                                                                            setNewCatName('');
+                                                                            setCategoryError('');
+                                                                            setShowCategoryModal(true);
+                                                                        }}
+                                                                    >
+                                                                        <Plus size={10} strokeWidth={2.5} /> Sub
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="cat-tree-del-btn cat-tree-del-btn--sm"
+                                                                        disabled={deletingCatId === sub.id}
+                                                                        onClick={() => handleDeleteCategory(sub.id, sub.name)}
+                                                                        title="Eliminar"
+                                                                    >
+                                                                        {deletingCatId === sub.id ? '…' : <X size={12} strokeWidth={2.5} />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Nivel 3 */}
+                                                            {sub.children.length > 0 && (
+                                                                <div className="cat-tree-children cat-tree-children--deep">
+                                                                    {sub.children.map(subsub => (
+                                                                        <div key={subsub.id} className="cat-tree-row cat-tree-row--3">
+                                                                            <span className="cat-tree-icon cat-tree-icon--subsub">
+                                                                                <Dot size={16} strokeWidth={3} />
+                                                                            </span>
+                                                                            <span className="cat-tree-name cat-tree-name--subsub">{subsub.name}</span>
+                                                                            <div className="cat-tree-actions">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="cat-tree-del-btn cat-tree-del-btn--sm"
+                                                                                    disabled={deletingCatId === subsub.id}
+                                                                                    onClick={() => handleDeleteCategory(subsub.id, subsub.name)}
+                                                                                    title="Eliminar"
+                                                                                >
+                                                                                    {deletingCatId === subsub.id ? '…' : <X size={11} strokeWidth={2.5} />}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Footer ── */}
+                        <div className="cat-manage-footer">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => {
+                                    setShowManageCatModal(false);
+                                    setManageCatError('');
+                                    setNewCatParentId(null);
+                                    setNewCatName('');
+                                    setCategoryError('');
+                                    setShowCategoryModal(true);
+                                }}
+                            >
+                                + Nueva categoría
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={() => { setShowManageCatModal(false); setManageCatError(''); }}
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="product-modal-footer">
                 <button className="admin-btn-secondary" onClick={onClose} disabled={saving}>
                     Cancelar
@@ -834,7 +1645,63 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
                     {saving ? 'Guardando...' : 'Guardar producto'}
                 </button>
             </div>
+
+            {showOptionalWarning && (
+                <div
+                    className="cat-modal-overlay"
+                    onClick={() => setShowOptionalWarning(false)}
+                >
+                    <div className="cat-modal optional-warning-modal" onClick={e => e.stopPropagation()}>
+                        <h4 className="cat-modal__title">Campos opcionales incompletos</h4>
+                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#555', lineHeight: 1.6 }}>
+                            ¿Estás seguro que deseas guardar el producto sin la siguiente información?
+                        </p>
+                        <ul className="optional-warning-list">
+                            {missingOptionals.map(field => (
+                                <li key={field}>{field}</li>
+                            ))}
+                        </ul>
+                        <div className="cat-modal__actions">
+                            <button
+                                type="button"
+                                className="admin-btn-secondary"
+                                onClick={() => setShowOptionalWarning(false)}
+                                disabled={saving}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn-primary"
+                                onClick={() => { setShowOptionalWarning(false); executeSave(); }}
+                                disabled={saving}
+                            >
+                                {saving ? 'Guardando...' : 'Guardar de todas formas'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Modal>
+
+        <ConfirmationModal
+            isOpen={deleteCatConfirm !== null}
+            onClose={() => setDeleteCatConfirm(null)}
+            title={`Eliminar "${deleteCatConfirm?.name}"`}
+            message="También se eliminarán sus subcategorías. Esta acción no se puede deshacer."
+            status="error"
+            actionButtonText="Eliminar"
+            cancelButtonText="Cancelar"
+            onActionClick={confirmDeleteCategory}
+        />
+
+        <CloudinaryImagePicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            onSelect={handlePickerSelect}
+        />
+
+        </>
     );
 };
 
