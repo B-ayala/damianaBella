@@ -28,6 +28,28 @@ body {
     box-shadow var(--transition-base) var(--transition-curve);
 }
 
+/* ─── Clásico (marca LIA original) ───────────────────────────────────────── */
+:root[data-season='default'] {
+  --primary-color: #B8A5C8;
+  --primary-light: #D4C9E0;
+  --primary-dark: #9A86AC;
+  --primary-bg: #F5F0FA;
+  --primary-accent: #B8377D;
+  --bg-light: #F5F0FA;
+
+  --brand-green: #2c5f2d;
+  --button-dark: #050505;
+  --button-dark-hover: #234a24;
+
+  --season-gradient: linear-gradient(135deg, #9A86AC 0%, #B8A5C8 50%, #B8377D 100%);
+  --season-soft: linear-gradient(180deg, #F5F0FA 0%, #FDF0F8 100%);
+  --season-ribbon: linear-gradient(90deg, #9A86AC, #B8A5C8, #B8377D);
+
+  --shadow-primary: 0 10px 30px rgba(184, 165, 200, 0.4);
+  --shadow-primary-hover: 0 15px 40px rgba(184, 165, 200, 0.6);
+  --shadow-2xl: 0 25px 80px -20px rgba(184, 165, 200, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
 /* ─── Primavera ────────────────────────────────────────────────────────────── */
 :root[data-season='spring'] {
   --primary-color: #7BB661;

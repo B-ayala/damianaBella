@@ -1,10 +1,17 @@
 /* ─── Seasonal backdrop ─────────────────────────────────────────────────────
- * Capa decorativa fijada detrás del contenido (pointer-events: none) que
- * muestra partículas acordes a la estación: hojas en otoño, nieve en invierno,
- * pétalos en primavera y destellos cálidos en verano.
+ * Capa decorativa fijada detrás del contenido (pointer-events: none) con
+ * partículas estacionales. Optimizaciones aplicadas:
  *
- * Pensado para ser ligero — cada partícula es un solo glyph con animación
- * de translate/rotate (compositor-only, sin repaint).
+ *  - SÓLO animamos transform + opacity (compositor-only, sin repaint).
+ *  - Sin `filter: drop-shadow` ni `text-shadow`: fuerzan repaint por frame.
+ *  - `contain: layout paint style` aísla el backdrop del resto del árbol,
+ *    así un cambio aquí no invalida el paint del resto de la página.
+ *  - `transform: translateZ(0)` en el contenedor promueve una sola capa
+ *    compositor desde el arranque (sin "salto" cuando empieza la animación).
+ *  - `will-change: transform` sólo en las partículas activas — no lo usamos
+ *    en el contenedor porque reserva memoria GPU sin beneficio.
+ *  - `animation-play-state: paused` cuando el documento está oculto
+ *    (reduce uso de GPU cuando el usuario no está mirando la pestaña).
  * ─────────────────────────────────────────────────────────────────────────── */
 
 .seasonal-backdrop {
@@ -15,6 +22,8 @@
   pointer-events: none;
   z-index: 1;
   overflow: hidden;
+  contain: layout paint style;
+  transform: translateZ(0);
 }
 
 .seasonal-particle {
@@ -23,8 +32,14 @@
   font-size: 1.6rem;
   opacity: 0;
   will-change: transform, opacity;
+  backface-visibility: hidden;
   user-select: none;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* Pausa las animaciones cuando el tab no está visible — el browser ya
+ * throttlea, pero esto las congela del todo y libera trabajo de compositor. */
+:root[data-page-hidden='true'] .seasonal-particle {
+  animation-play-state: paused;
 }
 
 /* ─── Otoño — hojas que caen con balanceo lateral ─────────────────────────── */
@@ -56,7 +71,6 @@
 [data-season='winter'] .seasonal-particle {
   animation: snow-fall linear infinite;
   color: #ffffff;
-  text-shadow: 0 0 6px rgba(168, 200, 232, 0.8);
 }
 
 @keyframes snow-fall {
@@ -105,16 +119,11 @@
 }
 
 /* ─── Verano — destellos cálidos ascendentes ──────────────────────────────── */
-[data-season='summer'] .seasonal-backdrop {
-  height: 100vh;
-}
-
 [data-season='summer'] .seasonal-particle {
   top: auto;
   bottom: -5vh;
   animation: spark-rise linear infinite;
   color: #F4A100;
-  text-shadow: 0 0 10px rgba(244, 161, 0, 0.6);
 }
 
 @keyframes spark-rise {
@@ -158,10 +167,10 @@
   }
 }
 
-/* En pantallas muy chicas reducimos la cantidad visible — menos ruido visual
- * y menos carga de animaciones para dispositivos con menos GPU. */
+/* En pantallas chicas bajamos la cantidad y tamaño — menos trabajo para GPUs
+ * móviles y menos ruido visual. */
 @media (max-width: 600px) {
-  .seasonal-particle:nth-child(n+9) {
+  .seasonal-particle:nth-child(n+7) {
     display: none;
   }
   .seasonal-particle {

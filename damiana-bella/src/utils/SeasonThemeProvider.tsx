@@ -15,21 +15,47 @@ import {
 // el admin elige "Aplicar a todos los usuarios". Si la lectura falla (RLS,
 // tabla inexistente), el provider degrada a la preferencia local sin romper.
 
-const STORAGE_KEY = 'lia.seasonTheme.v1';
+const STORAGE_KEY = 'lia.seasonTheme.v2';
+const STORAGE_KEY_LEGACY = 'lia.seasonTheme.v1';
+
+type AnimationsEnabled = Record<SeasonId, boolean>;
+
+const DEFAULT_ANIMATIONS: AnimationsEnabled = {
+  default: false,
+  spring: true,
+  summer: true,
+  autumn: true,
+  winter: true,
+};
 
 interface PersistedPreference {
   season: SeasonId;
   mode: ThemeMode;
+  animations: AnimationsEnabled;
 }
+
+const normalizeAnimations = (raw: unknown): AnimationsEnabled => {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_ANIMATIONS };
+  const source = raw as Record<string, unknown>;
+  const out = { ...DEFAULT_ANIMATIONS };
+  (Object.keys(out) as SeasonId[]).forEach((key) => {
+    if (typeof source[key] === 'boolean') out[key] = source[key] as boolean;
+  });
+  return out;
+};
 
 const readLocalPreference = (): PersistedPreference | null => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(STORAGE_KEY_LEGACY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!isSeasonId(parsed.season)) return null;
     const mode: ThemeMode = parsed.mode === 'auto' ? 'auto' : 'manual';
-    return { season: parsed.season, mode };
+    return {
+      season: parsed.season,
+      mode,
+      animations: normalizeAnimations(parsed.animations),
+    };
   } catch {
     return null;
   }
@@ -61,8 +87,11 @@ interface SeasonThemeContextValue {
   mode: ThemeMode;
   detectedSeason: SeasonId;  // según la fecha actual
   isPreviewing: boolean;
+  animations: AnimationsEnabled;
+  isAnimationEnabled: (season: SeasonId) => boolean;
   setSeason: (season: SeasonId) => void;
   setMode: (mode: ThemeMode) => void;
+  setAnimationEnabled: (season: SeasonId, enabled: boolean) => void;
   preview: (season: SeasonId) => void;
   clearPreview: () => void;
   resetToDefault: () => void;
@@ -85,11 +114,12 @@ export const SeasonThemeProvider = ({ children }: SeasonThemeProviderProps) => {
   const initial = useMemo<PersistedPreference>(() => {
     const stored = readLocalPreference();
     if (stored) return stored;
-    return { season: DEFAULT_SEASON, mode: 'manual' };
+    return { season: DEFAULT_SEASON, mode: 'manual', animations: { ...DEFAULT_ANIMATIONS } };
   }, []);
 
   const [storedSeason, setStoredSeason] = useState<SeasonId>(initial.season);
   const [mode, setModeState] = useState<ThemeMode>(initial.mode);
+  const [animations, setAnimations] = useState<AnimationsEnabled>(initial.animations);
   const [previewSeason, setPreviewSeason] = useState<SeasonId | null>(null);
   const [detectedSeason, setDetectedSeason] = useState<SeasonId>(() => detectSeasonFromDate());
 
@@ -115,8 +145,8 @@ export const SeasonThemeProvider = ({ children }: SeasonThemeProviderProps) => {
 
   // Persistencia local — no perseguimos preview, sólo la preferencia confirmada.
   useEffect(() => {
-    writeLocalPreference({ season: storedSeason, mode });
-  }, [storedSeason, mode]);
+    writeLocalPreference({ season: storedSeason, mode, animations });
+  }, [storedSeason, mode, animations]);
 
   const setSeason = useCallback((season: SeasonId) => {
     if (!SEASONS[season]) return;
@@ -130,6 +160,19 @@ export const SeasonThemeProvider = ({ children }: SeasonThemeProviderProps) => {
     setModeState(next);
     setPreviewSeason(null);
   }, []);
+
+  const setAnimationEnabled = useCallback((season: SeasonId, enabled: boolean) => {
+    if (!SEASONS[season]) return;
+    setAnimations((prev) => {
+      if (prev[season] === enabled) return prev;
+      return { ...prev, [season]: enabled };
+    });
+  }, []);
+
+  const isAnimationEnabled = useCallback(
+    (season: SeasonId) => SEASONS[season].hasParticles && animations[season],
+    [animations],
+  );
 
   const preview = useCallback((season: SeasonId) => {
     if (!SEASONS[season]) return;
@@ -150,13 +193,16 @@ export const SeasonThemeProvider = ({ children }: SeasonThemeProviderProps) => {
     mode,
     detectedSeason,
     isPreviewing: previewSeason !== null,
+    animations,
+    isAnimationEnabled,
     setSeason,
     setMode,
+    setAnimationEnabled,
     preview,
     clearPreview,
     resetToDefault,
-  }), [effectiveSeason, storedSeason, mode, detectedSeason, previewSeason,
-       setSeason, setMode, preview, clearPreview, resetToDefault]);
+  }), [effectiveSeason, storedSeason, mode, detectedSeason, previewSeason, animations,
+       isAnimationEnabled, setSeason, setMode, setAnimationEnabled, preview, clearPreview, resetToDefault]);
 
   return (
     <SeasonThemeContext.Provider value={value}>

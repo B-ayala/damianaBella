@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Globe, Palette, RefreshCw, Save, Sparkles } from 'lucide-react';
+import { Check, EyeOff, Globe, Palette, RefreshCw, Save, Sparkles } from 'lucide-react';
 import { supabase } from '../../../config/supabaseClient';
 import { useSeasonTheme } from '../../../utils/SeasonThemeProvider';
 import {
@@ -20,7 +20,19 @@ interface RemoteThemePref {
 }
 
 const ThemesManager = () => {
-  const { season, storedSeason, mode, detectedSeason, isPreviewing, setSeason, setMode, preview, clearPreview } = useSeasonTheme();
+  const {
+    season,
+    storedSeason,
+    mode,
+    detectedSeason,
+    isPreviewing,
+    animations,
+    setSeason,
+    setMode,
+    setAnimationEnabled,
+    preview,
+    clearPreview,
+  } = useSeasonTheme();
 
   const [remoteSeason, setRemoteSeason] = useState<SeasonId | null>(null);
   const [savingRemote, setSavingRemote] = useState(false);
@@ -129,6 +141,8 @@ const ThemesManager = () => {
             const isActive = season === s.id;
             const isStored = storedSeason === s.id && mode === 'manual';
             const isRemote = remoteSeason === s.id;
+            const animationEnabled = animations[s.id];
+            const toggleId = `anim-toggle-${s.id}`;
             return (
               <article
                 key={s.id}
@@ -180,6 +194,34 @@ const ThemesManager = () => {
                     </span>
                   </div>
                 </div>
+
+                {s.hasParticles ? (
+                  <label
+                    className="theme-card-animation"
+                    htmlFor={toggleId}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="theme-card-animation-label">
+                      <Sparkles size={14} aria-hidden="true" />
+                      Animación de fondo
+                    </span>
+                    <input
+                      id={toggleId}
+                      type="checkbox"
+                      className="theme-card-animation-input"
+                      checked={animationEnabled}
+                      onChange={(e) => setAnimationEnabled(s.id, e.target.checked)}
+                    />
+                    <span className="theme-card-animation-switch" aria-hidden="true" />
+                  </label>
+                ) : (
+                  <div className="theme-card-animation is-disabled" aria-hidden="true">
+                    <span className="theme-card-animation-label">
+                      <EyeOff size={14} aria-hidden="true" />
+                      Sin animación
+                    </span>
+                  </div>
+                )}
 
                 <footer className="theme-card-footer">
                   <div className="theme-card-meta">
