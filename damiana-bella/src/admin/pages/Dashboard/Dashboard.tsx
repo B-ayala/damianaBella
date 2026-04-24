@@ -9,14 +9,10 @@ const Dashboard = () => {
     const totalProducts = products.length;
     const lowStockProducts = products.filter(p => p.stock <= 5).length;
     const totalUsers = users.length;
-<<<<<<< HEAD
     // "Promo activa" = producto activo con descuento numérico > 0. El campo
     // `hasPromo` original no existe en el schema actual — se derivó del
     // descuento cuando se migró a la tabla `productos`.
     const activePromos = products.filter(p => p.status === 'active' && (p.discount ?? 0) > 0).length;
-=======
-    const activePromos = products.filter(p => p.discount && p.discount > 0 && p.status === 'active').length;
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 
     const cards = [
         { title: 'Total Productos', value: totalProducts, icon: Package, color: 'bg-blue-100 text-blue-600', iconColor: '#2563eb', bgColor: '#dbeafe' },

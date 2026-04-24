@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiX, FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { useCartStore } from '../../../store/cartStore';
 import type { UnitVariants } from '../../../store/cartStore';
-import { useAdminStore } from '../../../admin/store/adminStore';
+import { useAuthStore } from '../../../store/authStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
@@ -40,7 +40,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const navigate = useNavigate();
-  const currentUser = useAdminStore((s) => s.currentUser);
+  const currentUser = useAuthStore((s) => s.currentUser);
   const items = useCartStore((s) => s.items);
   const removeItem = useCartStore((s) => s.removeItem);
   const setUnitVariants = useCartStore((s) => s.setUnitVariants);

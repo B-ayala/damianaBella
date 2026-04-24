@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { loginUser, logoutUser } from '../services/userService';
+import { getCurrentUser, loginUser, logoutUser } from '../services/userService';
 
 // ─── Authentication store ────────────────────────────────────────────────────
 //
@@ -24,14 +24,27 @@ export interface AuthUser {
 
 interface AuthState {
   isAuthenticated: boolean;
+  authInitialized: boolean;
   currentUser: AuthUser | null;
+  initializeAuth: () => Promise<void>;
   login: (email: string, pass: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
+  authInitialized: false,
   currentUser: null,
+  initializeAuth: async () => {
+    const user = await getCurrentUser();
+    set({
+      currentUser: user
+        ? { id: user.id || '', name: user.name, email: user.email, role: user.role }
+        : null,
+      isAuthenticated: user?.role === 'admin',
+      authInitialized: true,
+    });
+  },
   login: async (email, pass) => {
     const response = await loginUser({ email, password: pass });
     if (response.success && response.data) {
@@ -43,17 +56,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       };
 
       if (response.data.role === 'admin') {
-        set({ isAuthenticated: true, currentUser: userData });
+        set({ isAuthenticated: true, authInitialized: true, currentUser: userData });
         return true;
       }
       // Usuario regular: sesión válida pero sin acceso al panel.
-      set({ currentUser: userData });
+      set({ currentUser: userData, authInitialized: true });
       return false;
     }
     return false;
   },
   logout: async () => {
     await logoutUser();
-    set({ isAuthenticated: false, currentUser: null });
+    set({ isAuthenticated: false, currentUser: null, authInitialized: true });
   },
 }));

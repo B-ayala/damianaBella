@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/cartStore';
-import { useAdminStore } from '../../../admin/store/adminStore';
+import { useAuthStore } from '../../../store/authStore';
 import { parseColorOption } from '../../../utils/constants';
 import { getProductPricing } from '../../../utils/pricing';
 import { createOrder, createMpPreference, INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
@@ -245,8 +245,8 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
   const [mpError, setMpError] = useState('');
   const [mpReady, setMpReady] = useState(false);
-  const currentUser = useAdminStore((s) => s.currentUser);
-  const authInitialized = useAdminStore((s) => s.authInitialized);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const authInitialized = useAuthStore((s) => s.authInitialized);
   const [buyerName, setBuyerName] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [selectedPayment, setSelectedPayment] = useState('mp');

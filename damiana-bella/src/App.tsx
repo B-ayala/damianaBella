@@ -9,14 +9,14 @@ import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
 import Footer from './components/common/Footer/Footer';
 import { supabase } from './config/supabaseClient';
-import { useAdminStore } from './admin/store/adminStore';
+import { useAuthStore } from './store/authStore';
 import { InitialLoadProvider, useInitialLoad } from './components/common/InitialLoad/InitialLoadProvider';
 
 const AppContent = () => {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const isAuthRoute = location.pathname.startsWith('/auth');
-  const initializeAuth = useAdminStore((state) => state.initializeAuth);
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const { completeTask } = useInitialLoad();
 
   useEffect(() => {
@@ -75,26 +75,18 @@ const AppContent = () => {
 
 function App() {
   return (
-<<<<<<< HEAD
-    <ThemeProvider theme={theme}>
-      <SeasonThemeProvider>
-        <BrowserRouter basename="/LIA">
-          <AppContent />
-        </BrowserRouter>
-      </SeasonThemeProvider>
-    </ThemeProvider>
-=======
     <HelmetProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BrowserRouter>
-          <InitialLoadProvider>
-            <AppContent />
-          </InitialLoadProvider>
-        </BrowserRouter>
+        <SeasonThemeProvider>
+          <BrowserRouter>
+            <InitialLoadProvider>
+              <AppContent />
+            </InitialLoadProvider>
+          </BrowserRouter>
+        </SeasonThemeProvider>
       </ThemeProvider>
     </HelmetProvider>
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
   );
 }
 

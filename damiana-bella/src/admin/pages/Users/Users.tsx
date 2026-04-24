@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react';
-<<<<<<< HEAD
-import { Trash2, RefreshCw, Shield, ShieldOff } from 'lucide-react';
-import { useAuthStore } from '../../../store/authStore';
-=======
 import { Trash2, RefreshCw, Shield, ShieldOff, Search } from 'lucide-react';
 import { Pagination, Box, InputAdornment, TextField } from '@mui/material';
-import { useAdminStore } from '../../store/adminStore';
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
+import { useAuthStore } from '../../../store/authStore';
 import { getAdminUsers, deleteAdminUser, updateUserRole, type AdminUserData } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import './Users.css';

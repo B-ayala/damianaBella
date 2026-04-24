@@ -7,11 +7,7 @@ import logoImg from '../../../../assets/img/logo.jpeg?w=120&format=webp&quality=
 import AuthModal from '../../auth/AuthModal';
 import UserProfileDropdown from './UserProfileDropdown';
 import ChangePasswordModal from './ChangePasswordModal';
-<<<<<<< HEAD
 import { useAuthStore } from '../../../../store/authStore';
-import { fetchCategories } from '../../../../services/productService';
-=======
-import { useAdminStore } from '../../../../admin/store/adminStore';
 import { fetchCategoriesTree, searchProducts, type Category, type ProductSearchResult } from '../../../../services/productService';
 import { getProductPricing } from '../../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../../utils/cloudinary';
@@ -19,7 +15,6 @@ import { useCartStore } from '../../../../store/cartStore';
 import CartDrawer from '../../cart/CartDrawer';
 import MyPurchasesModal from './MyPurchasesModal';
 import { useInitialLoadTask } from '../../../../components/common/InitialLoad/InitialLoadProvider';
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 import './NavBar.css';
 
 const staticNavBefore = [{ name: 'Inicio', path: '/' }];
@@ -50,11 +45,6 @@ const NavBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
-<<<<<<< HEAD
-  const [categories, setCategories] = useState<string[]>([]);
-  const currentUser = useAuthStore(state => state.currentUser);
-  const logout = useAuthStore(state => state.logout);
-=======
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobilePurchasesModalOpen, setIsMobilePurchasesModalOpen] = useState(false);
   const [cartBump, setCartBump] = useState(false);
@@ -76,9 +66,8 @@ const NavBar = () => {
   const [mobileL1, setMobileL1] = useState<Category | null>(null);
   const [mobileL2, setMobileL2] = useState<Category | null>(null);
   const [mobileInProductsMenu, setMobileInProductsMenu] = useState(false);
-  const currentUser = useAdminStore(state => state.currentUser);
-  const logout = useAdminStore(state => state.logout);
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
+  const currentUser = useAuthStore(state => state.currentUser);
+  const logout = useAuthStore(state => state.logout);
 
   useBodyScrollLock(mobileMenuOpen);
   useInitialLoadTask('public-layout', isCategoriesLoading);

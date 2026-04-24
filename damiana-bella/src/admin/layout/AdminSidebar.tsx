@@ -1,14 +1,8 @@
 import { NavLink } from 'react-router-dom';
-<<<<<<< HEAD
-import { Home, ShoppingBag, Users, Info, Settings, LogOut, Image, Palette } from 'lucide-react';
+import { Home, ShoppingBag, Users, Info, Settings, LogOut, Image, Palette, BarChart2, Truck } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import logoImg from '../../assets/img/logo.jpeg';
-=======
-import { Home, ShoppingBag, Users, Info, Settings, LogOut, Image, BarChart2, Truck } from 'lucide-react';
-import { useAdminStore } from '../store/adminStore';
 // @ts-ignore - vite-imagetools query param
 import logoImg from '../../assets/img/logo.jpeg?w=120&format=webp&quality=80';
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 import './AdminSidebar.css';
 
 const AdminSidebar = ({ isOpen, toggleSidebar }: { isOpen: boolean, toggleSidebar: () => void }) => {

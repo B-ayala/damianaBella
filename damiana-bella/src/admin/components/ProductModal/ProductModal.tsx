@@ -3,15 +3,10 @@ import Modal from '../../../components/common/Modal/Modal';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
-<<<<<<< HEAD
 import { createProduct, updateProduct as updateProductApi } from '../../../services/productService';
-import type { Variant, Specification, FAQ } from '../../../types/product';
-=======
 import type { Specification, FAQ } from '../../../types/product';
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
 import { COLOR_MAP } from '../../../utils/constants';
 import { calculateDiscountPercentage } from '../../../utils/pricing';
-import { apiFetch } from '../../../utils/apiFetch';
 import { fetchCategoriesTree, createCategory, deleteCategory, type Category } from '../../../services/productService';
 import { getNormalizedVariantOptions, getProductStockFromVariants, isSizeVariant, normalizeVariantOption, sanitizeProductVariants } from '../../../utils/productVariants';
 import { Folder, FolderOpen, Dot, Plus, X, Images } from 'lucide-react';
@@ -298,7 +293,6 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             const payload = buildPayload();
 
             if (product?.id) {
-<<<<<<< HEAD
                 // Editar: pasa por el service (centraliza body + headers + error handling)
                 await updateProductApi(product.id, payload, token);
                 updateProduct(product.id, payload);
@@ -306,40 +300,6 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                 // Crear: idem. Si el backend no devuelve id (caso raro), caemos a
                 // timestamp como sentinel — patrón histórico del componente.
                 const savedData = await createProduct(payload, token);
-=======
-                // Editar: llamar API y actualizar store
-                const response = await apiFetch(
-                    `${import.meta.env.VITE_API_URL_LOCAL}/products/${product.id}`,
-                    {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`,
-                        },
-                        body: JSON.stringify(payload),
-                    }
-                );
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'No se pudo actualizar el producto');
-                }
-                updateProduct(product.id, payload);
-            } else {
-                // Crear: llamar API y agregar al store
-                const response = await apiFetch(`${import.meta.env.VITE_API_URL_LOCAL}/products`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(payload),
-                });
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'No se pudo crear el producto');
-                }
-                const savedData = await response.json();
->>>>>>> dbfe84bfd5fd63ece459443b614fa97480384591
                 const newProduct: AdminProduct = {
                     id: savedData?.data?.id || Date.now().toString(),
                     ...payload,
