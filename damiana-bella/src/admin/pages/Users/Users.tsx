@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Trash2, RefreshCw, Shield, ShieldOff } from 'lucide-react';
-import { useAdminStore } from '../../store/adminStore';
+import { useAuthStore } from '../../../store/authStore';
 import { getAdminUsers, deleteAdminUser, updateUserRole, type AdminUserData } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import './Users.css';
 
 const Users = () => {
-    const currentUser = useAdminStore(state => state.currentUser);
+    const currentUser = useAuthStore(state => state.currentUser);
     const [users, setUsers] = useState<AdminUserData[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);

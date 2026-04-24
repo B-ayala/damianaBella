@@ -8,7 +8,7 @@ import { FcGoogle } from 'react-icons/fc';
 import {
   FiLogIn, FiUserPlus, FiAlertCircle, FiCheckCircle, FiMail, FiArrowRight, FiMessageSquare,
 } from 'react-icons/fi';
-import { useAdminStore } from '../../../admin/store/adminStore';
+import { useAuthStore } from '../../../store/authStore';
 import { isValidEmail } from '../../../utils/validation';
 import { createUser, resendConfirmationEmail } from '../../../services/userService';
 import Modal from '../../../components/common/Modal/Modal';
@@ -196,7 +196,7 @@ const fieldError = (msg?: string) =>
 
 const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const navigate = useNavigate();
-  const login = useAdminStore(state => state.login);
+  const login = useAuthStore(state => state.login);
   const isMobile = useMediaQuery('(max-width:639px)');
   const [view, setView] = useState<'login' | 'register'>('login');
 

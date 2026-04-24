@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { loginUser, logoutUser } from '../../services/userService';
 import type { Variant, Specification, FAQ } from '../../types/product';
+
+// Auth (login/logout/currentUser/isAuthenticated) vive en `src/store/authStore.ts`
+// — separado para no forzar a la capa pública a importar desde `admin/`.
 
 export interface AdminProduct {
   id: string;
@@ -11,7 +13,8 @@ export interface AdminProduct {
   imageUrl: string;
   images?: string[];
   description?: string;
-  discount?: number;
+  // Permite null: sentinel de "borrar descuento" en PUT (undefined se omite del JSON).
+  discount?: number | null;
   condition?: 'new' | 'used';
   freeShipping?: boolean;
   variants?: Variant[];
@@ -63,13 +66,9 @@ export interface FooterInfo {
 }
 
 interface AdminState {
-  isAuthenticated: boolean;
-  currentUser: { id: string; name: string; email: string; role: string } | null;
   products: AdminProduct[];
   users: AdminUser[];
   carouselImages: CarouselImage[];
-  login: (email: string, pass: string) => Promise<boolean>;
-  logout: () => void;
   setCarouselImages: (images: CarouselImage[]) => void;
   addCarouselImage: (url: string) => void;
   updateCarouselImage: (id: string, data: Partial<CarouselImage>) => void;
@@ -86,8 +85,6 @@ interface AdminState {
 }
 
 export const useAdminStore = create<AdminState>((set) => ({
-  isAuthenticated: false,
-  currentUser: null,
   products: [],
   users: [],
   carouselImages: [],
@@ -104,34 +101,6 @@ export const useAdminStore = create<AdminState>((set) => ({
     address: '',
     mapQuery: '',
     copyright: '',
-  },
-  login: async (email, pass) => {
-    const response = await loginUser({ email, password: pass });
-    console.log('[adminStore] loginUser response:', JSON.stringify(response));
-    if (response.success && response.data) {
-      const userData = {
-        id: response.data.id || '',
-        name: response.data.name,
-        email: response.data.email,
-        role: response.data.role,
-      };
-
-      if (response.data.role === 'admin') {
-        set({
-          isAuthenticated: true,
-          currentUser: userData
-        });
-        return true;
-      } else {
-        set({ currentUser: userData });
-        return false;
-      }
-    }
-    return false;
-  },
-  logout: async () => {
-    await logoutUser();
-    set({ isAuthenticated: false, currentUser: null });
   },
   setCarouselImages: (images) => set({ carouselImages: images }),
   addCarouselImage: (url) => set((state) => ({

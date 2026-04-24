@@ -46,7 +46,8 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
         filteredProducts.sort((a, b) => {
             const aVal = a[key];
             const bVal = b[key];
-            if (aVal !== undefined && bVal !== undefined) {
+            // != null cubre undefined y null (este último válido p/ discount).
+            if (aVal != null && bVal != null) {
                 if (aVal < bVal) return direction === 'asc' ? -1 : 1;
                 if (aVal > bVal) return direction === 'asc' ? 1 : -1;
             }

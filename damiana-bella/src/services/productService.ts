@@ -215,6 +215,34 @@ export const fetchProductById = async (id: string) => {
   return data;
 };
 
+// Body que el backend de productos consume — el server traduce a snake_case
+// internamente. `publicId` se deriva de la última parte de la URL (Cloudinary)
+// para que el backend pueda hacer cleanup en delete sin recalcularlo.
+const buildProductBody = (product: Partial<AdminProduct>) => ({
+  name: product.name,
+  price: product.price,
+  stock: product.stock,
+  category: product.category,
+  imageUrl: product.imageUrl,
+  publicId: product.imageUrl ? product.imageUrl.split('/').pop() : '',
+  description: product.description,
+  discount: product.discount,
+  condition: product.condition,
+  freeShipping: product.freeShipping,
+  variants: product.variants,
+  specifications: product.specifications,
+  features: product.features,
+  faqs: product.faqs,
+  warranty: product.warranty,
+  returnPolicy: product.returnPolicy,
+  status: product.status,
+});
+
+const productAuthHeaders = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+});
+
 // Create product via backend API
 export const createProduct = async (
   product: Omit<AdminProduct, 'id'>,
@@ -222,29 +250,8 @@ export const createProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      name: product.name,
-      price: product.price,
-      stock: product.stock,
-      category: product.category,
-      imageUrl: product.imageUrl,
-      publicId: product.imageUrl ? product.imageUrl.split('/').pop() : '',
-      description: product.description,
-      discount: product.discount,
-      condition: product.condition,
-      freeShipping: product.freeShipping,
-      variants: product.variants,
-      specifications: product.specifications,
-      features: product.features,
-      faqs: product.faqs,
-      warranty: product.warranty,
-      returnPolicy: product.returnPolicy,
-      status: product.status,
-    }),
+    headers: productAuthHeaders(token),
+    body: JSON.stringify(buildProductBody(product)),
   });
 
   if (!response.ok) {
@@ -263,29 +270,8 @@ export const updateProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      name: product.name,
-      price: product.price,
-      stock: product.stock,
-      category: product.category,
-      imageUrl: product.imageUrl,
-      publicId: product.imageUrl ? product.imageUrl.split('/').pop() : '',
-      description: product.description,
-      discount: product.discount,
-      condition: product.condition,
-      freeShipping: product.freeShipping,
-      variants: product.variants,
-      specifications: product.specifications,
-      features: product.features,
-      faqs: product.faqs,
-      warranty: product.warranty,
-      returnPolicy: product.returnPolicy,
-      status: product.status,
-    }),
+    headers: productAuthHeaders(token),
+    body: JSON.stringify(buildProductBody(product)),
   });
 
   if (!response.ok) {
@@ -387,89 +373,3 @@ export const reorderCarouselImages = async (images: { id: string; order: number 
   );
 };
 
-// Direct Supabase methods (for client-side operations if needed)
-export const supabaseProducts = {
-  async getAll() {
-    const { data, error } = await supabase
-      .from('productos')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data;
-  },
-
-  async getById(id: string) {
-    const { data, error } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async insert(product: Omit<AdminProduct, 'id'>) {
-    const { data, error } = await supabase
-      .from('productos')
-      .insert([
-        {
-          name: product.name,
-          price: product.price,
-          stock: product.stock,
-          category: product.category,
-          image_url: product.imageUrl,
-          public_id: product.imageUrl ? product.imageUrl.split('/').pop() : '',
-          description: product.description,
-          discount: product.discount,
-          condition: product.condition,
-          free_shipping: product.freeShipping,
-          variants: product.variants,
-          specifications: product.specifications,
-          features: product.features,
-          faqs: product.faqs,
-          warranty: product.warranty,
-          return_policy: product.returnPolicy,
-          status: product.status,
-        },
-      ])
-      .select();
-    if (error) throw error;
-    return data?.[0];
-  },
-
-  async update(id: string, product: Partial<AdminProduct>) {
-    const updateData: Record<string, unknown> = {};
-    if (product.name) updateData.name = product.name;
-    if (product.price) updateData.price = product.price;
-    if (product.stock !== undefined) updateData.stock = product.stock;
-    if (product.category) updateData.category = product.category;
-    if (product.imageUrl) updateData.image_url = product.imageUrl;
-    if (product.description !== undefined) updateData.description = product.description;
-    if (product.discount !== undefined) updateData.discount = product.discount;
-    if (product.condition) updateData.condition = product.condition;
-    if (product.freeShipping !== undefined) updateData.free_shipping = product.freeShipping;
-    if (product.variants !== undefined) updateData.variants = product.variants;
-    if (product.specifications !== undefined) updateData.specifications = product.specifications;
-    if (product.features !== undefined) updateData.features = product.features;
-    if (product.faqs !== undefined) updateData.faqs = product.faqs;
-    if (product.warranty !== undefined) updateData.warranty = product.warranty;
-    if (product.returnPolicy !== undefined) updateData.return_policy = product.returnPolicy;
-    if (product.status) updateData.status = product.status;
-
-    const { data, error } = await supabase
-      .from('productos')
-      .update(updateData)
-      .eq('id', id)
-      .select();
-    if (error) throw error;
-    return data?.[0];
-  },
-
-  async delete(id: string) {
-    const { error } = await supabase
-      .from('productos')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  },
-};

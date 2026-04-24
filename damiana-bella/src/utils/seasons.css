@@ -1,0 +1,103 @@
+/* ─── Temas estacionales ─────────────────────────────────────────────────────
+ * Cada bloque sobreescribe sólo las variables de marca (`--primary-*`,
+ * `--primary-bg`, `--primary-accent`). Los neutros, semánticos y radios se
+ * mantienen para preservar layouts y contraste de UI no decorativo.
+ *
+ * Las variables `--shadow-primary*` se rebasan también porque dependen del
+ * color primario; sin eso, el botón principal arrastra el lila original como
+ * un halo visual en cada tema.
+ *
+ * Para agregar una estación: replicar un bloque con el id correspondiente.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Transición suave entre temas. Se aplica al body para no inundar a cada
+ * elemento con una transición global (eso rompería animaciones internas).
+ * Las superficies que reaccionan más al color (header, sidebar, cards) ya
+ * usan estas variables, así que heredan la transición vía cascade. */
+body {
+  transition:
+    background-color var(--transition-base) var(--transition-curve),
+    color var(--transition-base) var(--transition-curve);
+}
+
+:root[data-season] .admin-sidebar,
+:root[data-season] .admin-header,
+:root[data-season] .nav-bar,
+:root[data-season] .footer-section,
+:root[data-season] button,
+:root[data-season] a {
+  transition:
+    background-color var(--transition-base) var(--transition-curve),
+    color var(--transition-base) var(--transition-curve),
+    border-color var(--transition-base) var(--transition-curve),
+    box-shadow var(--transition-base) var(--transition-curve);
+}
+
+/* ─── Primavera ────────────────────────────────────────────────────────────── */
+:root[data-season='spring'] {
+  --primary-color: #7BB661;
+  --primary-light: #B8E0A6;
+  --primary-dark: #4F8C3A;
+  --primary-bg: #F2FBEC;
+  --primary-accent: #E58FB8;
+  --bg-light: #F2FBEC;
+
+  --shadow-primary: 0 10px 30px rgba(123, 182, 97, 0.35);
+  --shadow-primary-hover: 0 15px 40px rgba(123, 182, 97, 0.5);
+  --shadow-2xl: 0 25px 80px -20px rgba(123, 182, 97, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Verano ───────────────────────────────────────────────────────────────── */
+:root[data-season='summer'] {
+  --primary-color: #F4A100;
+  --primary-light: #FFD371;
+  --primary-dark: #C97A00;
+  --primary-bg: #FFF8E8;
+  --primary-accent: #E2522C;
+  --bg-light: #FFF8E8;
+
+  --shadow-primary: 0 10px 30px rgba(244, 161, 0, 0.35);
+  --shadow-primary-hover: 0 15px 40px rgba(244, 161, 0, 0.5);
+  --shadow-2xl: 0 25px 80px -20px rgba(244, 161, 0, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Otoño ────────────────────────────────────────────────────────────────── */
+:root[data-season='autumn'] {
+  --primary-color: #B8612C;
+  --primary-light: #E29A6A;
+  --primary-dark: #7E3F18;
+  --primary-bg: #FBF1E6;
+  --primary-accent: #8B3A1F;
+  --bg-light: #FBF1E6;
+
+  --shadow-primary: 0 10px 30px rgba(184, 97, 44, 0.35);
+  --shadow-primary-hover: 0 15px 40px rgba(184, 97, 44, 0.5);
+  --shadow-2xl: 0 25px 80px -20px rgba(184, 97, 44, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Invierno ─────────────────────────────────────────────────────────────── */
+:root[data-season='winter'] {
+  --primary-color: #4F86C6;
+  --primary-light: #A8C8E8;
+  --primary-dark: #2E5A94;
+  --primary-bg: #EEF5FB;
+  --primary-accent: #1F3F66;
+  --bg-light: #EEF5FB;
+
+  --shadow-primary: 0 10px 30px rgba(79, 134, 198, 0.35);
+  --shadow-primary-hover: 0 15px 40px rgba(79, 134, 198, 0.5);
+  --shadow-2xl: 0 25px 80px -20px rgba(79, 134, 198, 0.4), 0 15px 40px -10px rgba(0, 0, 0, 0.2);
+}
+
+/* Respeta la preferencia del usuario por menos movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  :root[data-season] .admin-sidebar,
+  :root[data-season] .admin-header,
+  :root[data-season] .nav-bar,
+  :root[data-season] .footer-section,
+  :root[data-season] button,
+  :root[data-season] a {
+    transition: none;
+  }
+}

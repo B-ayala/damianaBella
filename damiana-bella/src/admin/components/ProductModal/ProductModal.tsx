@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { supabase } from '../../../config/supabaseClient';
+import { createProduct, updateProduct as updateProductApi } from '../../../services/productService';
 import type { Variant, Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
 import './ProductModal.css';
@@ -181,40 +182,15 @@ const ProductModal = ({ isOpen, onClose, product }: ProductModalProps) => {
             const payload = buildPayload();
 
             if (product?.id) {
-                // Editar: llamar API y actualizar store
-                const response = await fetch(
-                    `${import.meta.env.VITE_API_URL_LOCAL}/products/${product.id}`,
-                    {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`,
-                        },
-                        body: JSON.stringify(payload),
-                    }
-                );
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'No se pudo actualizar el producto');
-                }
+                // Editar: pasa por el service (centraliza body + headers + error handling)
+                await updateProductApi(product.id, payload, token);
                 updateProduct(product.id, payload);
             } else {
-                // Crear: llamar API y agregar al store
-                const response = await fetch(`${import.meta.env.VITE_API_URL_LOCAL}/products`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(payload),
-                });
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'No se pudo crear el producto');
-                }
-                const savedData = await response.json();
+                // Crear: idem. Si el backend no devuelve id (caso raro), caemos a
+                // timestamp como sentinel — patrón histórico del componente.
+                const savedData = await createProduct(payload, token);
                 const newProduct: AdminProduct = {
-                    id: savedData.data?.id || Date.now().toString(),
+                    id: savedData?.data?.id || Date.now().toString(),
                     ...payload,
                 };
                 addProduct(newProduct);

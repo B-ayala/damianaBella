@@ -1,6 +1,7 @@
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './utils/ThemeProvider';
 import { theme } from './utils/theme';
+import { SeasonThemeProvider } from './utils/SeasonThemeProvider';
 import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
 import Footer from './components/common/Footer/Footer';
@@ -21,9 +22,11 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <BrowserRouter basename="/LIA">
-        <AppContent />
-      </BrowserRouter>
+      <SeasonThemeProvider>
+        <BrowserRouter basename="/LIA">
+          <AppContent />
+        </BrowserRouter>
+      </SeasonThemeProvider>
     </ThemeProvider>
   );
 }

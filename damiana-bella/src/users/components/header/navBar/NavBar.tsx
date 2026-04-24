@@ -6,7 +6,7 @@ import logoImg from '../../../../assets/img/logo.jpeg';
 import AuthModal from '../../auth/AuthModal';
 import UserProfileDropdown from './UserProfileDropdown';
 import ChangePasswordModal from './ChangePasswordModal';
-import { useAdminStore } from '../../../../admin/store/adminStore';
+import { useAuthStore } from '../../../../store/authStore';
 import { fetchCategories } from '../../../../services/productService';
 import './NavBar.css';
 
@@ -23,8 +23,8 @@ const NavBar = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobilePasswordModalOpen, setIsMobilePasswordModalOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
-  const currentUser = useAdminStore(state => state.currentUser);
-  const logout = useAdminStore(state => state.logout);
+  const currentUser = useAuthStore(state => state.currentUser);
+  const logout = useAuthStore(state => state.logout);
 
   // Nivel de navegación: 'main' = Nivel 1, o el nombre de la categoría activa (Nivel 2)
   const [activeMenuLevel, setActiveMenuLevel] = useState<string>('main');

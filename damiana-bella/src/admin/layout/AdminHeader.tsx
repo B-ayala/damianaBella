@@ -1,9 +1,9 @@
 import { Menu, UserCircle } from 'lucide-react';
-import { useAdminStore } from '../store/adminStore';
+import { useAuthStore } from '../../store/authStore';
 import './AdminHeader.css';
 
 const AdminHeader = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
-    const currentUser = useAdminStore(state => state.currentUser);
+    const currentUser = useAuthStore(state => state.currentUser);
 
     return (
         <header className="admin-header">
