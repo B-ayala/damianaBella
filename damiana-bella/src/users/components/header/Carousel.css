@@ -3,7 +3,7 @@
   width: 100%;
   height: calc(100vh - 95px);
   overflow: hidden;
-  background: #b0adad;
+  background: var(--primary-dark, #b0adad);
 }
 
 .carousel--skeleton {

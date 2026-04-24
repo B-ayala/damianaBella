@@ -5,7 +5,8 @@
 
 .home__featured-products {
   padding: 60px 0;
-  background-color: #f9fafb;
+  background: var(--season-soft, linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%));
+  transition: background var(--transition-base) var(--transition-curve);
 }
 
 .home__container {
@@ -28,7 +29,7 @@
   display: block;
   width: 80px;
   height: 4px;
-  background-color: #2c5f2d;
+  background: var(--season-ribbon, linear-gradient(90deg, var(--primary-dark), var(--primary-color), var(--primary-accent)));
   margin: 16px auto 0;
   border-radius: 2px;
 }
