@@ -22,6 +22,7 @@ export const DISPATCH_STATUS_LABEL: Record<string, string> = {
   en_preparacion: 'En preparación',
   despachado: 'Despachado',
   listo_para_retiro: 'Listo para retiro',
+  entregado: 'Entregado',
 };
 
 export const filterSelectSlotProps = {

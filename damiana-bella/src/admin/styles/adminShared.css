@@ -119,6 +119,9 @@
 
 .search-input-wrapper {
     width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
 /* ---------- Repeated summary grids ---------- */
@@ -369,6 +372,63 @@
 .payment-status-badge.pendiente {
     background: #fef9c3;
     color: #92400e;
+}
+
+.payment-badge.fallido,
+.payment-status-badge.fallido {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.payment-badge.expirado,
+.payment-status-badge.expirado {
+    background: #f3e8ff;
+    color: #6b21a8;
+}
+
+.payment-badge.cancelado,
+.payment-status-badge.cancelado {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.transfer-status-select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    background: #fef9c3;
+    color: #92400e;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.transfer-status-select:hover,
+.transfer-status-select:focus {
+    border-color: #94a3b8;
+}
+
+.admin-btn-danger {
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: #ef4444;
+    color: #fff;
+    transition: background 0.15s;
+}
+
+.admin-btn-danger:hover {
+    background: #dc2626;
+}
+
+.admin-btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* ---------- Repeated loading and empty states ---------- */

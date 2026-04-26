@@ -657,6 +657,7 @@ const Checkout = () => {
         itemsSubtotal,
         grandTotal,
         source: directCheckoutItem ? 'direct' : 'cart',
+        shippingMethod: selectedShipping,
       }));
       sessionStorage.setItem('mp_order_ids', JSON.stringify(order_ids));
       window.location.href = init_point;

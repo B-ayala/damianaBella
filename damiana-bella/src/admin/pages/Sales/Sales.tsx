@@ -5,7 +5,11 @@ import { supabase } from '../../../config/supabaseClient';
 import { formatDate, formatPriceInt } from '../../../utils/formatters';
 import { PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, SHIPPING_METHOD_LABEL, filterSelectSlotProps } from '../../../utils/labels';
 import { usePagination } from '../../../hooks/usePagination';
+import { apiFetch, authHeaders } from '../../../utils/apiFetch';
+import { getAuthToken } from '../../../utils/auth';
 import './Sales.css';
+
+const API_URL = import.meta.env.VITE_API_URL_LOCAL || 'http://localhost:3000/api';
 
 interface StockAlert {
     id: number;
@@ -34,15 +38,15 @@ interface Sale {
     current_stock?: number;
 }
 
-const EXPIRY_MS = 15 * 60 * 1000;
+const MP_EXPIRY_MS = 15 * 60 * 1000;
+const TRANSFER_EXPIRY_MS = 5 * 60 * 60 * 1000;
 
-// Trata como expirado a órdenes MP pendientes con más de 15 min (UI-only, antes de que corra el cron)
+// UI-only: muestra como expirado antes de que corra el cron del backend
 const getEffectiveStatus = (sale: Sale): Sale['payment_status'] => {
-    if (
-        sale.payment_method === 'mp' &&
-        sale.payment_status === 'pendiente' &&
-        Date.now() - new Date(sale.created_at).getTime() > EXPIRY_MS
-    ) return 'expirado';
+    if (sale.payment_status !== 'pendiente') return sale.payment_status;
+    const elapsed = Date.now() - new Date(sale.created_at).getTime();
+    if (sale.payment_method === 'mp' && elapsed > MP_EXPIRY_MS) return 'expirado';
+    if (sale.payment_method === 'transfer' && elapsed > TRANSFER_EXPIRY_MS) return 'expirado';
     return sale.payment_status;
 };
 
@@ -54,6 +58,10 @@ const Sales = () => {
     const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
     const [filterStock, setFilterStock] = useState('');
     const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
+    const [confirmingSale, setConfirmingSale] = useState<Sale | null>(null);
+    const [confirming, setConfirming] = useState(false);
+    const [cancellingSale, setCancellingSale] = useState<Sale | null>(null);
+    const [cancelling, setCancelling] = useState(false);
 
     const loadSales = async () => {
         setLoading(true);
@@ -114,20 +122,59 @@ const Sales = () => {
         loadSales();
     }, []);
 
-    const handleTogglePaymentStatus = async (sale: Sale) => {
-        // Solo las órdenes de transferencia se gestionan manualmente
-        if (sale.payment_method !== 'transfer') return;
-        const effectiveStatus = getEffectiveStatus(sale);
-        if (effectiveStatus === 'fallido' || effectiveStatus === 'expirado' || effectiveStatus === 'cancelado') return;
-        const newStatus = effectiveStatus === 'pendiente' ? 'pagado' : 'pendiente';
-        const { error } = await supabase
-            .from('ventas')
-            .update({ payment_status: newStatus })
-            .eq('id', sale.id);
-        if (!error) {
+    const handleTransferStatusChange = (sale: Sale, newStatus: string) => {
+        if (sale.payment_method !== 'transfer' || getEffectiveStatus(sale) !== 'pendiente') return;
+        if (newStatus === 'pagado') setConfirmingSale(sale);
+        if (newStatus === 'cancelado') setCancellingSale(sale);
+    };
+
+    const handleConfirmCancel = async () => {
+        if (!cancellingSale) return;
+        setCancelling(true);
+        try {
+            const token = await getAuthToken();
+            const res = await apiFetch(`${API_URL}/orders/${cancellingSale.id}/cancel-transfer`, {
+                method: 'PATCH',
+                headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                alert(body.message ?? 'Error al cancelar la orden');
+                return;
+            }
             setSales((prev) =>
-                prev.map((s) => s.id === sale.id ? { ...s, payment_status: newStatus } : s)
+                prev.map((s) => s.id === cancellingSale.id ? { ...s, payment_status: 'cancelado' } : s)
             );
+            setCancellingSale(null);
+        } catch {
+            alert('Error de red al cancelar la orden');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const handleConfirmTransfer = async () => {
+        if (!confirmingSale) return;
+        setConfirming(true);
+        try {
+            const token = await getAuthToken();
+            const res = await apiFetch(`${API_URL}/orders/${confirmingSale.id}/confirm-transfer`, {
+                method: 'PATCH',
+                headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                alert(body.message ?? 'Error al confirmar el pago');
+                return;
+            }
+            setSales((prev) =>
+                prev.map((s) => s.id === confirmingSale.id ? { ...s, payment_status: 'pagado' } : s)
+            );
+            setConfirmingSale(null);
+        } catch {
+            alert('Error de red al confirmar el pago');
+        } finally {
+            setConfirming(false);
         }
     };
 
@@ -160,6 +207,36 @@ const Sales = () => {
 
     return (
         <div className="admin-sales-page">
+            {confirmingSale && (
+                <div className="confirm-overlay">
+                    <div className="confirm-dialog">
+                        <p className="confirm-message">¿Confirmás el pago? Una vez realizada, no se podrá deshacer.</p>
+                        <div className="confirm-actions">
+                            <button className="admin-btn-secondary" onClick={() => setConfirmingSale(null)} disabled={confirming}>
+                                Volver
+                            </button>
+                            <button className="admin-btn-primary" onClick={handleConfirmTransfer} disabled={confirming}>
+                                {confirming ? 'Confirmando...' : 'Confirmar pago'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {cancellingSale && (
+                <div className="confirm-overlay">
+                    <div className="confirm-dialog">
+                        <p className="confirm-message">¿Cancelar esta orden de transferencia? Esta acción no se puede deshacer.</p>
+                        <div className="confirm-actions">
+                            <button className="admin-btn-secondary" onClick={() => setCancellingSale(null)} disabled={cancelling}>
+                                Volver
+                            </button>
+                            <button className="admin-btn-danger" onClick={handleConfirmCancel} disabled={cancelling}>
+                                {cancelling ? 'Cancelando...' : 'Cancelar orden'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="admin-page-header admin-flex-between">
                 <div>
                     <h1 className="admin-page-title">Ventas</h1>
@@ -349,18 +426,20 @@ const Sales = () => {
                                         </div>
                                         <div className="sale-card-field">
                                             <span className="field-label">Estado pago</span>
-                                            {sale.payment_method !== 'transfer' || (['fallido', 'expirado', 'cancelado'] as const).includes(getEffectiveStatus(sale) as never) ? (
+                                            {sale.payment_method === 'transfer' && getEffectiveStatus(sale) === 'pendiente' ? (
+                                                <select
+                                                    className="transfer-status-select pendiente"
+                                                    value="pendiente"
+                                                    onChange={(e) => handleTransferStatusChange(sale, e.target.value)}
+                                                >
+                                                    <option value="pendiente">Pendiente</option>
+                                                    <option value="pagado">Pagado</option>
+                                                    <option value="cancelado">Cancelado</option>
+                                                </select>
+                                            ) : (
                                                 <span className={`payment-badge ${getEffectiveStatus(sale)}`}>
                                                     {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
                                                 </span>
-                                            ) : (
-                                                <button
-                                                    className={`payment-badge ${getEffectiveStatus(sale)}`}
-                                                    onClick={() => handleTogglePaymentStatus(sale)}
-                                                    title="Clic para cambiar estado"
-                                                >
-                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
-                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -417,18 +496,20 @@ const Sales = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            {sale.payment_method !== 'transfer' || (['fallido', 'expirado', 'cancelado'] as const).includes(getEffectiveStatus(sale) as never) ? (
+                                            {sale.payment_method === 'transfer' && getEffectiveStatus(sale) === 'pendiente' ? (
+                                                <select
+                                                    className="transfer-status-select pendiente"
+                                                    value="pendiente"
+                                                    onChange={(e) => handleTransferStatusChange(sale, e.target.value)}
+                                                >
+                                                    <option value="pendiente">Pendiente</option>
+                                                    <option value="pagado">Pagado</option>
+                                                    <option value="cancelado">Cancelado</option>
+                                                </select>
+                                            ) : (
                                                 <span className={`payment-badge ${getEffectiveStatus(sale)}`}>
                                                     {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
                                                 </span>
-                                            ) : (
-                                                <button
-                                                    className={`payment-badge ${getEffectiveStatus(sale)}`}
-                                                    onClick={() => handleTogglePaymentStatus(sale)}
-                                                    title="Clic para cambiar estado"
-                                                >
-                                                    {PAYMENT_STATUS_LABEL[getEffectiveStatus(sale)]}
-                                                </button>
                                             )}
                                         </td>
                                     </tr>

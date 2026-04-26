@@ -39,6 +39,9 @@ const AppContent = () => {
   useEffect(() => {
     const setupAuth = async () => {
       try {
+        // Validate stored session — if corrupt/expired, sign out to clear localStorage
+        const { error } = await supabase.auth.getSession();
+        if (error) await supabase.auth.signOut();
         await initializeAuth();
       } finally {
         completeTask('auth');

@@ -160,7 +160,9 @@ export interface Purchase {
   total_price: number;
   units_config: Record<string, string>[] | null;
   payment_method: string;
+  payment_status: string;
   shipping_method: string | null;
+  dispatch_status: string | null;
   created_at: string;
 }
 

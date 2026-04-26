@@ -7,7 +7,7 @@ import { DISPATCH_STATUS_LABEL, SHIPPING_METHOD_LABEL, filterSelectSlotProps } f
 import { usePagination } from '../../../hooks/usePagination';
 import './Dispatches.css';
 
-type DispatchStatus = 'pendiente' | 'en_preparacion' | 'despachado' | 'listo_para_retiro';
+type DispatchStatus = 'pendiente' | 'en_preparacion' | 'despachado' | 'listo_para_retiro' | 'entregado';
 type PaymentStatus = 'pagado';
 
 interface Dispatch {
@@ -46,9 +46,10 @@ const getDispatchStatusFieldSx = (status: DispatchStatus) => {
         en_preparacion: { backgroundColor: '#ffedd5', color: '#c2410c', borderColor: '#fdba74' },
         despachado: { backgroundColor: '#dbeafe', color: '#1d4ed8', borderColor: '#93c5fd' },
         listo_para_retiro: { backgroundColor: '#dcfce7', color: '#166534', borderColor: '#86efac' },
+        entregado: { backgroundColor: '#f3e8ff', color: '#7c3aed', borderColor: '#c4b5fd' },
     } satisfies Record<DispatchStatus, { backgroundColor: string; color: string; borderColor: string }>;
 
-    const selected = statusStyles[status];
+    const selected = statusStyles[status] ?? statusStyles.pendiente;
 
     return {
         minWidth: 170,
@@ -191,6 +192,7 @@ const Dispatches = () => {
                         <MenuItem value="en_preparacion">En preparación</MenuItem>
                         <MenuItem value="despachado">Despachado</MenuItem>
                         <MenuItem value="listo_para_retiro">Listo para retiro</MenuItem>
+                        <MenuItem value="entregado">Entregado</MenuItem>
                     </TextField>
                 </div>
             </div>
@@ -239,7 +241,7 @@ const Dispatches = () => {
                         <div className="dispatch-card-list">
                             {paginated.map((d) => {
                                 const isTerminal =
-                                    d.dispatch_status === 'despachado' || d.dispatch_status === 'listo_para_retiro';
+                                    d.dispatch_status === 'despachado' || d.dispatch_status === 'listo_para_retiro' || d.dispatch_status === 'entregado';
                                 return (
                                     <div className="dispatch-card" key={d.id}>
                                         <div className="dispatch-card-buyer">
@@ -365,6 +367,7 @@ const Dispatches = () => {
                                                 ) : (
                                                     <MenuItem value="despachado">Despachado</MenuItem>
                                                 )}
+                                                <MenuItem value="entregado">Entregado</MenuItem>
                                             </TextField>
                                         </td>
                                     </tr>

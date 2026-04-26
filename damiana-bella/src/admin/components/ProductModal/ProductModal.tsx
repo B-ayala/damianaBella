@@ -205,11 +205,14 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                 setFeaturesText((product.features || []).join('\n'));
                 setWarranty(product.warranty || '');
                 setReturnPolicy(product.returnPolicy || '');
+                const dbStock = product.stock ?? 0;
                 setVariants(
                     (product.variants || []).map(v => ({
                         name: v.name,
                         optionsText: v.options.join(', '),
-                        stockByOption: v.stockByOption,
+                        stockByOption: dbStock === 0 && v.stockByOption
+                            ? Object.fromEntries(Object.keys(v.stockByOption).map(k => [k, 0]))
+                            : v.stockByOption,
                     }))
                 );
                 setSpecifications(product.specifications ? [...product.specifications] : []);
