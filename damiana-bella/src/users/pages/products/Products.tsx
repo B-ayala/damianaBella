@@ -38,7 +38,7 @@ const Products = () => {
 
   useEffect(() => {
     Promise.all([
-      fetchProducts().then((rows) => rows.map(mapDbRowToProduct).filter((p) => p.stock > 0)),
+      fetchProducts().then((rows) => rows.map(mapDbRowToProduct).filter((p) => (p.stock ?? 0) > 0)),
       fetchCategoriesTree(),
     ])
       .then(([prods, cats]) => {
