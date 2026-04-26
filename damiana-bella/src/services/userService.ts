@@ -17,6 +17,26 @@ interface User {
   createdAt?: string;
 }
 
+const getEmailRedirectUrl = (path: string) =>
+  `${window.location.origin}${import.meta.env.BASE_URL}${path}`;
+
+const fetchUserProfile = async (userId: string, email: string): Promise<User> => {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, name, role')
+    .eq('id', userId)
+    .single();
+
+  if (error) throw new Error('Error al obtener el perfil del usuario');
+
+  return {
+    id: userId,
+    name: profile?.name || '',
+    email: email,
+    role: profile?.role || 'user',
+  };
+};
+
 /**
  * Crear un nuevo usuario con Supabase Auth
  * El trigger en Supabase automáticamente crea el perfil en public.profiles
@@ -38,7 +58,7 @@ export const createUser = async (payload: CreateUserPayload): Promise<{ success:
           name: payload.name,
           ...(payload.phone ? { phone: payload.phone } : {}),
         },
-        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
+        emailRedirectTo: getEmailRedirectUrl('auth/confirm'),
       },
     });
 
@@ -112,25 +132,9 @@ export const loginUser = async (payload: LoginPayload): Promise<{ success: boole
     }
 
     // Obtener datos del perfil (email vive en auth.users, no en profiles)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name, role')
-      .eq('id', authData.user.id)
-      .single();
+    const user = await fetchUserProfile(authData.user.id, authData.user.email || '');
 
-    if (profileError) {
-      throw new Error('Error al obtener el perfil del usuario');
-    }
-
-    return {
-      success: true,
-      data: {
-        id: authData.user.id,
-        name: profile?.name || '',
-        email: authData.user.email || '',
-        role: profile?.role || 'user',
-      },
-    };
+    return { success: true, data: user };
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Credenciales inválidas');
   }
@@ -145,20 +149,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     if (!user) return null;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, name, role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) return null;
-
-    return {
-      id: user.id,
-      name: profile.name || '',
-      email: user.email || '',
-      role: profile.role || 'user',
-    };
+    return await fetchUserProfile(user.id, user.email || '');
   } catch (error) {
     console.error('Error al obtener usuario actual:', error);
     return null;
@@ -182,7 +173,7 @@ export const resendConfirmationEmail = async (email: string): Promise<{ success:
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/confirm`,
+        emailRedirectTo: getEmailRedirectUrl('auth/confirm'),
       },
     });
 
@@ -275,7 +266,7 @@ const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> =
  */
 export const requestPasswordReset = async (email: string): Promise<void> => {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
+    redirectTo: getEmailRedirectUrl('auth/reset-password'),
   });
   if (error) {
     throw new Error(error.message || 'Error al enviar el email de recuperación');

@@ -6,6 +6,7 @@ import ProductTable from '../../components/ProductTable/ProductTable';
 import ProductModal from '../../components/ProductModal/ProductModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { fetchAllProducts } from '../../../services/productService';
+import { filterSelectSlotProps } from '../../../utils/labels';
 import './Products.css';
 
 const mapProductRow = (p: Record<string, unknown>): AdminProduct => ({
@@ -41,12 +42,6 @@ const Products = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const filterSelectSlotProps = {
-        select: {
-            displayEmpty: true,
-        },
-    } as const;
 
     const categories = useMemo(() => {
         const unique = [...new Set(products.map(p => p.category).filter(Boolean))];

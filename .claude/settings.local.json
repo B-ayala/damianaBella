@@ -4,7 +4,8 @@
       "Bash(find /c/Users/Brian/Desktop/DamianaBella -type f -name *bout* -o -name *About*)",
       "Bash(grep -r \"localStorage\\\\|sessionStorage\\\\|persist\" /c/Users/Brian/Desktop/DamianaBella/damiana-bella/src --include=*.ts --include=*.tsx)",
       "Bash(git rm:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -10,7 +10,8 @@ import {
   FiEye, FiEyeOff, FiPhone,
 } from 'react-icons/fi';
 import { useAuthStore } from '../../../store/authStore';
-import { isValidEmail } from '../../../utils/validation';
+import { isValidEmail, validatePassword, validatePasswordMatch, validatePhone } from '../../../utils/validation';
+import { extractErrorMessage } from '../../../utils/errorMessage';
 import { createUser, resendConfirmationEmail, requestPasswordReset } from '../../../services/userService';
 import Modal from '../../../components/common/Modal/Modal';
 import { EMAIL_CONFIRMED_CHANNEL, EMAIL_CONFIRMED_STORAGE_KEY } from '../../pages/auth/EmailConfirmation';
@@ -342,13 +343,14 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     if (!registerEmail.trim()) newErrors.registerEmail = 'El correo electrónico es requerido';
     else if (!isValidEmail(registerEmail)) newErrors.registerEmail = 'Ingresa un correo válido';
 
-    if (!registerPhone.trim()) newErrors.registerPhone = 'El número de celular es requerido';
-    else if (!/^\+?[\d\s\-()]{7,20}$/.test(registerPhone.trim())) newErrors.registerPhone = 'Ingresa un número de celular válido';
+    const phoneError = validatePhone(registerPhone);
+    if (phoneError) newErrors.registerPhone = phoneError;
 
-    if (!registerPassword.trim()) newErrors.registerPassword = 'La contraseña es requerida';
-    else if (registerPassword.length < 6) newErrors.registerPassword = 'La contraseña debe tener al menos 6 caracteres';
+    const pwdError = validatePassword(registerPassword);
+    if (pwdError) newErrors.registerPassword = pwdError;
 
-    if (registerPassword !== registerConfirmPassword) newErrors.registerConfirmPassword = 'Las contraseñas no coinciden';
+    const matchError = validatePasswordMatch(registerPassword, registerConfirmPassword);
+    if (matchError) newErrors.registerConfirmPassword = matchError;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -393,7 +395,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
       await requestPasswordReset(forgotEmail.trim());
       setForgotSent(true);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Error al enviar el email');
+      setServerError(extractErrorMessage(err, 'Error al enviar el email'));
     } finally {
       setIsLoading(false);
     }

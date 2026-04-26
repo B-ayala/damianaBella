@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { RefreshCw, Package, Truck, Store, User, Mail, SendHorizonal } from 'lucide-react';
 import { Box, MenuItem, Pagination, TextField } from '@mui/material';
 import { supabase } from '../../../config/supabaseClient';
+import { formatDate, formatPriceInt } from '../../../utils/formatters';
+import { DISPATCH_STATUS_LABEL, SHIPPING_METHOD_LABEL, filterSelectSlotProps } from '../../../utils/labels';
+import { usePagination } from '../../../hooks/usePagination';
 import './Dispatches.css';
 
 type DispatchStatus = 'pendiente' | 'en_preparacion' | 'despachado' | 'listo_para_retiro';
@@ -23,26 +26,6 @@ interface Dispatch {
     created_at: string;
 }
 
-const SHIPPING_METHOD_LABEL: Record<string, string> = {
-    correo: 'Correo Argentino',
-    moto: 'Envío por moto',
-    local: 'Retiro en local',
-};
-
-const DISPATCH_STATUS_LABEL: Record<DispatchStatus, string> = {
-    pendiente: 'Pendiente',
-    en_preparacion: 'En preparación',
-    despachado: 'Despachado',
-    listo_para_retiro: 'Listo para retiro',
-};
-
-const ITEMS_PER_PAGE = 10;
-
-const filterSelectSlotProps = {
-    select: {
-        displayEmpty: true,
-    },
-} as const;
 
 function ShippingIcon({ method }: { method: string | null }) {
     if (method === 'correo') return <Package size={14} className="shipping-icon correo" />;
@@ -97,7 +80,6 @@ const Dispatches = () => {
     const [loading, setLoading] = useState(true);
     const [filterShipping, setFilterShipping] = useState('');
     const [filterDispatch, setFilterDispatch] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
 
     const loadDispatches = async () => {
         setLoading(true);
@@ -159,20 +141,9 @@ const Dispatches = () => {
     if (filterShipping) filtered = filtered.filter((d) => d.shipping_method === filterShipping);
     if (filterDispatch) filtered = filtered.filter((d) => d.dispatch_status === filterDispatch);
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-    const formatDate = (iso: string) => {
-        const d = new Date(iso);
-        return (
-            d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-            ' ' +
-            d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-        );
-    };
-
-    const formatPrice = (n: number) =>
-        '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const { currentPage, setCurrentPage, totalPages, paginated } = usePagination(filtered, {
+        resetDeps: [filterShipping, filterDispatch],
+    });
 
     const countBy = (status: DispatchStatus) => dispatches.filter((d) => d.dispatch_status === status).length;
     const countDispatched = dispatches.filter((d) => d.dispatch_status === 'despachado' || d.dispatch_status === 'listo_para_retiro').length;
@@ -196,7 +167,7 @@ const Dispatches = () => {
                         select
                         className="filter-select"
                         value={filterShipping}
-                        onChange={(e) => { setFilterShipping(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setFilterShipping(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={filterSelectSlotProps}
@@ -210,7 +181,7 @@ const Dispatches = () => {
                         select
                         className="filter-select"
                         value={filterDispatch}
-                        onChange={(e) => { setFilterDispatch(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setFilterDispatch(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={filterSelectSlotProps}
@@ -303,7 +274,7 @@ const Dispatches = () => {
                                             </div>
                                             <div className="dispatch-card-field">
                                                 <span className="field-label">Total</span>
-                                                <span className="field-value">{formatPrice(d.total_price)}</span>
+                                                <span className="field-value">{formatPriceInt(d.total_price)}</span>
                                             </div>
                                             <div className="dispatch-card-field">
                                                 <span className="field-label">Envío</span>

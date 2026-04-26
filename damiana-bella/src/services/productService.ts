@@ -1,7 +1,7 @@
 import { supabase } from '../config/supabaseClient';
 import { type AdminProduct } from '../admin/store/adminStore';
 import type { Product } from '../types/product';
-import { apiFetch } from '../utils/apiFetch';
+import { apiFetch, authHeaders } from '../utils/apiFetch';
 import { getProductStockFromVariants, sanitizeProductVariants } from '../utils/productVariants';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,7 +64,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
   const url = path
     ? `${API_URL}/cloudinary/folders?path=${encodeURIComponent(path)}`
     : `${API_URL}/cloudinary/folders`;
-  const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+  const response = await apiFetch(url, { headers: authHeaders(token) });
   if (!response.ok) throw new Error('Failed to fetch folders');
   const data = await response.json();
   return (data.data?.folders ?? []) as CloudinaryFolder[];
@@ -74,7 +74,7 @@ export const fetchCloudinaryFolders = async (token: string, path?: string): Prom
 export const createCloudinaryFolder = async (token: string, path: string): Promise<void> => {
   const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    headers: authHeaders(token),
     body: JSON.stringify({ path }),
   });
   if (!response.ok) throw new Error('Failed to create folder');
@@ -84,7 +84,7 @@ export const createCloudinaryFolder = async (token: string, path: string): Promi
 export const deleteCloudinaryFolder = async (token: string, path: string): Promise<void> => {
   const response = await apiFetch(`${API_URL}/cloudinary/folders`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    headers: authHeaders(token),
     body: JSON.stringify({ path }),
   });
   if (!response.ok) throw new Error('Failed to delete folder');
@@ -106,9 +106,7 @@ export const fetchCloudinaryImages = async (token: string, folder?: string, next
   if (nextCursor) params.set('next_cursor', nextCursor);
   if (params.toString()) url += `?${params.toString()}`;
 
-  const response = await apiFetch(url, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await apiFetch(url, { headers: authHeaders(token) });
 
   if (!response.ok) throw new Error('Failed to fetch Cloudinary images');
   const data = await response.json();
@@ -129,10 +127,7 @@ export interface CloudinaryResource {
 export const deleteCloudinaryImage = async (publicId: string, token: string) => {
   const response = await apiFetch(`${API_URL}/cloudinary/delete`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
     body: JSON.stringify({ publicId }),
   });
 
@@ -159,7 +154,7 @@ export interface CloudinaryUsage {
 // Fetch storage usage from Cloudinary
 export const fetchCloudinaryUsage = async (token: string): Promise<CloudinaryUsage> => {
   const response = await apiFetch(`${API_URL}/cloudinary/usage`, {
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: authHeaders(token),
   });
   if (!response.ok) throw new Error('Failed to fetch Cloudinary usage');
   const data = await response.json();
@@ -282,12 +277,18 @@ export const toggleProductFeatured = async (id: string, featured: boolean) => {
   }
 };
 
-// Fetch all products from Supabase (admin — includes inactive)
-export const fetchAllProducts = async () => {
-  const { data, error } = await supabase
+// Fetch products from Supabase. Pass activeOnly=false for admin (includes inactive).
+export const fetchProducts = async (activeOnly = true) => {
+  let query = supabase
     .from('productos')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (activeOnly) {
+    query = query.eq('status', 'active');
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Fetch products error:', error);
@@ -297,21 +298,8 @@ export const fetchAllProducts = async () => {
   return data || [];
 };
 
-// Fetch all products from Supabase (only active)
-export const fetchProducts = async () => {
-  const { data, error } = await supabase
-    .from('productos')
-    .select('*')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Fetch products error:', error);
-    throw error;
-  }
-
-  return data || [];
-};
+/** @deprecated Use fetchProducts(false) instead */
+export const fetchAllProducts = () => fetchProducts(false);
 
 // Search products by name, category or description
 export interface ProductSearchResult {
@@ -382,12 +370,17 @@ export const searchProducts = async (query: string): Promise<ProductSearchResult
 };
 
 // Fetch single product
-export const fetchProductById = async (id: string) => {
-  const { data, error } = await supabase
+export const fetchProductById = async (id: string, activeOnly = true) => {
+  let query = supabase
     .from('productos')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+
+  if (activeOnly) {
+    query = query.eq('status', 'active');
+  }
+
+  const { data, error } = await query.single();
 
   if (error) {
     console.error('Fetch product error:', error);
@@ -420,11 +413,6 @@ const buildProductBody = (product: Partial<AdminProduct>) => ({
   status: product.status,
 });
 
-const productAuthHeaders = (token: string) => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${token}`,
-});
-
 // Create product via backend API
 export const createProduct = async (
   product: Omit<AdminProduct, 'id'>,
@@ -432,7 +420,7 @@ export const createProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products`, {
     method: 'POST',
-    headers: productAuthHeaders(token),
+    headers: authHeaders(token),
     body: JSON.stringify(buildProductBody(product)),
   });
 
@@ -452,7 +440,7 @@ export const updateProduct = async (
 ) => {
   const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'PUT',
-    headers: productAuthHeaders(token),
+    headers: authHeaders(token),
     body: JSON.stringify(buildProductBody(product)),
   });
 
@@ -468,9 +456,7 @@ export const updateProduct = async (
 export const deleteProduct = async (id: string, token: string) => {
   const response = await apiFetch(`${API_URL}/products/${id}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    headers: authHeaders(token),
   });
 
   if (!response.ok) {

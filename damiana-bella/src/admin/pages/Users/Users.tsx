@@ -4,14 +4,14 @@ import { Pagination, Box, InputAdornment, TextField } from '@mui/material';
 import { useAuthStore } from '../../../store/authStore';
 import { getAdminUsers, deleteAdminUser, updateUserRole, type AdminUserData } from '../../../services/userService';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
+import { usePagination } from '../../../hooks/usePagination';
+import { extractErrorMessage } from '../../../utils/errorMessage';
 import './Users.css';
 
 const Users = () => {
     const currentUser = useAuthStore(state => state.currentUser);
     const [users, setUsers] = useState<AdminUserData[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 5;
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [userToDelete, setUserToDelete] = useState<AdminUserData | null>(null);
@@ -30,7 +30,7 @@ const Users = () => {
             const data = await getAdminUsers();
             setUsers(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error al cargar usuarios');
+            setError(extractErrorMessage(err, 'Error al cargar usuarios'));
         } finally {
             setIsLoading(false);
         }
@@ -45,15 +45,10 @@ const Users = () => {
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
-    const paginatedUsers = filteredUsers.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const { currentPage, setCurrentPage, totalPages, paginated: paginatedUsers } = usePagination(filteredUsers, {
+        itemsPerPage: 5,
+        resetDeps: [searchTerm],
+    });
 
     const handleDeleteClick = (user: AdminUserData) => {
         if (currentUser && currentUser.id === user.id) {
@@ -86,7 +81,7 @@ const Users = () => {
                 isOpen: true,
                 status: 'error',
                 title: 'Error al Eliminar',
-                message: err instanceof Error ? err.message : 'Error al eliminar el usuario',
+                message: extractErrorMessage(err, 'Error al eliminar el usuario'),
             });
         } finally {
             setIsDeleting(false);
@@ -131,7 +126,7 @@ const Users = () => {
                 isOpen: true,
                 status: 'error',
                 title: 'Error al Actualizar',
-                message: err instanceof Error ? err.message : 'Error al actualizar el rol del usuario',
+                message: extractErrorMessage(err, 'Error al actualizar el rol del usuario'),
             });
         }
     };

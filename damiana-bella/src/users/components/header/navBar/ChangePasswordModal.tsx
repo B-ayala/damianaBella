@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { TextField, Button, CircularProgress, Alert } from '@mui/material';
 import Modal from '../../../../components/common/Modal/Modal';
 import { changePassword } from '../../../../services/userService';
+import { validatePassword, validatePasswordMatch } from '../../../../utils/validation';
+import { extractErrorMessage } from '../../../../utils/errorMessage';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -32,28 +34,20 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
   };
 
   const handlePasswordChange = async () => {
-    // Validations
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Todos los campos son requeridos',
-      });
+    if (!currentPassword.trim()) {
+      setFeedbackMessage({ type: 'error', text: 'La contraseña actual es requerida' });
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'Las nuevas contraseñas no coinciden',
-      });
+    const pwdError = validatePassword(newPassword);
+    if (pwdError) {
+      setFeedbackMessage({ type: 'error', text: pwdError });
       return;
     }
 
-    if (newPassword.length < 6) {
-      setFeedbackMessage({
-        type: 'error',
-        text: 'La contraseña debe tener al menos 6 caracteres',
-      });
+    const matchError = validatePasswordMatch(newPassword, confirmPassword);
+    if (matchError) {
+      setFeedbackMessage({ type: 'error', text: matchError });
       return;
     }
 
@@ -70,7 +64,7 @@ const ChangePasswordModal = ({ isOpen, onClose }: ChangePasswordModalProps) => {
     } catch (error) {
       setFeedbackMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Error al cambiar la contraseña',
+        text: extractErrorMessage(error, 'Error al cambiar la contraseña'),
       });
     } finally {
       setIsLoading(false);

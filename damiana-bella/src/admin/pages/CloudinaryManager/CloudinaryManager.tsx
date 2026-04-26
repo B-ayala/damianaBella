@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../config/supabaseClient';
 import { apiFetch } from '../../../utils/apiFetch';
+import { getAuthToken } from '../../../utils/auth';
 import { useAdminStore } from '../../store/adminStore';
 import {
   fetchCloudinaryImages,
@@ -84,10 +85,7 @@ const CloudinaryManager = () => {
   const [mobileFolderOpen, setMobileFolderOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? '';
-  };
+  const getToken = () => getAuthToken().catch(() => '');
 
   // Load folders at current level
   const loadFolders = useCallback(async (path: string) => {

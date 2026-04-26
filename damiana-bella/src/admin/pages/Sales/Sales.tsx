@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Search, RefreshCw, ShoppingBag, User, Mail } from 'lucide-react';
 import { Box, InputAdornment, MenuItem, Pagination, TextField } from '@mui/material';
 import { supabase } from '../../../config/supabaseClient';
+import { formatDate, formatPriceInt } from '../../../utils/formatters';
+import { PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, SHIPPING_METHOD_LABEL, filterSelectSlotProps } from '../../../utils/labels';
+import { usePagination } from '../../../hooks/usePagination';
 import './Sales.css';
 
 interface StockAlert {
@@ -31,19 +34,6 @@ interface Sale {
     current_stock?: number;
 }
 
-const PAYMENT_METHOD_LABEL: Record<string, string> = {
-    mp: 'Mercado Pago',
-    transfer: 'Transferencia',
-};
-
-const PAYMENT_STATUS_LABEL: Record<string, string> = {
-    pendiente: 'Pendiente',
-    pagado: 'Pagado',
-    fallido: 'Fallido',
-    expirado: 'Expirado',
-    cancelado: 'Cancelado',
-};
-
 const EXPIRY_MS = 15 * 60 * 1000;
 
 // Trata como expirado a órdenes MP pendientes con más de 15 min (UI-only, antes de que corra el cron)
@@ -56,20 +46,6 @@ const getEffectiveStatus = (sale: Sale): Sale['payment_status'] => {
     return sale.payment_status;
 };
 
-const SHIPPING_METHOD_LABEL: Record<string, string> = {
-    correo: 'Correo Argentino',
-    moto: 'Envío por moto',
-    local: 'Retiro en local',
-};
-
-const ITEMS_PER_PAGE = 10;
-
-const filterSelectSlotProps = {
-    select: {
-        displayEmpty: true,
-    },
-} as const;
-
 const Sales = () => {
     const [sales, setSales] = useState<Sale[]>([]);
     const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
@@ -78,7 +54,6 @@ const Sales = () => {
     const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
     const [filterStock, setFilterStock] = useState('');
     const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
 
     const loadSales = async () => {
         setLoading(true);
@@ -179,17 +154,9 @@ const Sales = () => {
         filtered = filtered.filter((s) => s.current_stock !== undefined && s.current_stock > 0 && s.current_stock <= 5);
     }
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-    const formatDate = (iso: string) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-            ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const formatPrice = (n: number) =>
-        '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const { currentPage, setCurrentPage, totalPages, paginated } = usePagination(filtered, {
+        resetDeps: [searchTerm, filterPaymentStatus, filterPaymentMethod, filterStock],
+    });
 
     return (
         <div className="admin-sales-page">
@@ -209,7 +176,7 @@ const Sales = () => {
                     <TextField
                         placeholder="Buscar por producto, comprador o email..."
                         value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={{
@@ -228,7 +195,7 @@ const Sales = () => {
                         select
                         className="filter-select"
                         value={filterPaymentStatus}
-                        onChange={(e) => { setFilterPaymentStatus(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setFilterPaymentStatus(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={filterSelectSlotProps}
@@ -243,7 +210,7 @@ const Sales = () => {
                         select
                         className="filter-select"
                         value={filterPaymentMethod}
-                        onChange={(e) => { setFilterPaymentMethod(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setFilterPaymentMethod(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={filterSelectSlotProps}
@@ -256,7 +223,7 @@ const Sales = () => {
                         select
                         className="filter-select"
                         value={filterStock}
-                        onChange={(e) => { setFilterStock(e.target.value); setCurrentPage(1); }}
+                        onChange={(e) => setFilterStock(e.target.value)}
                         fullWidth
                         size="small"
                         slotProps={filterSelectSlotProps}
@@ -368,7 +335,7 @@ const Sales = () => {
                                         </div>
                                         <div className="sale-card-field">
                                             <span className="field-label">Total</span>
-                                            <span className="field-value">{formatPrice(sale.total_price)}</span>
+                                            <span className="field-value">{formatPriceInt(sale.total_price)}</span>
                                         </div>
                                         <div className="sale-card-field">
                                             <span className="field-label">Pago</span>
@@ -441,7 +408,7 @@ const Sales = () => {
                                         </td>
                                         <td className="date-cell">{formatDate(sale.created_at)}</td>
                                         <td>{sale.quantity}</td>
-                                        <td className="font-medium">{formatPrice(sale.total_price)}</td>
+                                        <td className="font-medium">{formatPriceInt(sale.total_price)}</td>
                                         <td>{PAYMENT_METHOD_LABEL[sale.payment_method] ?? sale.payment_method}</td>
                                         <td>{sale.shipping_method ? (SHIPPING_METHOD_LABEL[sale.shipping_method] ?? sale.shipping_method) : '—'}</td>
                                         <td>

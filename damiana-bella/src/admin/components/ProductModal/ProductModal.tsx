@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../../components/common/Modal/Modal';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
-import { supabase } from '../../../config/supabaseClient';
+import { getAuthToken } from '../../../utils/auth';
+import { extractErrorMessage } from '../../../utils/errorMessage';
 import { createProduct, updateProduct as updateProductApi } from '../../../services/productService';
 import type { Specification, FAQ } from '../../../types/product';
 import { COLOR_MAP } from '../../../utils/constants';
@@ -96,8 +97,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [showOptionalWarning, setShowOptionalWarning] = useState(false);
-    const [missingOptionals, setMissingOptionals] = useState<string[]>([]);
+    const [inactiveWarning, setInactiveWarning] = useState<string[] | null>(null);
     const managesStockFromVariants = useMemo(
         () => variants.some((variant) => isSizeVariant(variant.name) && getNormalizedVariantOptions(variant.name, variant.optionsText.split(',')).length > 0),
         [variants]
@@ -218,6 +218,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                 resetForm();
             }
             setError('');
+            setInactiveWarning(null);
         }
     }, [isOpen, product]);
 
@@ -244,8 +245,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
         setCustomColorName('');
         setCustomColorHex('#000000');
         setFieldErrors({});
-        setShowOptionalWarning(false);
-        setMissingOptionals([]);
+        setInactiveWarning(null);
     };
 
     const buildPayload = () => {
@@ -284,69 +284,59 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
     const executeSave = async () => {
         setSaving(true);
         setError('');
+        setInactiveWarning(null);
 
         try {
-            const session = await supabase.auth.getSession();
-            const token = session.data.session?.access_token;
-            if (!token) throw new Error('Token no disponible');
-
+            const token = await getAuthToken();
             const payload = buildPayload();
 
             if (product?.id) {
-                // Editar: pasa por el service (centraliza body + headers + error handling)
-                await updateProductApi(product.id, payload, token);
-                updateProduct(product.id, payload);
+                const savedData = await updateProductApi(product.id, payload, token);
+                const finalStatus = savedData?.data?.status ?? payload.status;
+                updateProduct(product.id, { ...payload, status: finalStatus });
+
+                if (savedData?.autoInactive) {
+                    setInactiveWarning(savedData.missingFields ?? []);
+                    onSaved?.();
+                    return;
+                }
             } else {
-                // Crear: idem. Si el backend no devuelve id (caso raro), caemos a
-                // timestamp como sentinel — patrón histórico del componente.
                 const savedData = await createProduct(payload, token);
                 const newProduct: AdminProduct = {
                     id: savedData?.data?.id || Date.now().toString(),
                     ...payload,
+                    status: savedData?.data?.status ?? payload.status,
                 };
                 addProduct(newProduct);
+
+                if (savedData?.autoInactive) {
+                    setInactiveWarning(savedData.missingFields ?? []);
+                    onSaved?.();
+                    return;
+                }
             }
 
             resetForm();
             onClose();
             onSaved?.();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'No se pudo guardar el producto');
+            setError(extractErrorMessage(err, 'No se pudo guardar el producto'));
         } finally {
             setSaving(false);
         }
     };
 
     const handleSave = async () => {
-        // Nivel 1: campos obligatorios
-        const errors: Record<string, string> = {};
-        if (!name.trim()) errors.name = 'El nombre es requerido';
-        if (!price) errors.price = 'El precio es requerido';
-        if (!category) errors.category = 'La categoría es requerida';
-        if (!managesStockFromVariants && !stock) errors.stock = 'El stock es requerido';
-
-        if (Object.keys(errors).length > 0) {
-            setFieldErrors(errors);
+        // El nombre es el único campo que bloquea el guardado en el frontend.
+        // El resto (precio, talles, descripción) es validado en el backend:
+        // si faltan, el producto se guarda automáticamente como inactivo.
+        if (!name.trim()) {
+            setFieldErrors({ name: 'El nombre es requerido' });
             setActiveTab('Datos Básicos');
             return;
         }
 
         setFieldErrors({});
-
-        // Nivel 2: campos opcionales recomendados
-        const hasValidVariants = variants.some(v => v.name.trim() && v.optionsText.trim());
-        const missing: string[] = [];
-        if (!hasValidVariants) missing.push('Variantes (colores, talles)');
-        if (!description.trim()) missing.push('Descripción');
-        if (specifications.length === 0) missing.push('Especificaciones técnicas');
-        if (faqs.length === 0) missing.push('Preguntas frecuentes (FAQ)');
-
-        if (missing.length > 0) {
-            setMissingOptionals(missing);
-            setShowOptionalWarning(true);
-            return;
-        }
-
         await executeSave();
     };
 
@@ -508,7 +498,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             setNewCatName('');
             setNewCatParentId(null);
         } catch (err) {
-            setCategoryError(err instanceof Error ? err.message : 'No se pudo crear la categoría');
+            setCategoryError(extractErrorMessage(err, 'No se pudo crear la categoría'));
         } finally {
             setSavingCategory(false);
         }
@@ -529,7 +519,7 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
             setDbCategories(updated);
             if (category === name) setCategory('');
         } catch (err) {
-            setManageCatError(err instanceof Error ? err.message : 'No se pudo eliminar la categoría');
+            setManageCatError(extractErrorMessage(err, 'No se pudo eliminar la categoría'));
         } finally {
             setDeletingCatId(null);
         }
@@ -571,6 +561,17 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                     {error && (
                         <div style={{ color: 'red', marginBottom: '1rem', padding: '0.5rem', background: '#fff0f0', borderRadius: '0.25rem' }}>
                             {error}
+                        </div>
+                    )}
+                    {inactiveWarning && (
+                        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '0.375rem', color: '#7c5800', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                            <strong>Producto guardado como inactivo.</strong>
+                            {' '}El producto se guardó en estado inactivo porque faltan completar campos obligatorios. Por favor, completalos para activarlo.
+                            {inactiveWarning.length > 0 && (
+                                <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.25rem' }}>
+                                    {inactiveWarning.map(f => <li key={f} style={{ textTransform: 'capitalize' }}>{f}</li>)}
+                                </ul>
+                            )}
                         </div>
                     )}
 
@@ -715,8 +716,13 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                     {fieldErrors.price && <span className="field-error-msg">{fieldErrors.price}</span>}
                                 </div>
                                 <div className={`form-group${fieldErrors.stock ? ' form-group--error' : ''}`}>
-                                    <label>{managesStockFromVariants ? 'Stock total' : 'Stock disponible'}</label>
-                                    {managesStockFromVariants ? (
+                                    <label>{managesStockFromVariants || !product ? 'Stock total' : 'Stock disponible'}</label>
+                                    {!product ? (
+                                        <div className="stock-derived-card">
+                                            <strong>{derivedVariantStock}</strong>
+                                            <span>Se calcula automáticamente desde las variantes de talle.</span>
+                                        </div>
+                                    ) : managesStockFromVariants ? (
                                         <div className="stock-derived-card">
                                             <strong>{derivedVariantStock}</strong>
                                             <span>Se calcula automáticamente desde los talles configurados en Variantes.</span>
@@ -1060,12 +1066,6 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                                                                                 onClick={() => {
                                                                                     const remaining = options.filter(currentOption => currentOption !== normalizedOption);
                                                                                     updateVariant(i, 'optionsText', remaining.join(', '));
-                                                                                    // Al eliminar opción, eliminar su stock
-                                                                                    if (isTalleVariant && v.stockByOption) {
-                                                                                        const updated = [...variants];
-                                                                                        delete updated[i].stockByOption![normalizedOption];
-                                                                                        setVariants(updated);
-                                                                                    }
                                                                                 }}
                                                                             >
                                                                                 <X size={14} />
@@ -1606,42 +1606,6 @@ const ProductModal = ({ isOpen, onClose, product, onSaved }: ProductModalProps) 
                 </button>
             </div>
 
-            {showOptionalWarning && (
-                <div
-                    className="cat-modal-overlay"
-                    onClick={() => setShowOptionalWarning(false)}
-                >
-                    <div className="cat-modal optional-warning-modal" onClick={e => e.stopPropagation()}>
-                        <h4 className="cat-modal__title">Campos opcionales incompletos</h4>
-                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#555', lineHeight: 1.6 }}>
-                            ¿Estás seguro que deseas guardar el producto sin la siguiente información?
-                        </p>
-                        <ul className="optional-warning-list">
-                            {missingOptionals.map(field => (
-                                <li key={field}>{field}</li>
-                            ))}
-                        </ul>
-                        <div className="cat-modal__actions">
-                            <button
-                                type="button"
-                                className="admin-btn-secondary"
-                                onClick={() => setShowOptionalWarning(false)}
-                                disabled={saving}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                className="admin-btn-primary"
-                                onClick={() => { setShowOptionalWarning(false); executeSave(); }}
-                                disabled={saving}
-                            >
-                                {saving ? 'Guardando...' : 'Guardar de todas formas'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </Modal>
 
         <ConfirmationModal

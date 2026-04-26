@@ -4,6 +4,8 @@ import { useCartStore } from '../../../store/cartStore';
 import { useAuthStore } from '../../../store/authStore';
 import { parseColorOption } from '../../../utils/constants';
 import { getProductPricing } from '../../../utils/pricing';
+import { buildVariantLine as fmtVariantLine, allUnitsShareVariants } from '../../../utils/formatters';
+import { extractErrorMessage } from '../../../utils/errorMessage';
 import { createOrder, createMpPreference, INVALID_PRODUCT_PRICE_MESSAGE } from '../../../services/orderService';
 import AuthModal from '../../components/auth/AuthModal';
 import SEO from '../../../components/common/SEO/SEO';
@@ -538,36 +540,26 @@ const Checkout = () => {
 
   const fmt = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
-  const buildVariantLine = (uv: Record<string, string>): string => {
-    return Object.entries(uv)
-      .map(([name, val]) => {
-        const isColor = name.toLowerCase() === 'color';
-        const display = isColor ? parseColorOption(val).name : val.toUpperCase();
-        const label = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-        return `${label} ${display}`;
-      })
+  const buildVariantLineJoined = (uv: Record<string, string>): string =>
+    Object.entries(uv)
+      .map(([name, val]) => fmtVariantLine(name, val))
       .join(' | ');
-  };
 
   const buildWhatsAppMessage = (): string => {
     const lines: string[] = ['Hola, ¿cómo estás?', 'Quiero comprar los siguientes productos:', ''];
 
     checkoutItems.forEach((checkoutItem, index) => {
-      const allSame =
-        checkoutItem.unitVariants.length <= 1 ||
-        checkoutItem.unitVariants.every(
-          (uv) => JSON.stringify(uv) === JSON.stringify(checkoutItem.unitVariants[0])
-        );
+      const allSame = allUnitsShareVariants(checkoutItem.unitVariants);
 
       lines.push(`*Producto ${index + 1}:* ${checkoutItem.product.name}`);
       lines.push(`*Cantidad:* ${checkoutItem.quantity}`);
       lines.push('');
 
       if (allSame && Object.keys(checkoutItem.unitVariants[0] ?? {}).length > 0) {
-        lines.push(`*Variantes:* ${buildVariantLine(checkoutItem.unitVariants[0])}`);
+        lines.push(`*Variantes:* ${buildVariantLineJoined(checkoutItem.unitVariants[0])}`);
       } else if (!allSame) {
         checkoutItem.unitVariants.forEach((uv, unitIndex) => {
-          lines.push(`* Unidad ${unitIndex + 1}: ${buildVariantLine(uv)}`);
+          lines.push(`* Unidad ${unitIndex + 1}: ${buildVariantLineJoined(uv)}`);
         });
       }
 
@@ -632,7 +624,7 @@ const Checkout = () => {
         window.open(whatsappUrl, '_blank');
         clearCart();
       } catch (err) {
-        setMpError(err instanceof Error ? err.message : 'No se pudo iniciar la compra. Intenta nuevamente.');
+        setMpError(extractErrorMessage(err, 'No se pudo iniciar la compra. Intenta nuevamente.'));
       }
     }
   };
@@ -669,7 +661,7 @@ const Checkout = () => {
       sessionStorage.setItem('mp_order_ids', JSON.stringify(order_ids));
       window.location.href = init_point;
     } catch (err) {
-      setMpError(err instanceof Error ? err.message : 'No se pudo conectar con el sistema de pagos. Intentá de nuevo o elegí transferencia.');
+      setMpError(extractErrorMessage(err, 'No se pudo conectar con el sistema de pagos. Intentá de nuevo o elegí transferencia.'));
       setSubmitting(false);
     }
   };
@@ -692,11 +684,7 @@ const Checkout = () => {
             <h2 className="checkout-section-title">Tu pedido</h2>
             {checkoutItems.map((checkoutItem) => {
               const { product, quantity, unitVariants, unitPrice, totalPrice } = checkoutItem;
-              const allSame =
-                unitVariants.length <= 1 ||
-                unitVariants.every(
-                  (uv) => JSON.stringify(uv) === JSON.stringify(unitVariants[0])
-                );
+              const allSame = allUnitsShareVariants(unitVariants);
 
               return (
                 <div key={String(product.id)} className="checkout-product-card">
