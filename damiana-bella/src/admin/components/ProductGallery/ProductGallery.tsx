@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchProducts, deleteProduct } from '../../../services/productService';
-import { supabase } from '../../../config/supabaseClient';
+import { getAuthToken } from '../../../utils/auth';
 import './ProductGallery.css';
 
 interface Product {
@@ -52,12 +52,8 @@ const ProductGallery = ({ onProductSelect, refreshTrigger }: ProductGalleryProps
     setError('');
 
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-
-      if (!token) {
-        throw new Error('Usuario no autenticado');
-      }
+      const token = await getAuthToken().catch(() => '');
+      if (!token) throw new Error('Usuario no autenticado');
 
       // Call backend to delete product and image
       await deleteProduct(product.id, token);

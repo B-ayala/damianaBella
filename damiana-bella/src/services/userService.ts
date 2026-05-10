@@ -1,5 +1,10 @@
-import { supabase } from '../config/supabaseClient';
+/**
+ * userService — wrappers compatibles para componentes existentes (AuthModal, etc.).
+ * Internamente delega al nuevo authService (JWT propio).
+ */
+
 import { apiFetch } from '../utils/apiFetch';
+import * as authService from './authService';
 
 interface CreateUserPayload {
   name: string;
@@ -13,98 +18,44 @@ interface User {
   id?: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   createdAt?: string;
 }
 
-const getEmailRedirectUrl = (path: string) =>
-  `${window.location.origin}${import.meta.env.BASE_URL}${path}`;
+const API_BASE_URL = import.meta.env.VITE_API_URL_LOCAL ?? 'http://localhost:3000/api';
 
-const fetchUserProfile = async (userId: string, email: string): Promise<User> => {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('id, name, role')
-    .eq('id', userId)
-    .single();
-
-  if (error) throw new Error('Error al obtener el perfil del usuario');
-
-  return {
-    id: userId,
-    name: profile?.name || '',
-    email: email,
-    role: profile?.role || 'user',
-  };
-};
+const codeOf = (err: unknown): string | undefined =>
+  err && typeof err === 'object' && 'code' in err
+    ? ((err as { code?: string }).code)
+    : undefined;
 
 /**
- * Crear un nuevo usuario con Supabase Auth
- * El trigger en Supabase automáticamente crea el perfil en public.profiles
+ * Registrar nuevo usuario.
+ * Lanza Error con messages convencionales que ya entiende el AuthModal:
+ *   - 'EMAIL_ALREADY_CONFIRMED'
+ *   - 'EMAIL_PENDING_CONFIRMATION'
+ *   - 'SIGNUP_RATE_LIMIT:<seconds>:<count>'
  */
 export const createUser = async (payload: CreateUserPayload): Promise<{ success: boolean; data?: User; message?: string }> => {
   try {
-    // 1. Pre-check: solo leer si hay un cooldown activo (no modifica nada)
-    const status = await getSignupStatus(payload.email);
-    if (status?.blocked) {
-      throw new Error(`SIGNUP_RATE_LIMIT:${status.remainingSeconds}:${status.count}`);
+    const res = await authService.register(payload);
+    if (res.autoConfirmed) {
+      // En modo dev (EMAIL_PROVIDER=console) la cuenta queda confirmada al instante.
     }
-
-    // 2. Registrarse en Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: payload.email,
-      password: payload.password,
-      options: {
-        data: {
-          name: payload.name,
-          ...(payload.phone ? { phone: payload.phone } : {}),
-        },
-        emailRedirectTo: getEmailRedirectUrl('auth/confirm'),
-      },
-    });
-
-    if (authError) {
-      // Email ya registrado y confirmado
-      if (authError.message?.includes('already registered') || authError.message?.includes('User already exists')) {
-        throw new Error('EMAIL_ALREADY_CONFIRMED');
-      }
-      if (authError.message?.toLowerCase().includes('rate limit') || authError.message?.toLowerCase().includes('over_email_send_rate_limit')) {
-        const updated = await notifyRateLimit(payload.email);
-        throw new Error(`SIGNUP_RATE_LIMIT:${updated?.remainingSeconds ?? 60}:${updated?.count ?? 1}`);
-      }
-      throw new Error(authError.message);
-    }
-
-    if (!authData.user) {
-      throw new Error('Error al crear el usuario en autenticación');
-    }
-
-    // Detectar "signup falso" — Supabase retorna éxito pero sin crear usuario real
-    // Esto pasa cuando el email ya existe pero no está confirmado (identities viene vacío)
-    if (!authData.user.identities || authData.user.identities.length === 0) {
-      throw new Error('EMAIL_PENDING_CONFIRMATION');
-    }
-
-    // El trigger handle_new_user() se encarga de leer el nombre desde raw_user_meta_data
-    // Intento best-effort de actualizar, pero no falla si RLS lo bloquea (email no confirmado)
-    await supabase
-      .from('profiles')
-      .update({
-        name: payload.name,
-        ...(payload.phone ? { phone: payload.phone } : {}),
-      })
-      .eq('id', authData.user.id);
-
     return {
       success: true,
-      data: {
-        id: authData.user.id,
-        name: payload.name,
-        email: payload.email,
-        role: 'user',
-      },
+      data: res.data
+        ? { id: res.data.id, name: res.data.name, email: res.data.email, role: res.data.role }
+        : undefined,
     };
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Error al registrar el usuario');
+  } catch (err) {
+    const code = codeOf(err);
+    const msg = err instanceof Error ? err.message : 'Error al registrar';
+    if (code === 'EMAIL_ALREADY_CONFIRMED') throw new Error('EMAIL_ALREADY_CONFIRMED');
+    if (code === 'EMAIL_PENDING_CONFIRMATION') throw new Error('EMAIL_PENDING_CONFIRMATION');
+    if (code === 'RATE_LIMIT') throw new Error('SIGNUP_RATE_LIMIT:60:1');
+    throw new Error(msg);
   }
 };
 
@@ -113,211 +64,86 @@ interface LoginPayload {
   password: string;
 }
 
-/**
- * Iniciar sesión con Supabase Auth
- */
 export const loginUser = async (payload: LoginPayload): Promise<{ success: boolean; data?: User; message?: string }> => {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: payload.email,
-      password: payload.password,
-    });
-
-    if (authError) {
-      throw new Error(authError.message);
-    }
-
-    if (!authData.user) {
-      throw new Error('Error al iniciar sesión');
-    }
-
-    // Obtener datos del perfil (email vive en auth.users, no en profiles)
-    const user = await fetchUserProfile(authData.user.id, authData.user.email || '');
-
-    return { success: true, data: user };
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Credenciales inválidas');
+    const user = await authService.login(payload.email, payload.password);
+    return {
+      success: true,
+      data: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    };
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Credenciales inválidas');
   }
 };
 
-/**
- * Obtener el usuario autenticado actual
- */
 export const getCurrentUser = async (): Promise<User | null> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) return null;
-
-    return await fetchUserProfile(user.id, user.email || '');
-  } catch (error) {
-    console.error('Error al obtener usuario actual:', error);
-    return null;
-  }
-}
-
-/**
- * Cerrar sesión
- */
-export const logoutUser = async (): Promise<void> => {
-  await supabase.auth.signOut();
+  const user = await authService.me();
+  if (!user) return null;
+  return { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
 };
 
-/**
- * Reenviar email de confirmación
- * Se usa cuando el usuario no recibió el primer email o lo perdió
- */
+export const logoutUser = async (): Promise<void> => {
+  await authService.logout();
+};
+
 export const resendConfirmationEmail = async (email: string): Promise<{ success: boolean; message: string }> => {
   try {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email,
-      options: {
-        emailRedirectTo: getEmailRedirectUrl('auth/confirm'),
-      },
-    });
-
-    if (error) {
-      if (error.message?.toLowerCase().includes('rate limit') || error.message?.toLowerCase().includes('over_email_send_rate_limit')) {
-        throw new Error('Demasiados intentos. Por favor esperá unos minutos antes de volver a solicitar el email.');
-      }
-      if (error.message?.toLowerCase().includes('you can only request this after')) {
-        const match = error.message.match(/after (\d+) second/);
-        const seconds = match ? match[1] : '60';
-        throw new Error(`RESEND_COOLDOWN:${seconds}`);
-      }
-      throw new Error(error.message);
-    }
-
+    await authService.resendConfirmation(email);
     return {
       success: true,
-      message: `Email de confirmación reenviado a ${email}. Revisa tu bandeja de entrada (y carpeta de spam).`,
+      message: `Si la cuenta existe y está pendiente, te reenviamos el email a ${email}. Revisá tu bandeja de entrada (y carpeta de spam).`,
     };
-  } catch (error) {
-    throw new Error(
-      error instanceof Error ? error.message : 'Error al reenviar el email de confirmación'
-    );
+  } catch (err) {
+    const code = codeOf(err);
+    if (code === 'RATE_LIMIT') throw new Error('RESEND_COOLDOWN:60');
+    throw new Error(err instanceof Error ? err.message : 'Error al reenviar el email');
   }
 };
 
-/**
- * Verificar confirmación de email con Supabase
- * Se usa cuando el usuario hace click en el link del email de confirmación
- */
 export const verifyEmailConfirmation = async (token: string): Promise<{ success: boolean; message: string }> => {
   try {
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'email',
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return {
-      success: true,
-      message: 'Tu cuenta ha sido confirmada correctamente.',
-    };
-  } catch (error) {
-    throw new Error(
-      error instanceof Error ? error.message : 'Error al verificar el email'
-    );
+    await authService.confirmEmail(token);
+    return { success: true, message: 'Tu cuenta ha sido confirmada correctamente.' };
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Error al verificar el email');
   }
 };
 
-// ============================================================
-// Admin API functions (Backend endpoints)
-// ============================================================
-
-const API_BASE_URL = import.meta.env.VITE_API_URL_LOCAL;
-
-type RateLimitStatus = { blocked: boolean; count: number; remainingSeconds: number; remainingAttempts: number };
-
-// Solo lee el estado actual — no modifica nada
-const getSignupStatus = async (email: string): Promise<RateLimitStatus | null> => {
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/users/signup-status/${encodeURIComponent(email)}`);
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-};
-
-// Llamar SOLO cuando Supabase devuelve rate limit
-const notifyRateLimit = async (email: string): Promise<RateLimitStatus | null> => {
-  try {
-    const res = await apiFetch(`${API_BASE_URL}/users/signup-ratelimit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Solicitar recuperación de contraseña por email
- * Supabase envía un link mágico al correo con type=recovery
- */
 export const requestPasswordReset = async (email: string): Promise<void> => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: getEmailRedirectUrl('auth/reset-password'),
-  });
-  if (error) {
-    throw new Error(error.message || 'Error al enviar el email de recuperación');
+  try {
+    await authService.forgotPassword(email);
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Error al enviar el email de recuperación');
   }
 };
 
 /**
- * Establecer nueva contraseña (se llama desde la página de reset, tras el link mágico)
- * Requiere que Supabase ya haya establecido la sesión de recovery en el cliente
+ * Resetear contraseña (con token del link de email).
+ * NOTA: ahora requiere el token explícitamente (antes Supabase manejaba sesión interna).
+ * El nuevo flujo: ResetPassword.tsx lee `?token=XXX` del URL y lo pasa acá.
  */
-export const resetPassword = async (newPassword: string): Promise<void> => {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) {
-    throw new Error(error.message || 'Error al actualizar la contraseña');
+export const resetPassword = async (newPassword: string, token?: string): Promise<void> => {
+  if (!token) throw new Error('Token de recuperación faltante');
+  try {
+    await authService.resetPassword(token, newPassword);
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Error al actualizar la contraseña');
   }
 };
 
-/**
- * Cambiar la contraseña del usuario actual
- * Verifica la contraseña actual reautenticando, luego actualiza a la nueva
- */
 export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user?.email) {
-      throw new Error('No hay usuario autenticado');
-    }
-
-    // Verificar contraseña actual reautenticando
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
-
-    if (signInError) {
-      throw new Error('La contraseña actual es incorrecta');
-    }
-
-    // Cambiar a la nueva contraseña
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (updateError) {
-      throw new Error(updateError.message || 'Error al cambiar la contraseña');
-    }
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Error al cambiar la contraseña');
+    await authService.changePassword(currentPassword, newPassword);
+  } catch (err) {
+    const code = codeOf(err);
+    if (code === 'INVALID_CURRENT_PASSWORD') throw new Error('La contraseña actual es incorrecta');
+    throw new Error(err instanceof Error ? err.message : 'Error al cambiar la contraseña');
   }
 };
+
+// ============================================================
+// Admin API (CRUD usuarios) — sigue usando /api/users del backend
+// ============================================================
 
 export interface AdminUserData {
   id: string;
@@ -329,55 +155,29 @@ export interface AdminUserData {
   email_confirmed_at: string | null;
 }
 
-/**
- * Obtener todos los usuarios (endpoint admin del backend)
- */
 export const getAdminUsers = async (): Promise<AdminUserData[]> => {
   const response = await apiFetch(`${API_BASE_URL}/users`);
-
-  if (!response.ok) {
-    throw new Error('Error al conectar con el servidor');
-  }
-
+  if (!response.ok) throw new Error('Error al conectar con el servidor');
   const data = await response.json();
-
-  if (!data.success) {
-    throw new Error(data.message || 'Error al obtener usuarios');
-  }
-
+  if (!data.success) throw new Error(data.message || 'Error al obtener usuarios');
   return data.data;
 };
 
-/**
- * Eliminar un usuario completamente (auth.users + profiles)
- */
 export const deleteAdminUser = async (userId: string): Promise<void> => {
   const response = await apiFetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
   });
-
   const data = await response.json().catch(() => ({ success: false, message: 'Error al eliminar usuario' }));
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || 'Error al eliminar usuario');
-  }
+  if (!response.ok || !data.success) throw new Error(data.message || 'Error al eliminar usuario');
 };
 
-/**
- * Actualizar el rol de un usuario (admin/user)
- */
 export const updateUserRole = async (userId: string, newRole: 'admin' | 'user'): Promise<AdminUserData> => {
   const response = await apiFetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: newRole }),
   });
-
   const data = await response.json().catch(() => ({ success: false, message: 'Error al actualizar usuario' }));
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || 'Error al actualizar el rol del usuario');
-  }
-
+  if (!response.ok || !data.success) throw new Error(data.message || 'Error al actualizar el rol del usuario');
   return data.data;
 };

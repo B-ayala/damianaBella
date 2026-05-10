@@ -8,15 +8,17 @@ import { SeasonThemeProvider } from './utils/SeasonThemeProvider';
 import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
 import Footer from './components/common/Footer/Footer';
-import { supabase } from './config/supabaseClient';
 import { useAuthStore } from './store/authStore';
 import { InitialLoadProvider, useInitialLoad } from './components/common/InitialLoad/InitialLoadProvider';
+import { AUTH_LOGOUT_EVENT } from './utils/apiFetch';
 
 const AppContent = () => {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   const isAuthRoute = location.pathname.startsWith('/auth');
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const setUserFromStorage = useAuthStore((state) => state.setUserFromStorage);
+  const logout = useAuthStore((state) => state.logout);
   const { completeTask } = useInitialLoad();
 
   useEffect(() => {
@@ -24,42 +26,31 @@ const AppContent = () => {
       completeTask('window');
       return;
     }
-
-    const handleWindowLoad = () => {
-      completeTask('window');
-    };
-
+    const handleWindowLoad = () => completeTask('window');
     window.addEventListener('load', handleWindowLoad);
-
-    return () => {
-      window.removeEventListener('load', handleWindowLoad);
-    };
+    return () => window.removeEventListener('load', handleWindowLoad);
   }, [completeTask]);
 
   useEffect(() => {
     const setupAuth = async () => {
       try {
-        // Validate stored session — if corrupt/expired, sign out to clear localStorage
-        const { error } = await supabase.auth.getSession();
-        if (error) await supabase.auth.signOut();
+        // Hidratación rápida desde localStorage para evitar flicker
+        setUserFromStorage();
+        // Validación contra backend (apiFetch hace refresh si access expiró)
         await initializeAuth();
       } finally {
         completeTask('auth');
       }
     };
-
     void setupAuth();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void initializeAuth();
-    });
-
-    return () => {
-      subscription.unsubscribe();
+    // Cuando apiFetch detecta token inválido o refresh fallido, dispara este evento.
+    const onForcedLogout = () => {
+      void logout();
     };
-  }, [completeTask, initializeAuth]);
+    window.addEventListener(AUTH_LOGOUT_EVENT, onForcedLogout);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, onForcedLogout);
+  }, [completeTask, initializeAuth, setUserFromStorage, logout]);
 
   useEffect(() => {
     if (isAdmin || isAuthRoute) {
