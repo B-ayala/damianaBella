@@ -7,6 +7,11 @@
 const LOCALHOST_API = 'http://localhost:3000/api';
 const configuredBase: string = import.meta.env.VITE_API_URL_LOCAL ?? LOCALHOST_API;
 
+export const authHeaders = (token: string): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+});
+
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const headers = new Headers(init?.headers);
 

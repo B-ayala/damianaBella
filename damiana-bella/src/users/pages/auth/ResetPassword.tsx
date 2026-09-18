@@ -81,7 +81,7 @@ const ResetPassword = () => {
   const currentUser = useAuthStore((s) => s.currentUser);
   // 'waiting' | 'recovery' (via email link) | 'change' (logged-in user) | 'success' | 'invalid' | 'error'
   const [status, setStatus] = useState<'waiting' | 'recovery' | 'change' | 'success' | 'invalid' | 'error'>('waiting');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorMessage] = useState('');
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
