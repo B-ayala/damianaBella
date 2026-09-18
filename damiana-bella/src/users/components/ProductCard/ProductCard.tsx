@@ -27,7 +27,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onReadMore }) => {
 
   return (
     <div className="product-card">
-      <div className="product-card__image-container" onClick={handleReadMore}>
+      <div className="product-card__image-container">
         {pricing.hasPromotion && pricing.discountPercentage && (
           <div className="product-card__discount-badge">-{pricing.discountPercentage}%</div>
         )}

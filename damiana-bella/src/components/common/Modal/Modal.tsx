@@ -34,7 +34,7 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
           overflow: 'hidden',
           position: 'relative',
           maxWidth: '560px',
-          maxHeight: isMobile ? '100vh' : '85vh',
+          maxHeight: isMobile ? '100dvh' : '85dvh',
           '&::before': {
             content: '""',
             position: 'absolute',

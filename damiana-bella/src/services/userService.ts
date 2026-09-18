@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { apiFetch } from '../utils/apiFetch';
+import * as authService from './authService';
 
 interface CreateUserPayload {
   name: string;
@@ -94,46 +95,14 @@ interface LoginPayload {
 }
 
 /**
- * Iniciar sesión con Supabase Auth
+ * Iniciar sesión. Las credenciales van al backend (`POST /api/auth/login`),
+ * nunca directo a Supabase desde acá: el backend deja el refresh token en una
+ * cookie httpOnly y el access token vuelve en el body, para que quede solo en
+ * memoria del lado del frontend (ver `authService.ts`).
  */
 export const loginUser = async (payload: LoginPayload): Promise<{ success: boolean; data?: User; message?: string }> => {
-  try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: payload.email,
-      password: payload.password,
-    });
-
-    if (authError) {
-      throw new Error(authError.message);
-    }
-
-    if (!authData.user) {
-      throw new Error('Error al iniciar sesión');
-    }
-
-    // Obtener datos del perfil (email vive en auth.users, no en profiles)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name, role')
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError) {
-      throw new Error('Error al obtener el perfil del usuario');
-    }
-
-    return {
-      success: true,
-      data: {
-        id: authData.user.id,
-        name: profile?.name || '',
-        email: authData.user.email || '',
-        role: profile?.role || 'user',
-      },
-    };
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : 'Credenciales inválidas');
-  }
+  const user = await authService.login(payload.email, payload.password);
+  return { success: true, data: user };
 };
 
 /**
@@ -166,10 +135,11 @@ export const getCurrentUser = async (): Promise<User | null> => {
 }
 
 /**
- * Cerrar sesión
+ * Cerrar sesión: revoca el refresh token en el backend y limpia el access
+ * token en memoria (ver `authService.ts`).
  */
 export const logoutUser = async (): Promise<void> => {
-  await supabase.auth.signOut();
+  await authService.logout();
 };
 
 /**

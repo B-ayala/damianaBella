@@ -9,6 +9,7 @@ import AppRouter from './routes/AppRouter';
 import WhatsAppButton from './components/common/WhatsAppButton/WhatsAppButton';
 import Footer from './components/common/Footer/Footer';
 import { supabase } from './config/supabaseClient';
+import { restoreSession } from './services/authService';
 import { useAuthStore } from './store/authStore';
 import { InitialLoadProvider, useInitialLoad } from './components/common/InitialLoad/InitialLoadProvider';
 
@@ -39,6 +40,14 @@ const AppContent = () => {
   useEffect(() => {
     const setupAuth = async () => {
       try {
+        // El access token vive solo en memoria (nunca en localStorage): se
+        // pierde al recargar la página. Antes de leer el usuario actual,
+        // intentar recuperarlo con la cookie httpOnly del refresh token — si
+        // no hay sesión (no logueado, cookie vencida), esto no hace nada.
+        // Una sola vez acá (no dentro de `initializeAuth`): ese `setSession`
+        // dispara `onAuthStateChange` más abajo, y si el restore viviera ahí
+        // se re-dispararía a sí mismo en loop.
+        await restoreSession();
         await initializeAuth();
       } finally {
         completeTask('auth');

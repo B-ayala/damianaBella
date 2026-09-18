@@ -23,13 +23,16 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     headers.set('ngrok-skip-browser-warning', 'true');
   }
 
+  // `credentials: 'include'` por defecto: /api/auth/* depende de la cookie
+  // httpOnly del refresh token. El resto de los endpoints la ignora (no la
+  // usan), así que no hay efecto colateral en pedirla siempre.
   try {
-    return await fetch(input, { ...init, headers });
+    return await fetch(input, { credentials: 'include', ...init, headers });
   } catch (err) {
     // Error de red (ngrok caído) — reintentar con localhost
     if (isNgrokHost && rawUrl.startsWith(configuredBase)) {
       const fallbackUrl = LOCALHOST_API + rawUrl.slice(configuredBase.length);
-      return fetch(fallbackUrl, { ...init });
+      return fetch(fallbackUrl, { credentials: 'include', ...init });
     }
     throw err;
   }
