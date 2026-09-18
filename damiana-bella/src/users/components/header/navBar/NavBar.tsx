@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FiSearch, FiChevronRight, FiArrowLeft, FiX, FiShoppingCart, FiChevronDown, FiUser, FiLogOut, FiLock, FiShoppingBag } from 'react-icons/fi';
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock';
+import { useClickOutside } from '../../../../hooks/useClickOutside';
 // @ts-ignore - vite-imagetools query param
 import logoImg from '../../../../assets/img/logo.jpeg?w=120&format=webp&quality=80';
 import AuthModal from '../../auth/AuthModal';
@@ -104,15 +105,8 @@ const NavBar = () => {
     setIsMobilePurchasesModalOpen(true);
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const closeSearchResults = useCallback(() => setShowResults(false), []);
+  useClickOutside(searchRef, closeSearchResults);
 
   const handleToggleSearch = () => {
     if (searchOpen) {

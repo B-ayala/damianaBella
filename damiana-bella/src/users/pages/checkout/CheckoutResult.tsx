@@ -21,13 +21,20 @@ interface LastOrder {
     itemsSubtotal?: number;
     grandTotal: number;
     source?: 'cart' | 'direct';
+    shippingMethod?: string;
 }
+
+const APPROVED_DESC: Record<string, string> = {
+    moto: '¡Gracias por tu compra! Tu pedido y pago fueron registrados correctamente. Si seleccionaste envío a domicilio en moto, coordiná la entrega con nuestro asesor de motos.',
+    local: '¡Gracias por tu compra! Tu pedido y pago fueron registrados correctamente. Podés retirarlo en nuestro local de lunes a viernes (días hábiles), de 10:00 a 18:00.',
+};
+const DEFAULT_APPROVED_DESC = '¡Gracias por tu compra! Tu pedido y pago fueron registrados correctamente.';
 
 const CONTENT: Record<ResultStatus, { icon: React.ReactNode; title: string; desc: string; color: string }> = {
     approved: {
         icon: <CheckCircle size={56} />,
         title: '¡Pago aprobado!',
-        desc: 'Tu pedido fue registrado y el pago fue confirmado. Te avisaremos cuando tu pedido esté en camino.',
+        desc: DEFAULT_APPROVED_DESC,
         color: 'approved',
     },
     pending: {
@@ -122,7 +129,10 @@ const CheckoutResult = () => {
         }
     }, [cartItems.length, checkoutItem?.source, clearCart, externalRef, setItem, status]);
 
-    const { icon, title, desc, color } = CONTENT[status];
+    const { icon, title, color } = CONTENT[status];
+    const desc = status === 'approved'
+        ? (APPROVED_DESC[lastOrder?.shippingMethod ?? ''] ?? DEFAULT_APPROVED_DESC)
+        : CONTENT[status].desc;
     const fmt = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 2 });
 
     return (

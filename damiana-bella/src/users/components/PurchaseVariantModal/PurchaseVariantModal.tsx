@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Product, Variant } from '../../../types/product';
 import type { UnitVariants } from '../../../store/cartStore';
 import { parseColorOption } from '../../../utils/constants';
+import { allUnitsShareVariants } from '../../../utils/formatters';
 import {
   areUnitVariantSelectionsValid,
   getInvalidVariantSelections,
@@ -47,11 +48,7 @@ const PurchaseVariantModal = ({
   const initialUnitVariantsSignature = JSON.stringify(initialUnitVariants ?? []);
   const initialVariantsSignature = JSON.stringify(initialVariants);
 
-  const allUnitsShareSameVariants =
-    resolvedInitialUnitVariants.length <= 1 ||
-    resolvedInitialUnitVariants.every(
-      (selection) => JSON.stringify(selection) === JSON.stringify(resolvedInitialUnitVariants[0])
-    );
+  const allUnitsShareSameVariants = allUnitsShareVariants(resolvedInitialUnitVariants);
 
   useEffect(() => {
     if (isOpen) {

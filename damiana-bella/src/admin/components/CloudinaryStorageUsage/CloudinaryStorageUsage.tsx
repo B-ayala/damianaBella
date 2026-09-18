@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { supabase } from '../../../config/supabaseClient';
+import { getAuthToken } from '../../../utils/auth';
 import { fetchCloudinaryUsage, type CloudinaryUsage } from '../../../services/productService';
 import './CloudinaryStorageUsage.css';
 
@@ -19,8 +19,7 @@ const CloudinaryStorageUsage = ({ onRefresh }: StorageUsageProps) => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token ?? '';
+      const token = await getAuthToken().catch(() => '');
 
       if (!token) {
         setError('No se pudo obtener autenticación.');

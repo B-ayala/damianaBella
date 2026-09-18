@@ -14,7 +14,15 @@ export interface SessionUser {
 interface SessionResponse {
   success: boolean;
   message?: string;
+  code?: string;
   data?: { user: SessionUser; accessToken: string; expiresIn: number };
+}
+
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  autoConfirmed?: boolean;
 }
 
 /**
@@ -42,6 +50,13 @@ const applySession = async (data: { user: SessionUser; accessToken: string; expi
   await syncSupabaseSession(data.accessToken);
 };
 
+const parseError = async (response: Response): Promise<never> => {
+  const result: ApiResponse = await response.json().catch(() => ({ success: false }));
+  const err = new Error(result.message || 'Error de autenticación');
+  (err as Error & { code?: string }).code = result.code;
+  throw err;
+};
+
 /**
  * Login: credenciales van al backend (nunca a Supabase directo desde acá). El
  * backend deja el refresh token en una cookie httpOnly y devuelve el access
@@ -61,6 +76,87 @@ export const login = async (email: string, password: string): Promise<SessionUse
 
   await applySession(result.data);
   return result.data.user;
+};
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  phone?: string;
+  password: string;
+}
+
+export const register = async (payload: RegisterPayload): Promise<{ data?: SessionUser; autoConfirmed?: boolean }> => {
+  const response = await apiFetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result: SessionResponse & { autoConfirmed?: boolean } = await response.json().catch(() => ({ success: false }));
+
+  if (!response.ok || !result.success) {
+    const err = new Error(result.message || 'Error al registrar');
+    (err as Error & { code?: string }).code = result.code;
+    throw err;
+  }
+
+  return { data: result.data?.user, autoConfirmed: result.autoConfirmed };
+};
+
+export const confirmEmail = async (token: string): Promise<void> => {
+  const response = await apiFetch(`${API_BASE_URL}/auth/confirm-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) await parseError(response);
+};
+
+export const resendConfirmation = async (email: string): Promise<void> => {
+  const response = await apiFetch(`${API_BASE_URL}/auth/resend-confirmation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) await parseError(response);
+};
+
+export const forgotPassword = async (email: string): Promise<void> => {
+  const response = await apiFetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) await parseError(response);
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  const response = await apiFetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword }),
+  });
+  if (!response.ok) await parseError(response);
+};
+
+/**
+ * Cambiar contraseña estando logueado: requiere identificar al usuario, así
+ * que va el access token en memoria como Bearer (acá sí, porque no hay
+ * cookie de sesión de usuario final — solo el refresh token la usa).
+ */
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  const accessToken = getAccessToken();
+  const response = await apiFetch(`${API_BASE_URL}/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!response.ok) await parseError(response);
+  // Backend revoca todos los refresh tokens: forzar re-login limpiando la sesión local.
+  clearAccessToken();
+  await supabase.auth.signOut();
 };
 
 /**

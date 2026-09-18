@@ -56,7 +56,11 @@ const ProductDetail = () => {
 
   useEffect(() => {
     fetchProductById(id!)
-      .then((row) => setProduct(mapDbRowToProduct(row)))
+      .then((row) => {
+        const mapped = mapDbRowToProduct(row);
+        if ((mapped.stock ?? 0) <= 0) return navigate('/products');
+        setProduct(mapped);
+      })
       .catch(() => navigate('/products'));
   }, [id, navigate]);
 

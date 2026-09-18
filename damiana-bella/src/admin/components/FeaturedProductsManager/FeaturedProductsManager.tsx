@@ -49,7 +49,8 @@ const FeaturedProductsManager = () => {
     const searchResults = searchTerm.trim()
         ? products.filter((p) =>
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-            !p.featured
+            !p.featured &&
+            p.status === 'active'
           )
         : [];
 

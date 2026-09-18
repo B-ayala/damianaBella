@@ -66,6 +66,7 @@
 .dispatch-status-badge.en_preparacion   { background: #ffedd5; color: #c2410c; }
 .dispatch-status-badge.despachado       { background: #dbeafe; color: #1d4ed8; }
 .dispatch-status-badge.listo_para_retiro { background: #dcfce7; color: #166534; }
+.dispatch-status-badge.entregado         { background: #f3e8ff; color: #7c3aed; }
 
 /* Advance button (mobile) */
 .dispatch-status-row {

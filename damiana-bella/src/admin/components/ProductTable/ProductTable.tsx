@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Pagination, Box } from '@mui/material';
 import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
 import { useAdminStore, type AdminProduct } from '../../store/adminStore';
 import { StockBadge, StatusBadge } from './ProductBadges';
 import ConfirmationModal from '../../../components/common/Modal/ConfirmationModal';
 import { deleteProduct as deleteProductApi } from '../../../services/productService';
-import { supabase } from '../../../config/supabaseClient';
+import { getAuthToken } from '../../../utils/auth';
+import { usePagination } from '../../../hooks/usePagination';
 import './ProductTable.css';
 
 interface ProductTableProps {
@@ -20,8 +21,6 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
     const { products, deleteProduct } = useAdminStore();
     const [sortConfig, setSortConfig] = useState<{ key: keyof AdminProduct, direction: 'asc' | 'desc' } | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 5;
 
     // Filter by search term
     let filteredProducts = products.filter((p) =>
@@ -62,16 +61,10 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
         });
     }
 
-    // Reset page when filters/search change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm, filterCategory, filterStatus, filterStock]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
-    const paginatedProducts = filteredProducts.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
+    const { currentPage, setCurrentPage, totalPages, paginated: paginatedProducts } = usePagination(filteredProducts, {
+        itemsPerPage: 5,
+        resetDeps: [searchTerm, filterCategory, filterStatus, filterStock],
+    });
 
     const requestSort = (key: keyof AdminProduct) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -214,9 +207,7 @@ const ProductTable = ({ onEdit, searchTerm, filterCategory = '', filterStatus = 
             onActionClick={async () => {
                 if (!confirmDeleteId) return;
                 try {
-                    const session = await supabase.auth.getSession();
-                    const token = session.data.session?.access_token;
-                    if (!token) throw new Error('Token no disponible');
+                    const token = await getAuthToken();
                     await deleteProductApi(confirmDeleteId, token);
                     deleteProduct(confirmDeleteId);
                 } catch (err) {

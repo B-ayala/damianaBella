@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   X, RefreshCw, Home, Folder, FolderOpen, ChevronRight,
 } from 'lucide-react';
-import { supabase } from '../../../config/supabaseClient';
+import { getAuthToken } from '../../../utils/auth';
 import {
   fetchCloudinaryImages,
   fetchCloudinaryFolders,
@@ -29,8 +29,11 @@ const CloudinaryImagePicker = ({ open, onClose, onSelect }: CloudinaryImagePicke
   const [error, setError] = useState('');
 
   const getToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? '';
+    try {
+      return await getAuthToken();
+    } catch {
+      return '';
+    }
   };
 
   const loadFolders = useCallback(async (path: string) => {

@@ -7,8 +7,8 @@ import { useAuthStore } from '../../../store/authStore';
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock';
 import { getProductPricing } from '../../../utils/pricing';
 import { buildCloudinaryUrl } from '../../../utils/cloudinary';
-import { parseColorOption } from '../../../utils/constants';
 import { areUnitVariantSelectionsValid } from '../../../utils/productVariants';
+import { formatPrice, buildVariantLine } from '../../../utils/formatters';
 import AuthModal from '../auth/AuthModal';
 import PurchaseVariantModal from '../PurchaseVariantModal/PurchaseVariantModal';
 import './CartDrawer.css';
@@ -99,19 +99,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     continueToCheckout();
   };
 
-  const buildVariantLine = (variants: UnitVariants): string[] =>
-    Object.entries(variants).map(([name, value]) => {
-      const isColor = name.toLowerCase() === 'color';
-      const displayValue = isColor ? parseColorOption(value).name : value.toUpperCase();
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
-      return `${label} ${displayValue}`;
-    });
+  const buildVariantLines = (variants: UnitVariants): string[] =>
+    Object.entries(variants).map(([name, value]) => buildVariantLine(name, value));
 
   const groupUnitVariants = (unitVariants: UnitVariants[]): GroupedVariantRow[] => {
     const groupedRows = new Map<string, GroupedVariantRow>();
 
     unitVariants.forEach((variants) => {
-      const line = buildVariantLine(variants);
+      const line = buildVariantLines(variants);
 
       if (line.length === 0) {
         return;
@@ -284,7 +279,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                           </div>
                         )}
                         <div className="cart-drawer__item-summary cart-drawer__item-summary--inline">
-                          <span className="cart-drawer__item-price">${productSubtotal.toFixed(2)}</span>
+                          <span className="cart-drawer__item-price">{formatPrice(productSubtotal)}</span>
                         </div>
                       </div>
                     </div>
@@ -296,7 +291,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
             <div className="cart-drawer__footer">
               <div className="cart-drawer__total">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatPrice(total)}</span>
               </div>
               <button className="cart-drawer__clear" onClick={clearCart}>
                 Vaciar carrito

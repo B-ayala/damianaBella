@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, CircularProgress, IconButton, InputAdornment,
   Stack, TextField, Typography, Alert,
 } from '@mui/material';
 import { FiAlertCircle, FiCheckCircle, FiEye, FiEyeOff, FiLock } from 'react-icons/fi';
-import { supabase } from '../../../config/supabaseClient';
 import { resetPassword, changePassword } from '../../../services/userService';
+import { useAuthStore } from '../../../store/authStore';
 import { useInitialLoadTask } from '../../../components/common/InitialLoad/InitialLoadProvider';
 
 const cardSx = {
@@ -77,9 +77,12 @@ const labelSx = {
 
 const ResetPassword = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const currentUser = useAuthStore((s) => s.currentUser);
   // 'waiting' | 'recovery' (via email link) | 'change' (logged-in user) | 'success' | 'invalid' | 'error'
   const [status, setStatus] = useState<'waiting' | 'recovery' | 'change' | 'success' | 'invalid' | 'error'>('waiting');
   const [errorMessage, setErrorMessage] = useState('');
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -94,84 +97,28 @@ const ResetPassword = () => {
   useInitialLoadTask('route', status === 'waiting');
 
   useEffect(() => {
-    const initializeReset = async () => {
-      // Extract hash parameters (Supabase uses hash for OAuth flow)
-      const hash = window.location.hash.substring(1); // Remove the #
-      const params = new URLSearchParams(hash);
+    if (resolved.current) return;
 
-      const errorParam = params.get('error');
-      const errorCode = params.get('error_code');
-      const errorDescription = params.get('error_description');
-      const accessToken = params.get('access_token');
-      const type = params.get('type');
+    // Caso 1: link de recuperación con ?token=XXX
+    const token = searchParams.get('token');
+    if (token) {
+      resolved.current = true;
+      setRecoveryToken(token);
+      setStatus('recovery');
+      return;
+    }
 
-      console.log('🔍 ResetPassword Debug:', {
-        fullHash: window.location.hash,
-        hashParams: Object.fromEntries(params.entries()),
-        errorParam,
-        errorCode,
-        accessToken: accessToken ? '✓ present' : '✗ missing',
-        type,
-      });
+    // Caso 2: usuario logueado → cambio de contraseña
+    if (currentUser) {
+      resolved.current = true;
+      setStatus('change');
+      return;
+    }
 
-      // Case 1: Supabase returned an error (expired OTP, invalid token, etc.)
-      if (errorParam || errorCode) {
-        resolved.current = true;
-        setStatus('error');
-
-        // Map Supabase error codes to user-friendly messages
-        let message = 'El link de recuperación no es válido o ya expiró.';
-        if (errorCode === 'otp_expired') {
-          message = 'El link de recuperación ha expirado. Solicitá uno nuevo desde la pantalla de inicio de sesión.';
-        } else if (errorCode === 'otp_not_found' || errorCode === 'invalid_token') {
-          message = 'El link de recuperación es inválido. Solicitá uno nuevo desde la pantalla de inicio de sesión.';
-        } else if (errorDescription) {
-          message = decodeURIComponent(errorDescription);
-        }
-        setErrorMessage(message);
-        return;
-      }
-
-      // Case 2: Valid recovery link received (access_token + type=recovery)
-      if (accessToken && type === 'recovery') {
-        resolved.current = true;
-        setStatus('recovery');
-        return;
-      }
-
-      // Case 3: Check if user is already logged in (change password flow)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        resolved.current = true;
-        setStatus('change');
-        return;
-      }
-
-      // Case 4: No valid recovery token, not logged in, and no error
-      // Wait for onAuthStateChange event in case Supabase is still processing
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          resolved.current = true;
-          setStatus('recovery');
-          subscription.unsubscribe();
-        }
-      });
-
-      const timer = setTimeout(() => {
-        if (!resolved.current) {
-          setStatus('invalid');
-          subscription.unsubscribe();
-        }
-      }, 3000);
-
-      return () => {
-        subscription.unsubscribe();
-        clearTimeout(timer);
-      };
-    };
-
-    initializeReset();
-  }, []);
+    // Caso 3: ni token ni sesión → link inválido
+    resolved.current = true;
+    setStatus('invalid');
+  }, [searchParams, currentUser]);
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -193,7 +140,8 @@ const ResetPassword = () => {
       if (status === 'change') {
         await changePassword(currentPassword, newPassword);
       } else {
-        await resetPassword(newPassword);
+        if (!recoveryToken) throw new Error('Token de recuperación faltante');
+        await resetPassword(newPassword, recoveryToken);
       }
       setStatus('success');
     } catch (err) {

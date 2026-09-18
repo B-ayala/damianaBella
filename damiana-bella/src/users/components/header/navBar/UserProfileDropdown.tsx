@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { FiUser, FiLock, FiLogOut, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 import { Divider } from '@mui/material';
+import { useClickOutside } from '../../../../hooks/useClickOutside';
 import ChangePasswordModal from './ChangePasswordModal';
 import MyPurchasesModal from './MyPurchasesModal';
 import './UserProfileDropdown.css';
@@ -16,20 +17,8 @@ const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
   const [isPurchasesModalOpen, setIsPurchasesModalOpen] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isDropdownOpen]);
+  const closeDropdown = useCallback(() => setIsDropdownOpen(false), []);
+  useClickOutside(dropdownRef, closeDropdown, isDropdownOpen);
 
   const handleChangePasswordClick = () => {
     setIsDropdownOpen(false);
